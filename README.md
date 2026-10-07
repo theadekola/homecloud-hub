@@ -29,6 +29,16 @@ sudo bash /tmp/homecloud-install.sh
 
 The installer detects the VM IP automatically and prints `http://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
+### Get your setup code and register
+
+The installer prints `First-use setup code:` in the Ubuntu terminal. If you missed it, run this command **on the Ubuntu VM where HomeCloud is installed**:
+
+```sh
+sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
+```
+
+The output looks like `SETUP_TOKEN=your-setup-code`. Copy **only the value after `=`** into the **Setup code** field. Do not copy `SETUP_TOKEN=`. Enter your name, email, password and matching confirmation, then click **Register owner account**. Sign in with your new account afterward. Keep the setup code private; registration closes after the first account is created.
+
 For Proxmox, sign in as the owner and open **Proxmox → Add / Edit Cluster**. Test and save the cluster's host, API port, API token and TLS settings directly in the app. Nodes and guests are discovered automatically. The app supports one active cluster; credentials are encrypted on the server.
 
 For a manual installation:

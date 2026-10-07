@@ -23,6 +23,14 @@ For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 
 
 Save the **first-use setup code** printed during installation. Open HomeCloud, enter your name, email, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/homecloud-hub/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
 
+If you missed the setup code in the installation output, retrieve it **on the Ubuntu VM where HomeCloud is installed**:
+
+```sh
+sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
+```
+
+The output looks like `SETUP_TOKEN=your-setup-code`. Copy **only the value after `=`** into the registration screen's **Setup code** field, without the `SETUP_TOKEN=` prefix. Fill in your name, email, password and matching confirmation, then click **Register owner account**. Sign in with the new account afterward. Keep the setup code private.
+
 Application files live in `/opt/homecloud-hub`; integration credentials are configured in its `.env` or the Proxmox form. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
 
 ```sh

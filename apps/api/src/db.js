@@ -1,5 +1,4 @@
 import pg from 'pg';
-import bcrypt from 'bcryptjs';
 const { Pool } = pg;
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -57,17 +56,4 @@ export async function migrate() {
     );
   `);
 
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
-  if (!email || !password) throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required');
-  const found = await pool.query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
-  if (!found.rowCount) {
-    const hash = await bcrypt.hash(password, 12);
-    await pool.query(
-      `INSERT INTO users(email,name,password_hash,role,status)
-       VALUES($1,$2,$3,'owner','active')`,
-      [email.toLowerCase(), 'HomeCloud Owner', hash]
-    );
-    console.log(`Seeded owner account: ${email}`);
-  }
 }

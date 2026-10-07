@@ -15,12 +15,16 @@ less /tmp/homecloud-install.sh
 sudo bash /tmp/homecloud-install.sh \
   --repo https://github.com/theadekola/homecloud-hub.git \
   --url http://YOUR-UBUNTU-IP \
-  --email admin@example.com
+  --port 8082
 ```
 
-For automatic HTTPS, use `--url https://homecloud.your-domain.example`, configure its DNS to point at the server, and make ports 80 and 443 reachable. The installer reserves these ports through Caddy; an existing web server using them must be reconfigured first. `--ref v3.0.0` optionally pins an existing Git tag. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
+Open `http://YOUR-UBUNTU-IP:8082` after installation. `--port` defaults to 8080 and maps the host port to Caddy's internal port 80, like `8082:80`. Use an unused host port if Nextcloud or another application already uses 8082. HTTPS uses `--https-port` (default 8443). These ports are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
 
-Save the generated administrator password printed during installation. Application files live in `/opt/homecloud-hub`; integration credentials are configured in its `.env`. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
+For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to HomeCloud's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.0.0` optionally pins an existing Git tag. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
+
+Save the **first-use setup code** printed during installation. Open HomeCloud, enter your name, email, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/homecloud-hub/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
+
+Application files live in `/opt/homecloud-hub`; integration credentials are configured in its `.env` or the Proxmox form. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
 
 ```sh
 sudo homecloud status
@@ -36,23 +40,29 @@ Updates pull the current branch with `git pull --ff-only`, rebuild and check con
 
 ### Manual deployment
 
-Install Docker Engine and the Compose plugin using https://docs.docker.com/engine/install/ubuntu/ . Copy this project to `/opt/homecloud-hub`. Run `sh deployment/generate-secrets.sh` once, then edit `.env`. Keep its generated passwords and JWT secrets. Set `ADMIN_EMAIL` before first start; bootstrap creates the owner only if that email does not exist.
+Install Docker Engine and the Compose plugin using https://docs.docker.com/engine/install/ubuntu/ . Copy this project to `/opt/homecloud-hub`. Run `sh deployment/generate-secrets.sh` once, then edit `.env`. Keep its generated database password, JWT secrets and setup code. The first owner registers in the browser; `ADMIN_EMAIL` and `ADMIN_PASSWORD` are no longer used. Existing database accounts remain intact when updating.
 
 For initial private LAN testing:
 
 ```env
 DOMAIN=:80
-WEB_ORIGIN=http://YOUR-UBUNTU-IP
+WEB_PORT=8082
+HTTPS_PORT=8443
+WEB_ORIGIN=http://YOUR-UBUNTU-IP:8082
 ```
 
 For HTTPS, configure DNS and a real hostname with Caddy:
 
 ```env
 DOMAIN=homecloud.your-domain.example
+WEB_PORT=80
+HTTPS_PORT=443
 WEB_ORIGIN=https://homecloud.your-domain.example
 ```
 
 Use HTTPS or a trusted private access tunnel for credentials. Do not expose privileged connectors directly to the internet.
+
+To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=8082` and `WEB_ORIGIN=http://YOUR-UBUNTU-IP:8082`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
 
 ```sh
 docker compose up -d --build

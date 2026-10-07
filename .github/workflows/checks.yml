@@ -32,8 +32,10 @@ jobs:
       - name: Build and start the deployment
         run: |
           sh deployment/generate-secrets.sh > /dev/null
+          sed -i 's/^WEB_PORT=.*/WEB_PORT=8082/;s|^WEB_ORIGIN=.*|WEB_ORIGIN=http://localhost:8082|' .env
           docker compose up -d --build --wait --wait-timeout 180
-          curl --fail http://localhost/api/health
+          curl --fail http://localhost:8082/api/health
+          node deployment/check-registration.mjs
       - name: Deployment logs and cleanup
         if: always()
         run: |

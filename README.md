@@ -24,10 +24,10 @@ sudo apt-get update
 sudo apt-get install -y curl
 curl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/install.sh -o /tmp/homecloud-install.sh
 less /tmp/homecloud-install.sh
-sudo bash /tmp/homecloud-install.sh --repo https://github.com/theadekola/homecloud-hub.git --url http://YOUR-UBUNTU-IP --email admin@example.com
+sudo bash /tmp/homecloud-install.sh --repo https://github.com/theadekola/homecloud-hub.git --url http://YOUR-UBUNTU-IP --port 8082
 ```
 
-Replace the IP and email. Save the generated password. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
+Replace the IP and choose an unused port. Open `http://YOUR-UBUNTU-IP:8082` and register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
 For Proxmox, sign in as the owner and open **Proxmox → Add / Edit Cluster**. Test and save the cluster's host, API port, API token and TLS settings directly in the app. Nodes and guests are discovered automatically. The app supports one active cluster; credentials are encrypted on the server.
 
@@ -38,7 +38,7 @@ Install Docker Engine and the Compose plugin on Ubuntu, then:
 ```sh
 cd /opt/homecloud-hub
 sh deployment/generate-secrets.sh
-# Set your URL, admin email and integration credentials in .env.
+# Set your URL, WEB_PORT and integration credentials in .env.
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail=100 api

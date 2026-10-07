@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import { setupStatus,registerOwner } from './setup.js';
 import { clusterStore,clusterConfig,publicCluster,validateCluster } from './cluster-config.js';
 import { pool } from './db.js';
 import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } from './security.js';
@@ -19,6 +20,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'512kb'}));
  app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false}));
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
+ app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
+ app.post('/api/auth/register',loginLimiter,async(req,res)=>{
+   const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
+ });
  app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:'3.0.0',time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
    const email=required(req.body.email,'Email'),password=required(req.body.password,'Password');

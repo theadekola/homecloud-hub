@@ -12,9 +12,9 @@ services:
     environment:
       DOMAIN: ${DOMAIN:-:80}
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${WEB_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
     volumes:
       - ./deployment/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

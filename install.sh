@@ -3,14 +3,14 @@ set -Eeuo pipefail
 umask 077
 fail() { echo "Error: $*" >&2; exit 1; }
 usage() {
-  echo 'Usage: sudo bash install.sh --repo https://github.com/OWNER/REPO.git [--ref BRANCH_OR_TAG] --url http://SERVER-IP [--email admin@example.com]'
+  echo 'Usage: sudo bash install.sh --repo https://github.com/OWNER/REPO.git [--ref BRANCH_OR_TAG] --url http://SERVER-IP [--port 8080] [--https-port 8443]'
 }
-repo='' ref='' url='' email='admin@homecloud.local'
+repo='' ref='' url='' web_port=8080 https_port=8443
 while (($#)); do
   case "$1" in
-    --repo|--ref|--url|--email)
+    --repo|--ref|--url|--port|--https-port)
       (($# >= 2)) || fail "Missing value for $1"
-      case "$1" in --repo) repo=$2;; --ref) ref=$2;; --url) url=$2;; --email) email=$2;; esac
+      case "$1" in --repo) repo=$2;; --ref) ref=$2;; --url) url=$2;; --port) web_port=$2;; --https-port) https_port=$2;; esac
       shift 2;;
     -h|--help) usage; exit 0;;
     *) usage; fail "Unknown option: $1";;
@@ -18,7 +18,10 @@ while (($#)); do
 done
 [[ $repo =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$ ]] || fail 'Supply a public GitHub HTTPS repository with --repo.'
 [[ $url =~ ^https?://[A-Za-z0-9.-]+$ ]] || fail '--url must be http://SERVER-IP or https://hostname without a port or path.'
-[[ $email =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$ ]] || fail 'Invalid administrator email.'
+for selected_port in "$web_port" "$https_port"; do
+  [[ $selected_port =~ ^[1-9][0-9]{0,4}$ ]] && ((selected_port <= 65535)) || fail 'Ports must be between 1 and 65535.'
+done
+[[ $web_port != "$https_port" ]] || fail 'HTTP and HTTPS ports must differ.'
 [[ -z $ref || $ref != -* ]] || fail 'Invalid Git ref.'
 [[ $EUID == 0 ]] || fail 'Run with sudo bash install.sh ...'
 source /etc/os-release
@@ -61,8 +64,11 @@ cd "$stage/source"
 [[ -f docker-compose.yml && -f deployment/homecloud && -f deployment/homecloud-hub.service && -f .env.example ]] || fail 'Repository does not contain the HomeCloud Hub installation files.'
 sh deployment/generate-secrets.sh
 domain=':80'
-if [[ $url == https://* ]]; then domain=${url#https://}; fi
-sed -i "s|^DOMAIN=.*|DOMAIN=$domain|;s|^WEB_ORIGIN=.*|WEB_ORIGIN=$url|;s|^ADMIN_EMAIL=.*|ADMIN_EMAIL=$email|" .env
+if [[ $url == https://* ]]; then
+  domain=${url#https://}
+  if [[ $https_port != 443 ]]; then url="$url:$https_port"; fi
+elif [[ $web_port != 80 ]]; then url="$url:$web_port"; fi
+sed -i "s|^DOMAIN=.*|DOMAIN=$domain|;s|^WEB_ORIGIN=.*|WEB_ORIGIN=$url|;s|^WEB_PORT=.*|WEB_PORT=$web_port|;s|^HTTPS_PORT=.*|HTTPS_PORT=$https_port|" .env
 docker compose config --quiet
 mv "$stage/source" /opt/homecloud-hub
 cd /opt/homecloud-hub
@@ -72,5 +78,6 @@ docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now homecloud-hub.service
 echo "HomeCloud Hub installed at $url"
-echo "Administrator: $email (password shown above and stored in /opt/homecloud-hub/.env)"
+echo 'Open this URL and register your owner account using the setup code shown above.'
+echo 'Choose your name, email and password in the browser. Registration closes after the first account.'
 echo 'Configure integrations with sudo homecloud config, then sudo homecloud restart.'

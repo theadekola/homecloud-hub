@@ -14,6 +14,12 @@ case "$command" in
     [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Tracked files have local changes; commit or revert them before updating.' >&2; exit 1; }
     git symbolic-ref --quiet HEAD >/dev/null || { echo 'This installation is pinned to a ref. Check out the desired release manually before rebuilding.' >&2; exit 1; }
     git pull --ff-only
+    # Preserve original public ports when upgrading older installations.
+    grep -q '^WEB_PORT=' .env || echo 'WEB_PORT=80' >> .env
+    grep -q '^HTTPS_PORT=' .env || echo 'HTTPS_PORT=443' >> .env
+    if ! grep -q '^SETUP_TOKEN=' .env; then
+      printf '\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 16)" >> .env
+    fi
     docker compose config --quiet
     docker compose build --pull
     docker compose up -d --wait --wait-timeout 180

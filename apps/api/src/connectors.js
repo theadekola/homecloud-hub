@@ -65,9 +65,11 @@ export async function proxmoxSnapshot(){
   }));
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;
   const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryPercent:percent(r.mem,r.maxmem),uptime:r.uptime??null}));
+  let clusterStatus=[];
+  try{clusterStatus=await pve('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();
   const guestInventory=await inspectGuests(guests('qemu'),pve,`${config.url}:${config.tokenId}`);
-  return {guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
+  return {clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
     storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.maxdisk==null?null:r.maxdisk-(r.disk||0),usage:percent(r.disk,r.maxdisk)}))};
 }
@@ -98,6 +100,12 @@ export async function proxmoxBackup(payload){
   return pve(`/nodes/${encodeURIComponent(node)}/vzdump`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({
     vmid:payload.vmid, storage:payload.storage, mode:payload.mode||'snapshot', compress:payload.compress||'zstd', 'notes-template':payload.notes||'HomeCloud Hub'
   })});
+}
+
+export async function proxmoxCreateCt(payload,call=pve){
+  const vmid=await call('/cluster/nextid');
+  const body=form({vmid,hostname:payload.name,ostemplate:payload.ostemplate,cores:Number(payload.cores||2),memory:Number(payload.memory||1024),rootfs:`${payload.storage}:${Number(payload.disk||8)}`,net0:`name=eth0,bridge=${payload.bridge||'vmbr0'},ip=dhcp`,unprivileged:1,start:0,'ssh-public-keys':payload.sshKey||undefined});
+  return {vmid:String(vmid),task:await call(`/nodes/${encodeURIComponent(payload.node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
 }
 
 const dockerUrl=process.env.DOCKER_API_URL?.replace(/\/$/,'');

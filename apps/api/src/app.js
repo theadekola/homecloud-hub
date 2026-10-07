@@ -13,7 +13,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { pve,docker,proxmoxVmAction,proxmoxCreateVm,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune } from './connectors.js';
+import { pve,docker,proxmoxVmAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -92,7 +92,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:s.docker||inventory.reports.some(r=>r.status==='online')?inventory.resources.filter(r=>r.kind==='Docker container'&&r.status!=='stale').length:null,alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
- read('/proxmox',()=>snapshot('proxmox'));
+ read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
  read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.reports.length)return snapshot('docker');return {readOnly:true,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
  read('/truenas',()=>snapshot('truenas'));
@@ -119,6 +119,11 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    required(req.body.name,'Name');integer(req.body.cores||2,'Cores',1,128);integer(req.body.memory||4096,'Memory MB',128,1048576);integer(req.body.disk||40,'Disk GB',1,65536);return proxmoxCreateVm(req.body);
  });
  action('post','/proxmox/backup','operator','proxmox.backup',async req=>{required(req.body.storage,'Backup storage');integer(req.body.vmid,'VM ID',100);return {node:req.body.node,task:await proxmoxBackup(req.body)};});
+ action('post','/proxmox/ct','operator','proxmox.ct.create',req=>{
+   for(const key of ['name','node','ostemplate','storage'])required(req.body[key],key);
+   integer(req.body.cores||2,'Cores',1,128);integer(req.body.memory||1024,'Memory MB',128,1048576);integer(req.body.disk||8,'Disk GB',1,65536);
+   return proxmoxCreateCt(req.body);
+ });
  action('post','/docker/container','operator','docker.container.create',req=>dockerCreateContainer(req.body));
  read('/docker/container/:id/logs',async req=>({logs:await dockerLogs(req.params.id,Number(req.query.tail||200))}));
  action('post','/docker/prune/:kind','admin','docker.prune',req=>dockerPrune(req.params.kind),true);
@@ -153,6 +158,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  action('post','/restore/:id/run','admin','proxmox.restore',req=>restoreArchive(req.params.id,req.body),true);
  read('/tasks',()=>providerReads([['proxmox','proxmox',()=>pve('/cluster/tasks')],['truenas','truenas',()=>truenas('core.get_jobs',[[],{limit:100}])]]));
  read('/tasks/:node/:id',req=>pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/status`));
+ read('/tasks/:node/:id/log',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/log?limit=500`)}));
  action('post','/truenas/dataset','admin','truenas.dataset.create',req=>truenas('pool.dataset.create',[{name:required(req.body.name,'Dataset name'),type:'FILESYSTEM'}]));
  action('post','/truenas/snapshot','operator','truenas.snapshot.create',req=>truenas('pool.snapshot.create',[{dataset:required(req.body.dataset,'Dataset'),name:required(req.body.name,'Snapshot name'),recursive:false}]));
  action('delete','/truenas/snapshot/:id','admin','truenas.snapshot.delete',req=>truenas('pool.snapshot.delete',[req.params.id,{defer:false,recursive:false}]),true);

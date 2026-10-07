@@ -166,6 +166,10 @@ New installations enable it automatically. Sign in as the owner. The header Upda
 
 ### Automatic discovery and overview
 
+The Proxmox page has a compact cluster overview, live node charts, quorum and service readings, recent tasks and storage usage. Its time selector filters the recorded node history and provider tasks. Storage totals are sums of per-node entries; shared pools can appear more than once. No Ceph, HA or security health is inferred from node connectivity.
+
+Create VM allocates an empty virtual machine. Create CT requires an existing OS template volume and creates a stopped, unprivileged container with DHCP; supply a public SSH key for access. Creation requires the appropriate Proxmox allocation and storage permissions in addition to the application's operator role. Task IDs and logs report provider outcomes. Shell Access opens the Proxmox web console and requires a separate Proxmox login. Cluster Backup opens the real backup jobs and schedules rather than starting an implicit cluster-wide backup.
+
 Saving a Proxmox cluster starts automatic discovery of its nodes, VMs, LXC containers, storage and node services. No separate HomeCloud agent, enrollment key or per-guest HomeCloud installer is used.
 
 Running VMs with an existing QEMU guest agent can report services, installed packages and Docker containers through Proxmox. HomeCloud executes only fixed read-only inventory commands inside those guests and caches inventory for five minutes. Linux systemd/Debian package inventory and Windows service/installed-program inventory are supported. A missing guest agent or denied API permission is shown as an access limitation; inventory is not guessed from VM names. LXC internal applications and appliances still require access beyond the ordinary Proxmox resource API; their lifecycle, storage and resource measurements remain available.

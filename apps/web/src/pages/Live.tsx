@@ -1,5 +1,6 @@
 import Discovery,{downloadReport} from '../components/Discovery';
 import NewOverview from './Overview';
+import ProxmoxOverview from './Proxmox';
 import {useSearchParams} from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ClusterConnection } from '../components/ClusterConnection';
@@ -30,7 +31,7 @@ const field=(name:string,label:string,type='text',placeholder?:string):Field=>({
 const backupFields=[field('name','Job name'),field('node','Proxmox node'),field('vmid','VM/container IDs','text','101,102'),field('storage','Backup storage ID'),field('schedule','Proxmox calendar schedule','text','02:00 or sun 03:00'),{...field('retention','Retention','text','keep-last=7,keep-weekly=4'),required:false}];
 function State({error,loading}:{error?:string;loading?:boolean}){return <Card>{error?<p role="alert" className="login-error">{error}</p>:loading?<p>Loading live data…</p>:<p>No records returned by the connected provider.</p>}</Card>;}
 function Connections({services=[]}:{services?:any[]}){return <div className="live-connections">{services.filter(s=>s.status!=='not-configured').map(s=><div key={s.name} className="list-row"><b>{s.name}</b><Badge tone={s.status==='reachable'?'green':s.status==='not-configured'?'gray':'red'}>{s.status}</Badge>{s.error&&<span role="alert">{s.error}</span>}</div>)}</div>;}
-export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{title:string;subtitle:string;endpoint:string;views:View[];actions?:Action[];note?:string}){
+export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note,hideProviderErrors=false}:{title:string;subtitle:string;endpoint:string;views:View[];actions?:Action[];note?:string;hideProviderErrors?:boolean}){
  const [searchParams,setSearchParams]=useSearchParams();
  const {data,error,loading,refresh}=useApi<any>(endpoint,null);
  const {data:session}=useApi<any>('/auth/me',null);
@@ -49,7 +50,7 @@ export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{t
  return <><PageHeader title={title} subtitle={subtitle} actions={<><Button variant="secondary" disabled={loading||pending} onClick={refresh}>Refresh</Button>{actions.filter(allowed).map(a=><Button key={a.label} disabled={pending||data?.readOnly} onClick={()=>trigger(a)}>{a.label}</Button>)}</>}/>
  {data?.note&&<p className="muted">{data.note}</p>}{note&&<p className="muted">{note}</p>}{data?.sampledAt&&<p className="muted small">Last measurement: {new Date(data.sampledAt).toLocaleString()}</p>}
  <Connections services={data?.connectors||data?.services?.filter((s:any)=>s.provider)||data?.integrations}/>
- {data?.errors?.map((e:string)=><p key={e} className="login-error" role="alert">{e}</p>)}
+ {!hideProviderErrors&&data?.errors?.map((e:string)=><p key={e} className="login-error" role="alert">{e}</p>)}
  {failure&&<p role="alert" className="login-error">{failure}</p>}{message&&<p role="status">{message}</p>}
  {result&&<Card><details open><summary>Operation result</summary><pre className="live-output">{result.logs||JSON.stringify(result,null,2)}</pre></details></Card>}
  <Tabs items={views.map(v=>v.name)} active={view} onChange={setView}/>
@@ -60,13 +61,14 @@ export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{t
  </>;
 }
 const guestActions=(type:string)=>['start','shutdown','stop','reboot'].map(operation=>({label:operation,path:(r:any)=>`/actions/proxmox/${type}/${enc(r.id)}/${operation}`,body:(r:any)=>({node:r.node})}));
-export function Proxmox(){return <><ClusterConnection/><LiveTablePage title="Proxmox" subtitle="Live nodes, guests and storage from the Proxmox API." endpoint="/proxmox" views={[
+export function Proxmox(){return <ProxmoxOverview management={view=><ProxmoxManagement view={view}/>}/>;}
+function ProxmoxManagement({view}:{view:string}){return <LiveTablePage hideProviderErrors title={view} subtitle="Live Proxmox resources and actions." endpoint="/proxmox" views={[
  {name:'Nodes',key:'nodes',columns:['name','status','cpu','memoryPercent','cores','uptime']},
  {name:'Node Services',key:'nodeServices',columns:['node','name','status'],actions:['start','stop','restart'].map(operation=>({label:operation,role:'admin',path:(r:any)=>`/proxmox/node/${enc(r.node)}/service/${enc(r.service)}/${operation}`}))},
  {name:'Virtual Machines',key:'vms',columns:['id','name','node','status','cpu','memory','uptime'],actions:[...guestActions('vm'),{label:'Snapshot',path:(r:any)=>`/actions/proxmox/vm/${enc(r.id)}/snapshot`,body:(r:any)=>({node:r.node}),fields:[field('name','Snapshot name')]},{label:'Backup',path:'/proxmox/backup',body:(r:any)=>({node:r.node,vmid:r.id}),fields:[field('storage','Backup storage ID')]}]},
  {name:'LXC Containers',key:'lxc',columns:['id','name','node','status','cpu','memory'],actions:guestActions('lxc')},
  {name:'Storage',key:'storage',columns:['node','name','status','capacity','used','available','usage']}
- ]} actions={[{label:'Create VM',path:'/proxmox/vm',fields:[field('name','VM name'),field('node','Node'),field('storage','Disk storage ID'),field('cores','CPU cores','number'),field('memory','Memory MB','number'),field('disk','Disk GB','number'),field('bridge','Network bridge')]}]} note="VM creation allocates an empty guest. Install an OS using Proxmox or a template afterward. Lifecycle and backup operations may return asynchronous task IDs."/></>;}
+ ].filter(v=>v.name===view)} actions={view==='Virtual Machines'?[{label:'Create VM',path:'/proxmox/vm',fields:[field('name','VM name'),field('node','Node'),field('storage','Disk storage ID'),field('cores','CPU cores','number'),field('memory','Memory MB','number'),field('disk','Disk GB','number'),field('bridge','Network bridge')]}]:view==='LXC Containers'?[{label:'Create CT',path:'/proxmox/ct',fields:[field('name','Hostname'),field('node','Node'),field('ostemplate','Existing OS template volume','text','local:vztmpl/debian-12-standard.tar.zst'),field('storage','Root disk storage ID'),field('cores','CPU cores','number'),field('memory','Memory MB','number'),field('disk','Disk GB','number'),field('bridge','Network bridge'),{...field('sshKey','SSH public key'),required:false}]}]:[]} note={view==='Virtual Machines'?'Create VM allocates an empty guest. Install an OS through Proxmox afterward.':view==='LXC Containers'?'Create CT uses an existing template, creates an unprivileged container and leaves it stopped. Add a public SSH key for login.':undefined}/>;}
 export function Docker(){return <LiveTablePage title="Docker" subtitle="Live Docker Engine resources and existing Compose projects." endpoint="/docker" views={[
  {name:'Containers',key:'containers',columns:['name','image','status','ports','cpu','memory','statsError'],actions:[...['start','stop','restart','pause','unpause','remove'].map(operation=>({label:operation,path:(r:any)=>`/actions/docker/container/${enc(r.id)}/${operation}`})),{label:'Logs',method:'GET',path:(r:any)=>`/docker/container/${enc(r.id)}/logs`}]},
  {name:'Images',key:'images',columns:['name','size','created']},

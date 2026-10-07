@@ -14,6 +14,10 @@ const upstream=http.createServer(async(req,res)=>{
  const body=Object.fromEntries(new URLSearchParams(raw));requests.push({path:req.url,method:req.method,body});
  let data;
  if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
+ else if(req.url==='/api2/json/cluster/status')data=[{type:'cluster',name:'actual-cluster',quorate:1},{type:'node',name:'pve',ip:'192.0.2.10',online:1}];
+ else if(req.url==='/api2/json/cluster/nextid')data=104;
+ else if(req.url==='/api2/json/nodes/pve/lxc'&&req.method==='POST')data='UPID:create-ct';
+ else if(req.url==='/api2/json/nodes/pve/tasks/test-task/log?limit=500')data=[{n:1,t:'actual task log'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/services')data=[{name:'pveproxy',service:'pveproxy',state:'running','unit-state':'enabled'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/status')data={cpu:0.65,memory:{used:6,total:8},uptime:9000,cpuinfo:{cpus:8}};
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/qemu'&&req.method==='GET')data=[{vmid:102,name:'node-discovered-guest',status:'running',mem:2,maxmem:4}];
@@ -49,10 +53,17 @@ try{
    const missing=await call('/docker');assert.equal(missing.status,503);assert.match(missing.body.error,/not configured/);
  });
  await test('Proxmox metrics come from resource measurements',async()=>{
-   const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,42);assert.equal(result.nodes[0].memoryPercent,50);assert.equal(result.vms[0].name,'actual-guest');assert.equal(result.storage[0].usage,50);
+   const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,42);assert.equal(result.nodes[0].memoryPercent,50);assert.equal(result.vms[0].name,'actual-guest');assert.equal(result.storage[0].usage,50);assert.equal(result.clusterStatus[0].quorate,1);assert.equal(result.nodes[0].ip,'192.0.2.10');
  });
  await test('node status fills real measurements and discovers guests beyond cluster summaries',async()=>{nodeDetails=true;try{const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,65);assert.equal(result.nodes[0].memoryPercent,75);assert.equal(result.nodes[0].cores,8);assert.ok(result.vms.some(v=>v.id==='102'));assert.equal(result.lxc[0].id,'103');assert.equal(result.nodeServices[0].name,'pveproxy');}finally{nodeDetails=false;}});
  await test('node service actions enforce roles, confirmation and return the actual provider task',async()=>{const endpoint='/proxmox/node/pve/service/sshd/restart';assert.equal((await call(endpoint,'POST',{}, {'x-test-role':'operator'})).status,403);const challenge=await call(endpoint,'POST',{});assert.equal(challenge.status,409);const result=await call(endpoint,'POST',{}, {'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:service-task');});
+ await test('container creation enforces roles and validation, then returns the provider task',async()=>{
+   const body={name:'test-ct',node:'pve',ostemplate:'local:vztmpl/debian.tar.zst',storage:'local-lvm'};
+   assert.equal((await call('/proxmox/ct','POST',body,{'x-test-role':'viewer'})).status,403);
+   assert.equal((await call('/proxmox/ct','POST',{...body,disk:-1})).status,400);
+   const result=await call('/proxmox/ct','POST',body,{'x-test-role':'operator'});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:create-ct');assert.equal(result.body.result.vmid,'104');
+ });
+ await test('task log viewer returns actual provider log lines',async()=>{const result=await call('/tasks/pve/test-task/log');assert.equal(result.status,200);assert.deepEqual(result.body.logs,[{n:1,t:'actual task log'}]);});
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});
    assert.equal(response.status,200);const sent=requests.find(r=>r.path==='/api2/json/cluster/backup'&&r.method==='POST');assert.equal(sent.body.schedule,'02:00');assert.equal(sent.body['prune-backups'],'keep-last=7');

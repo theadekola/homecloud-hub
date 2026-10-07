@@ -7,6 +7,8 @@ import { Card, Modal } from './UI';
 export function ClusterConnection() {
  const {data:session}=useApi<any>('/auth/me',null);
  const owner=session?.user?.role==='owner';
+ const [copyMessage,setCopyMessage]=useState('');
+ const copyCaCommand=async()=>{try{await navigator.clipboard.writeText('cat /etc/pve/pve-root-ca.pem');setCopyMessage('Command copied.');}catch{setCopyMessage('Select and copy the command below.');}};
  const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]);
  const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const submit=async(event:any)=>{
@@ -31,6 +33,19 @@ export function ClusterConnection() {
  <label className="cluster-wide">API token secret<input name="tokenSecret" type="password" autoComplete="new-password" required placeholder="Enter token secret"/><small>Secrets are never returned to your browser. Re-enter the secret when editing.</small></label>
  <label className="cluster-toggle cluster-wide"><input name="verifyTls" type="checkbox" defaultChecked={cluster?.verifyTls!==false}/><ShieldCheck size={18}/> Verify SSL certificate</label>
  <label className="cluster-wide">Private CA certificate (optional)<textarea name="ca" rows={4} placeholder="-----BEGIN CERTIFICATE-----"/><small>{cluster?.hasCa?'A CA is already saved. Paste it again when saving edits.':'Paste the public PEM CA certificate if your cluster uses a private certificate authority.'}</small></label>
+ <details className="cluster-wide cluster-ca-help">
+ <summary>How to get your Proxmox CA certificate</summary>
+ <ol>
+ <li>In Proxmox, select your node, then open <strong>Shell</strong>.</li>
+ <li>Run this command on the <strong>Proxmox node</strong>, not the HomeCloud Ubuntu VM:
+ <div className="ca-command"><code>cat /etc/pve/pve-root-ca.pem</code><button type="button" className="btn secondary" onClick={copyCaCommand}>Copy command</button></div>
+ {copyMessage&&<small role="status">{copyMessage}</small>}</li>
+ <li>Copy the entire output, including <code>-----BEGIN CERTIFICATE-----</code> and <code>-----END CERTIFICATE-----</code>.</li>
+ <li>Paste it into the <strong>Private CA certificate</strong> field above. Keep <strong>Verify SSL certificate</strong> checked.</li>
+ <li>Click <strong>Test Connection</strong>, then <strong>Save &amp; Load Cluster</strong>.</li>
+ </ol>
+ <p>This applies to the default Proxmox cluster CA. A certificate from a trusted public authority usually needs no CA pasted here. The host must match the certificate's hostname or IP address.</p>
+ </details>
  <p className="muted cluster-wide">Connection details are encrypted on the server. A successful test confirms API access; permissions for management actions must also be granted in Proxmox.</p>
  {error&&<p role="alert" className="login-error cluster-wide">{error}</p>}{message&&<p role="status" className="cluster-wide">{message}</p>}
  {!!nodes.length&&<ul className="cluster-wide">{nodes.map(n=><li key={n.name}>{n.name} — {n.status||'Unknown'}</li>)}</ul>}

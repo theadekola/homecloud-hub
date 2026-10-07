@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useApi } from '../hooks';
 import { Card, Modal } from './UI';
 
-export function ClusterConnection({compact=false}:{compact?:boolean}) {
+export function ClusterConnection({compact=false,label='Cluster Settings',primary=false}:{compact?:boolean;label?:string;primary?:boolean}) {
  const {data:session}=useApi<any>('/auth/me',null);
  const owner=session?.user?.role==='owner';
  const [copyMessage,setCopyMessage]=useState('');
@@ -21,7 +21,7 @@ export function ClusterConnection({compact=false}:{compact?:boolean}) {
   }catch(e:any){setError(e.message);}finally{setBusy(false);}
  };
  if(!owner)return null;
- return <>{compact?<button className="btn secondary" disabled={busy} onClick={load}>Cluster Settings</button>:<Card className="cluster-connection"><div><h3><Server size={20}/> Cluster connection</h3><p>Connect a Proxmox cluster or standalone node. Its nodes and guests load automatically.</p><p className="muted">One active cluster is supported. Saving replaces the current Proxmox connection.</p></div><button className="btn primary" disabled={busy} onClick={load}>Add / Edit Cluster</button></Card>}
+ return <>{compact?<button className={`btn ${primary?'primary':'secondary'}`} disabled={busy} onClick={load}><Server size={15}/>{label}</button>:<Card className="cluster-connection"><div><h3><Server size={20}/> Cluster connection</h3><p>Connect a Proxmox cluster or standalone node. Its nodes and guests load automatically.</p><p className="muted">One active cluster is supported. Saving replaces the current Proxmox connection.</p></div><button className="btn primary" disabled={busy} onClick={load}>Add / Edit Cluster</button></Card>}
  {!open&&error&&<p role="alert" className="login-error">{error}</p>}{!open&&message&&<p role="status">{message}</p>}
  <Modal open={open} title={cluster?'Edit Cluster':'Add Cluster'} onClose={()=>!busy&&setOpen(false)}>
  <div className="cluster-provider"><Server size={22}/> Proxmox VE</div>

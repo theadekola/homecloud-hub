@@ -59,8 +59,10 @@ services:
     environment:
       DATA_DIR: /app/runtime
       PORT: "6000"
+      UPDATE_STATUS_DIR: /run/homecloud/updater
     volumes:
       - ./runtime:/app/runtime
+      - /var/lib/homecloud-updater:/run/homecloud/updater:ro
       - ./secrets/docker:/run/homecloud/docker:ro
       - ./secrets/ca:/run/homecloud/ca:ro
     healthcheck:

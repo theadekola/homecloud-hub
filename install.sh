@@ -80,6 +80,7 @@ mv "$stage/source" /opt/homecloud-hub
 cd /opt/homecloud-hub
 install -m 0755 deployment/homecloud /usr/local/bin/homecloud
 install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+bash deployment/setup-updater.sh
 docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now homecloud-hub.service

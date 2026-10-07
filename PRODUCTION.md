@@ -151,3 +151,14 @@ Only the server owner configures these endpoints. A successful HTTP response est
 Confirm real resources match each provider, exercise actions on a test guest/container/dataset, and inspect task outcomes. Disconnect a provider and verify its error is shown. Restart the stack and verify users, settings, alert rules and history persist.
 
 Back up the PostgreSQL volume, host `runtime/`, Caddy data, `.env` and connector certificates. Test restoration separately. The application uses `runtime/live-state.json`; legacy `state.json` demo records are deliberately not imported. No live infrastructure was tested by the local source checks.
+
+### Updates from the dashboard
+
+For an existing Ubuntu installation, run `sudo homecloud update` once, then run the following to enable the new update service (the previous CLI version may not install it automatically):
+
+```bash
+cd /opt/homecloud-hub
+sudo bash deployment/setup-updater.sh
+```
+
+New installations enable it automatically. Sign in as the owner. The header Update button replaces Sign out. An orange dot appears when the five-minute GitHub check finds a newer commit on the installed branch. Click Update to pull, rebuild and restart the deployment; the dashboard reconnects and reloads after completion. Database volumes, configuration and saved connections are retained. Other roles cannot trigger updates. Pinned releases require a manual update; local tracked changes block updates. Failures appear in the dashboard; inspect `sudo journalctl -u homecloud-updater -n 100` for details. No Docker socket is exposed to the API.

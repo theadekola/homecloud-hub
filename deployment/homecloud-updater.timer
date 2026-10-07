@@ -1,0 +1,10 @@
+[Unit]
+Description=Check HomeCloud Hub updates every five minutes
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

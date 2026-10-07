@@ -71,3 +71,14 @@ On Windows, if your environment prevents npm workspace links, run `npm install -
 Provider API versions and token permissions affect functionality. TrueNAS supports JSON-RPC and an explicit legacy WebSocket mode; incompatible methods surface errors. OPNsense interface fields vary by release. This is one connection per provider, not a multi-cluster inventory.
 
 No Compose file deployment, generic Docker-volume/database backup runner, network discovery, firewall-rule editor, email/Discord notifications, app two-factor login, automatic software updates, security scanner or invented health score is provided. Restore, prune and other sensitive actions require typed confirmation. Asynchronous tasks are reported as queued; provider task history shows their outcome.
+
+### Updates from the dashboard
+
+For an existing Ubuntu installation, run `sudo homecloud update` once, then run the following to enable the new update service (the previous CLI version may not install it automatically):
+
+```bash
+cd /opt/homecloud-hub
+sudo bash deployment/setup-updater.sh
+```
+
+New installations enable it automatically. Sign in as the owner. The header Update button replaces Sign out. An orange dot appears when the five-minute GitHub check finds a newer commit on the installed branch. Click Update to pull, rebuild and restart the deployment; the dashboard reconnects and reloads after completion. Database volumes, configuration and saved connections are retained. Other roles cannot trigger updates. Pinned releases require a manual update; local tracked changes block updates. Failures appear in the dashboard; inspect `sudo journalctl -u homecloud-updater -n 100` for details. No Docker socket is exposed to the API.

@@ -25,6 +25,7 @@ case "$command" in
     docker compose up -d --wait --wait-timeout 180
     install -m 0755 deployment/homecloud /usr/local/bin/homecloud
     install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+    bash deployment/setup-updater.sh
     systemctl daemon-reload
     ;;
   *) echo 'Usage: sudo homecloud {status|logs|start|stop|restart|config|update}';;

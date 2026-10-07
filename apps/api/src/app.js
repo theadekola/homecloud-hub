@@ -1,3 +1,4 @@
+import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -34,6 +35,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
  app.use('/api',authenticate);
+ app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
+ app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
  app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
  const testCluster=async input=>{
    const config=validateCluster(input);

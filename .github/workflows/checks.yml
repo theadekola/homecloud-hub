@@ -11,6 +11,9 @@ jobs:
       - name: Check Ubuntu shell syntax
         run: |
           bash -n install.sh
+          bash -n deployment/homecloud-updater
+          bash -n deployment/setup-updater.sh
+          bash deployment/test-updater.sh
           bash -n deployment/homecloud
           bash -n deployment/network.sh
           bash deployment/test-network.sh

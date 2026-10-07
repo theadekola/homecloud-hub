@@ -1,0 +1,9 @@
+[Unit]
+Description=HomeCloud Hub update checker and installer
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/homecloud-updater
+TimeoutStartSec=1800

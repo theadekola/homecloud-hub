@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+cd /opt/homecloud-hub
+exec 9>/run/homecloud-updater.lock
+flock -n 9 || exit 0
+mkdir -p runtime /var/lib/homecloud-updater
+current=$(git rev-parse HEAD)
+latest=$current
+available=false
+state=ready
+message='Up to date.'
+write_status() {
+  printf '{"current":"%s","latest":"%s","available":%s,"state":"%s","message":"%s","checkedAt":"%s"}\n' "$current" "$latest" "$available" "$state" "$message" "$(date -u +%FT%TZ)" > /var/lib/homecloud-updater/update-status.json.tmp
+  mv /var/lib/homecloud-updater/update-status.json.tmp /var/lib/homecloud-updater/update-status.json
+}
+trap 'rm -f runtime/update-request.json; state=failed; message="Update failed. Run sudo journalctl -u homecloud-updater -n 100 on Ubuntu."; write_status' ERR
+if ! git symbolic-ref --quiet HEAD >/dev/null; then
+  message='Pinned release: update manually on Ubuntu.'
+  rm -f runtime/update-request.json
+  write_status
+  exit 0
+fi
+git fetch --quiet origin
+latest=$(git rev-parse '@{upstream}')
+if [[ $current != "$latest" ]]; then available=true; message='A new update is available.'; fi
+if [[ -f runtime/update-request.json ]]; then
+  rm runtime/update-request.json
+  if [[ $available == true ]]; then
+    state=updating; message='Downloading and rebuilding. The dashboard will reconnect automatically.'; write_status
+    /usr/local/bin/homecloud update
+    current=$(git rev-parse HEAD)
+    available=false; state=completed; message='Update installed.'
+  fi
+fi
+write_status

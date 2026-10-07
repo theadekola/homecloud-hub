@@ -5,7 +5,7 @@ import {
   Search, Menu, Shield, HelpCircle, Moon, Cloud
 } from 'lucide-react';
 import { useState,useEffect } from 'react';
-import { clearTokens } from '../api';
+import UpdateButton from './UpdateButton';
 import { useApi,configureRefresh } from '../hooks';
 
 const sections = [
@@ -37,7 +37,7 @@ export default function Layout() {
     <div className="main-shell">
       <header className="topbar">
         <button className="icon-btn" onClick={()=>setCollapsed(v=>!v)}><Menu size={19}/></button>
-        <div className="top-actions"><button className="btn secondary" onClick={()=>{clearTokens();window.location.reload()}}>Sign out</button><div className="profile"><b>{session?.user?.name||'Signed in'}</b><span>{session?.user?.role||''}</span></div></div>
+        <div className="top-actions">{session?.user?.role==='owner' && <UpdateButton/>}<div className="profile"><b>{session?.user?.name||'Signed in'}</b><span>{session?.user?.role||''}</span></div></div>
       </header>
       <main className="content" key={location.pathname}><Outlet/></main>
     </div>

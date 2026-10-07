@@ -17,7 +17,8 @@ export function useApi<T>(path: string, initial: T) {
     const reset=()=>{window.clearInterval(timer);timer=window.setInterval(refresh,interval);};
     window.addEventListener('homecloud-refresh',reset);
     window.addEventListener('homecloud-settings',refresh);
-    return()=>{window.clearInterval(timer);window.removeEventListener('homecloud-refresh',reset);window.removeEventListener('homecloud-settings',refresh);};
+    window.addEventListener('homecloud-connection',refresh);
+    return()=>{window.clearInterval(timer);window.removeEventListener('homecloud-refresh',reset);window.removeEventListener('homecloud-settings',refresh);window.removeEventListener('homecloud-connection',refresh);};
   },[refresh]);
   return {data,setData,loading,error,refresh};
 }

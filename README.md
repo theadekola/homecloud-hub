@@ -29,6 +29,8 @@ sudo bash /tmp/homecloud-install.sh --repo https://github.com/theadekola/homeclo
 
 Replace the IP and email. Save the generated password. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
+For Proxmox, sign in as the owner and open **Proxmox → Add / Edit Cluster**. Test and save the cluster's host, API port, API token and TLS settings directly in the app. Nodes and guests are discovered automatically. The app supports one active cluster; credentials are encrypted on the server.
+
 For a manual installation:
 
 Install Docker Engine and the Compose plugin on Ubuntu, then:

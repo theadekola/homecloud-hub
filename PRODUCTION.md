@@ -62,6 +62,12 @@ docker compose logs --tail=100 api web caddy
 
 ## Proxmox
 
+The application owner can open **Proxmox → Add / Edit Cluster** to configure a connection without editing `.env`. Enter a cluster name, host/IP, port (usually 8006), API token ID (`user@realm!token-name`) and token secret. Keep SSL verification enabled and paste a public PEM CA certificate when using a private CA. Test Connection previews discovered nodes; Save & Load Cluster validates access again, saves the connection and refreshes the page without restarting the API. A standalone Proxmox server also works.
+
+One active Proxmox connection is supported. Saving replaces it and overrides the environment configuration. This form uses API tokens, not account passwords, SSH keys or automatic migration settings. Permissions for management actions must be assigned separately in Proxmox. Only owners can test, read or change connection settings. Secrets and the CA are never returned to the browser or written to audit details.
+
+Saved connection details are encrypted with AES-256-GCM in `runtime/proxmox-connection.json`, using a key derived from `JWT_SECRET`. Back up that file and the matching `.env`; changing `JWT_SECRET` requires reconfiguring the saved connection. Removing this file restores the `.env` connection after the next refresh. Monitoring history remains installation history across connection changes.
+
 Set `PROXMOX_URL`, `PROXMOX_TOKEN_ID` and `PROXMOX_TOKEN_SECRET`. Grant the token only required permissions. Reads generally require Sys.Audit, VM.Audit and Datastore.Audit; lifecycle/creation/backup/restore/prune need the corresponding VM and datastore privileges. Managing cluster backup schedules needs Sys.Modify. Check your Proxmox release's API permission requirements.
 
 Keep `PROXMOX_VERIFY_TLS=true`. For a private CA, put its PEM file in `secrets/ca/` and set `NODE_EXTRA_CA_CERTS=/run/homecloud/ca/your-ca.pem` in `.env`.

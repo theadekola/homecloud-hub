@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ClusterConnection } from '../components/ClusterConnection';
 import { AreaChart,Area,ResponsiveContainer,XAxis,YAxis,Tooltip } from 'recharts';
 import { useApi } from '../hooks';
 import { api,confirmedApi } from '../api';
@@ -54,12 +55,12 @@ export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{t
  </>;
 }
 const guestActions=(type:string)=>['start','shutdown','stop','reboot'].map(operation=>({label:operation,path:(r:any)=>`/actions/proxmox/${type}/${enc(r.id)}/${operation}`,body:(r:any)=>({node:r.node})}));
-export function Proxmox(){return <LiveTablePage title="Proxmox" subtitle="Live nodes, guests and storage from the Proxmox API." endpoint="/proxmox" views={[
+export function Proxmox(){return <><ClusterConnection/><LiveTablePage title="Proxmox" subtitle="Live nodes, guests and storage from the Proxmox API." endpoint="/proxmox" views={[
  {name:'Nodes',key:'nodes',columns:['name','status','cpu','memoryPercent','cores','uptime']},
  {name:'Virtual Machines',key:'vms',columns:['id','name','node','status','cpu','memory','uptime'],actions:[...guestActions('vm'),{label:'Snapshot',path:(r:any)=>`/actions/proxmox/vm/${enc(r.id)}/snapshot`,body:(r:any)=>({node:r.node}),fields:[field('name','Snapshot name')]},{label:'Backup',path:'/proxmox/backup',body:(r:any)=>({node:r.node,vmid:r.id}),fields:[field('storage','Backup storage ID')]}]},
  {name:'LXC Containers',key:'lxc',columns:['id','name','node','status','cpu','memory'],actions:guestActions('lxc')},
  {name:'Storage',key:'storage',columns:['node','name','status','capacity','used','available','usage']}
- ]} actions={[{label:'Create VM',path:'/proxmox/vm',fields:[field('name','VM name'),field('node','Node'),field('storage','Disk storage ID'),field('cores','CPU cores','number'),field('memory','Memory MB','number'),field('disk','Disk GB','number'),field('bridge','Network bridge')]}]} note="VM creation allocates an empty guest. Install an OS using Proxmox or a template afterward. Lifecycle and backup operations may return asynchronous task IDs."/>;}
+ ]} actions={[{label:'Create VM',path:'/proxmox/vm',fields:[field('name','VM name'),field('node','Node'),field('storage','Disk storage ID'),field('cores','CPU cores','number'),field('memory','Memory MB','number'),field('disk','Disk GB','number'),field('bridge','Network bridge')]}]} note="VM creation allocates an empty guest. Install an OS using Proxmox or a template afterward. Lifecycle and backup operations may return asynchronous task IDs."/></>;}
 export function Docker(){return <LiveTablePage title="Docker" subtitle="Live Docker Engine resources and existing Compose projects." endpoint="/docker" views={[
  {name:'Containers',key:'containers',columns:['name','image','status','ports','cpu','memory','statsError'],actions:[...['start','stop','restart','pause','unpause','remove'].map(operation=>({label:operation,path:(r:any)=>`/actions/docker/container/${enc(r.id)}/${operation}`})),{label:'Logs',method:'GET',path:(r:any)=>`/docker/container/${enc(r.id)}/logs`}]},
  {name:'Images',key:'images',columns:['name','size','created']},
@@ -129,7 +130,7 @@ export function Settings(){
  const save=async(e:any)=>{e.preventDefault();setPending(true);setFailure('');try{const values=Object.fromEntries(new FormData(e.currentTarget));await api('/settings',{method:'PUT',body:JSON.stringify(values)});setMessage('Settings saved.');refresh();window.dispatchEvent(new Event('homecloud-settings'));}catch(e:any){setFailure(e.message);}finally{setPending(false);}};
  return <><PageHeader title="Settings" subtitle="Application settings and real integration status."/>{error||!data?<State error={error} loading={loading}/>:<>
  <Card><form className="form-grid" onSubmit={save} key={JSON.stringify(data.settings)}><label>Site Name<input name="siteName" required defaultValue={data.settings.siteName}/></label><label>Description<input name="description" defaultValue={data.settings.description}/></label><label>Page refresh interval (seconds)<input name="refresh" type="number" min="15" max="300" defaultValue={data.settings.refresh}/></label><button type="submit" className="btn primary" disabled={pending||ranks[session?.user?.role]<40}>Save</button></form>{failure&&<p role="alert">{failure}</p>}{message&&<p role="status">{message}</p>}</Card>
- <Card><h3>Integrations</h3><Connections services={data.integrations}/><p>Configure URLs, credentials and certificate files in the server environment, then restart the API. Credentials are never sent to this page.</p></Card>
+ <Card><h3>Integrations</h3><Connections services={data.integrations}/><p>Owners can configure Proxmox through Add / Edit Cluster on the Proxmox page. Configure other integrations in the server environment, then restart the API. Saved credentials are never returned to this page.</p></Card>
  <Card><h3>Capabilities</h3><p>API monitoring polls every 30 seconds. Notifications appear in this app. Application two-factor login and automatic software updates are not implemented; use your deployment access controls.</p></Card>
  </>}</>;
 }

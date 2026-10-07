@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import { clusterStore,clusterConfig,publicCluster,validateCluster } from './cluster-config.js';
 import { pool } from './db.js';
 import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } from './security.js';
 import { writeAudit } from './audit.js';
@@ -28,6 +29,24 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
  app.use('/api',authenticate);
+ app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
+ const testCluster=async input=>{
+   const config=validateCluster(input);
+   try{const resources=await pve('/cluster/resources',{},config);
+     if(!Array.isArray(resources))throw new Error('Unexpected Proxmox response.');
+     return {config,nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))};
+   }catch{throw Object.assign(new Error('Cannot read the cluster. Check the host, API token permissions and TLS certificate.'),{status:502});}
+ };
+ app.post('/api/connections/proxmox/test',authorize('owner'),async(req,res)=>{const {nodes}=await testCluster(req.body);res.json({ok:true,nodes});});
+ app.put('/api/connections/proxmox',authorize('owner'),async(req,res)=>{
+   const {config,nodes}=await testCluster(req.body);clusterStore.save(config);await monitor.invalidate();
+   await audit(req,'connection.proxmox.save',config.name,{host:config.host,nodeCount:nodes.length},'success');
+   res.json({ok:true,cluster:publicCluster(config),nodes});
+ });
+ app.delete('/api/connections/proxmox',authorize('owner'),async(req,res)=>{
+   clusterStore.remove();await monitor.invalidate();await audit(req,'connection.proxmox.remove','proxmox',{},'success');
+   res.json({ok:true,cluster:publicCluster(clusterConfig())});
+ });
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{

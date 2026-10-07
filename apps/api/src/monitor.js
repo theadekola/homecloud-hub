@@ -54,6 +54,6 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
     })().finally(()=>{inFlight=null;});
     return inFlight;
   }
-  return {sample,invalidate:()=>{latest=null;}};
+  return {sample,invalidate:async()=>{latest=null;if(inFlight){await inFlight.catch(()=>{});latest=null;}}};
 }
 export const monitor=createMonitor();

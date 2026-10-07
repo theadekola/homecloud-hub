@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import https from 'node:https';
 import http from 'node:http';
+import { clusterConfig } from './cluster-config.js';
 
 // Per-connection TLS settings; never disable certificate checks globally.
 export function request(url, init={}, tls={}) {
@@ -25,21 +26,18 @@ export function request(url, init={}, tls={}) {
   });
 }
 
-const pveUrl=process.env.PROXMOX_URL?.replace(/\/$/,'');
-const pveTokenId=process.env.PROXMOX_TOKEN_ID;
-const pveSecret=process.env.PROXMOX_TOKEN_SECRET;
-
-export async function pve(path, init={}){
+export async function pve(path, init={}, config=clusterConfig()){
+  const {url:pveUrl,tokenId:pveTokenId,tokenSecret:pveSecret}=config;
   if(!pveUrl||!pveTokenId||!pveSecret) throw Object.assign(new Error('Proxmox is not configured'),{status:503});
   const headers={Authorization:`PVEAPIToken=${pveTokenId}=${pveSecret}`,...(init.headers||{})};
-  const res=await request(`${pveUrl}/api2/json${path}`,{...init,headers},{rejectUnauthorized:process.env.PROXMOX_VERIFY_TLS!=='false'});
+  const res=await request(`${pveUrl}/api2/json${path}`,{...init,headers},{rejectUnauthorized:config.verifyTls, ...(config.ca?{ca:config.ca}:{})});
   const body=await res.json().catch(()=>({}));
   if(!res.ok) throw Object.assign(new Error(body?.errors?JSON.stringify(body.errors):`Proxmox HTTP ${res.status}`),{status:502});
   return body.data;
 }
 const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]));
 
-export function proxmoxConfigured(){return !!(pveUrl&&pveTokenId&&pveSecret)}
+export function proxmoxConfigured(){const c=clusterConfig();return !!(c.url&&c.tokenId&&c.tokenSecret)}
 export async function proxmoxSnapshot(){
   const resources=await pve('/cluster/resources');
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;

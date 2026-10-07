@@ -19,7 +19,7 @@ test('discovery accepts enrolled reports, records software and marks old reports
 });
 test('discovery enrollment is owner-only and reports do not accept session tokens',async()=>{
  const {createApp}=await import('../src/app.js');const {requireRole}=await import('../src/security.js');
- const server=createApp({authenticate:(req,res,next)=>{req.user={role:req.headers['x-role']||'viewer'};next();},authorize:requireRole,audit:async()=>{},monitor:{invalidate:async()=>{}},db:{}}).listen(0,'127.0.0.1');
+ const server=createApp({authenticate:(req,res,next)=>{req.user={role:req.headers['x-role']||'viewer'};next();},authorize:requireRole,audit:async()=>{},monitor:{invalidate:async()=>{},sample:async()=>({services:[]})},db:{}}).listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
- try{assert.equal((await fetch(base+'/discovery/enrollment')).status,403);assert.equal((await fetch(base+'/discovery/enrollment',{headers:{'x-role':'owner'}})).status,200);assert.equal((await fetch(base+'/discovery/report',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);}finally{await new Promise(resolve=>server.close(resolve));}
+ try{const docker=await (await fetch(base+'/docker')).json();assert.equal(docker.readOnly,true);assert.equal(docker.containers[0].name,'nextcloud');assert.equal(docker.containers[0].status,'stale');assert.equal((await fetch(base+'/discovery/enrollment')).status,403);assert.equal((await fetch(base+'/discovery/enrollment',{headers:{'x-role':'owner'}})).status,200);assert.equal((await fetch(base+'/discovery/report',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);}finally{await new Promise(resolve=>server.close(resolve));}
 });

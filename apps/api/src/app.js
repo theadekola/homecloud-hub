@@ -96,7 +96,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',()=>snapshot('proxmox'));
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
- read('/docker',()=>snapshot('docker'));
+ read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered({});if(!inventory.reports.length)return snapshot('docker');return {readOnly:true,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Agent inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));
  read('/vpn',()=>snapshot('tailscale'));

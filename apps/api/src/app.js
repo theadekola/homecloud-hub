@@ -93,6 +93,13 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
+ read('/proxmox/node/:node/details',async req=>{const result={node:req.params.node,errors:[]};await Promise.all(['status','version','config'].map(async key=>{try{result[key]=await pve(`/nodes/${encode(req.params.node)}/${key}`);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));return result;});
+ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/syslog?limit=200`)}));
+ action('post','/proxmox/node/:node/power/:operation','admin','proxmox.node.power',async req=>{
+   if(!['reboot','shutdown'].includes(req.params.operation))throw httpError('Unsupported node power action');
+   await pveWrite(`/nodes/${encode(req.params.node)}/status`,'POST',{command:req.params.operation});
+   return {node:req.params.node,operation:req.params.operation,message:'Power command submitted to Proxmox. Watch node status for the outcome.'};
+ },true);
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
  read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.reports.length)return snapshot('docker');return {readOnly:true,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
  read('/truenas',()=>snapshot('truenas'));

@@ -166,6 +166,10 @@ New installations enable it automatically. Sign in as the owner. The header Upda
 
 ### Automatic discovery and overview
 
+The Nodes tab supports search, status and membership filters, sorting, list/grid views and per-node details. Node CPU, memory and storage charts use collected readings, with gaps for unknown values. Proxmox cluster members are peers; the app does not infer master/worker roles. The common uptime displayed is the shortest uptime of all online members, not a claim about historical cluster availability.
+
+Node reboot and shutdown require the application's admin/owner role, typed confirmation and Proxmox Sys.PowerMgmt permissions. Service operations require Sys.Modify; system logs require Sys.Syslog. Node configuration is read through the API; editing and shell access open the Proxmox console. Add Node guides the user through Proxmox's authenticated cluster join workflow, then refreshes discovery. The app never changes cluster membership implicitly.
+
 The Proxmox page has a compact cluster overview, live node charts, quorum and service readings, recent tasks and storage usage. Its time selector filters the recorded node history and provider tasks. Storage totals are sums of per-node entries; shared pools can appear more than once. No Ceph, HA or security health is inferred from node connectivity.
 
 Create VM allocates an empty virtual machine. Create CT requires an existing OS template volume and creates a stopped, unprivileged container with DHCP; supply a public SSH key for access. Creation requires the appropriate Proxmox allocation and storage permissions in addition to the application's operator role. Task IDs and logs report provider outcomes. Shell Access opens the Proxmox web console and requires a separate Proxmox login. Cluster Backup opens the real backup jobs and schedules rather than starting an implicit cluster-wide backup.

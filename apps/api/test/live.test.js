@@ -18,6 +18,10 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/cluster/nextid')data=104;
  else if(req.url==='/api2/json/nodes/pve/lxc'&&req.method==='POST')data='UPID:create-ct';
  else if(req.url==='/api2/json/nodes/pve/tasks/test-task/log?limit=500')data=[{n:1,t:'actual task log'}];
+ else if(req.url==='/api2/json/nodes/pve/status'&&req.method==='POST')data=null;
+ else if(req.url==='/api2/json/nodes/pve/version')data={version:'test-version'};
+ else if(req.url==='/api2/json/nodes/pve/config')data={description:'Test node'};
+ else if(req.url==='/api2/json/nodes/pve/syslog?limit=200')data=[{n:1,t:'actual system log'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/services')data=[{name:'pveproxy',service:'pveproxy',state:'running','unit-state':'enabled'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/status')data={cpu:0.65,memory:{used:6,total:8},uptime:9000,cpuinfo:{cpus:8}};
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/qemu'&&req.method==='GET')data=[{vmid:102,name:'node-discovered-guest',status:'running',mem:2,maxmem:4}];
@@ -64,6 +68,16 @@ try{
    const result=await call('/proxmox/ct','POST',body,{'x-test-role':'operator'});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:create-ct');assert.equal(result.body.result.vmid,'104');
  });
  await test('task log viewer returns actual provider log lines',async()=>{const result=await call('/tasks/pve/test-task/log');assert.equal(result.status,200);assert.deepEqual(result.body.logs,[{n:1,t:'actual task log'}]);});
+ await test('node power commands require admin and payload-bound confirmation',async()=>{
+   const endpoint='/proxmox/node/pve/power/reboot';assert.equal((await call(endpoint,'POST',{}, {'x-test-role':'operator'})).status,403);
+   const challenge=await call(endpoint,'POST',{});assert.equal(challenge.status,409);
+   const result=await call(endpoint,'POST',{}, {'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(result.status,200);assert.equal(requests.at(-1).body.command,'reboot');assert.match(result.body.result.message,/submitted/);
+   const unsupported='/proxmox/node/pve/power/erase',bad=await call(unsupported,'POST',{});assert.equal((await call(unsupported,'POST',{}, {'X-HomeCloud-Confirm':bad.body.confirmationPhrase})).status,400);
+ });
+ await test('node detail and system log endpoints return actual readings and partial errors',async()=>{
+   const details=await call('/proxmox/node/pve/details');assert.equal(details.status,200);assert.equal(details.body.version.version,'test-version');assert.equal(details.body.config.description,'Test node');assert.ok(details.body.errors.some(e=>e.startsWith('status:')));
+   const logs=await call('/proxmox/node/pve/logs');assert.deepEqual(logs.body.logs,[{n:1,t:'actual system log'}]);
+ });
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});
    assert.equal(response.status,200);const sent=requests.find(r=>r.path==='/api2/json/cluster/backup'&&r.method==='POST');assert.equal(sent.body.schedule,'02:00');assert.equal(sent.body['prune-backups'],'keep-last=7');

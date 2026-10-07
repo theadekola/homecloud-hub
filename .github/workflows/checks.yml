@@ -29,3 +29,15 @@ jobs:
         working-directory: apps/web
       - run: npm run build --workspaces=false
         working-directory: apps/web
+      - name: Build and start the deployment
+        run: |
+          sh deployment/generate-secrets.sh > /dev/null
+          docker compose up -d --build --wait --wait-timeout 180
+          curl --fail http://localhost/api/health
+      - name: Deployment logs and cleanup
+        if: always()
+        run: |
+          if [ -f .env ]; then
+            docker compose logs --tail=100
+            docker compose down --volumes
+          fi

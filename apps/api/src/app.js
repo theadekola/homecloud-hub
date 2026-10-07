@@ -1,4 +1,4 @@
-import {authorizeDiscovery,recordReport,discoveryKey,discovered} from './discovery.js';
+import {discovered} from './discovery.js';
 import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
@@ -35,9 +35,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
- app.post('/api/discovery/report',(req,res)=>{if(!authorizeDiscovery(req.headers.authorization))return res.status(401).json({error:'Invalid discovery key'});recordReport(req.body);monitor.invalidate();res.status(202).json({ok:true});});
  app.use('/api',authenticate);
- app.get('/api/discovery/enrollment',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({key:discoveryKey()});});
 
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
@@ -89,14 +87,14 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    return response;
  };
  read('/discovery',async()=>discovered(await monitor.sample()));
- read('/dashboard',async()=>{
-   const s=await monitor.sample(),inventory=discovered(s);return {sampledAt:s.sampledAt,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,
+ read('/dashboard',async req=>{
+   const s=await monitor.sample(req.query.refresh==='1'),inventory=discovered(s);return {sampledAt:s.sampledAt,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:s.docker||inventory.reports.some(r=>r.status==='online')?inventory.resources.filter(r=>r.kind==='Docker container'&&r.status!=='stale').length:null,alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',()=>snapshot('proxmox'));
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
- read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered({});if(!inventory.reports.length)return snapshot('docker');return {readOnly:true,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Agent inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
+ read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.reports.length)return snapshot('docker');return {readOnly:true,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));
  read('/vpn',()=>snapshot('tailscale'));

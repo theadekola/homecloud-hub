@@ -1,4 +1,6 @@
 import Discovery,{downloadReport} from '../components/Discovery';
+import NewOverview from './Overview';
+import {useSearchParams} from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ClusterConnection } from '../components/ClusterConnection';
 import { AreaChart,Area,ResponsiveContainer,XAxis,YAxis,Tooltip } from 'recharts';
@@ -29,10 +31,12 @@ const backupFields=[field('name','Job name'),field('node','Proxmox node'),field(
 function State({error,loading}:{error?:string;loading?:boolean}){return <Card>{error?<p role="alert" className="login-error">{error}</p>:loading?<p>Loading live data…</p>:<p>No records returned by the connected provider.</p>}</Card>;}
 function Connections({services=[]}:{services?:any[]}){return <div className="live-connections">{services.filter(s=>s.status!=='not-configured').map(s=><div key={s.name} className="list-row"><b>{s.name}</b><Badge tone={s.status==='reachable'?'green':s.status==='not-configured'?'gray':'red'}>{s.status}</Badge>{s.error&&<span role="alert">{s.error}</span>}</div>)}</div>;}
 export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{title:string;subtitle:string;endpoint:string;views:View[];actions?:Action[];note?:string}){
+ const [searchParams,setSearchParams]=useSearchParams();
  const {data,error,loading,refresh}=useApi<any>(endpoint,null);
  const {data:session}=useApi<any>('/auth/me',null);
  const [view,setView]=useState(views[0].name),[dialog,setDialog]=useState<{action:Action;row:any}|null>(null),[pending,setPending]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState(''),[result,setResult]=useState<any>(null);
  const allowed=(a:Action)=>ranks[session?.user?.role]>=ranks[a.role||'operator'];
+ useEffect(()=>{const selected=actions.find(a=>a.label===searchParams.get('action'));if(selected&&session){if(allowed(selected))setDialog({action:selected,row:{}});else setFailure('Your role cannot perform this action.');setSearchParams({}, {replace:true});}},[searchParams.get('action'),session?.user?.role]);
  const execute=async(action:Action,row:any={},fields:any={})=>{
    setPending(true);setFailure('');setMessage('');setResult(null);
    try{const base=typeof action.body==='function'?action.body(row):action.body||{};const path=typeof action.path==='function'?action.path({...row,...fields}):action.path;
@@ -92,7 +96,7 @@ export function Vpn(){return <LiveTablePage title="Tailscale VPN" subtitle="Live
 export function Backups(){return <LiveTablePage title="Backups" subtitle="Proxmox backup jobs and real backup archives." endpoint="/backups" views={[
  {name:'Backup Jobs',key:'jobs',columns:['id','comment','node','vmid','storage','schedule','enabled','prune-backups'],actions:[{label:'Run',path:(r:any)=>`/backups/${enc(r.id)}/run`}]},
  {name:'Archives',key:'points',columns:['node','storage','volid','type','vmid','created','size','protected']}
- ]} actions={[{label:'Create Backup Job',role:'admin',path:'/backups',fields:backupFields}]} note="The Proxmox scheduler executes these jobs. A queued backup is not marked successful until Proxmox reports completion; task history is available on Monitoring."/>;}
+ ]} actions={[{label:'Run Backup',path:'/proxmox/backup',fields:[field('node','Node'),field('vmid','Guest ID'),field('storage','Backup storage ID')]},{label:'Create Backup Job',role:'admin',path:'/backups',fields:backupFields}]} note="The Proxmox scheduler executes these jobs. A queued backup is not marked successful until Proxmox reports completion; task history is available on Monitoring."/>;}
 export function Schedules(){return <LiveTablePage title="Schedules" subtitle="Schedules owned and executed by Proxmox and TrueNAS." endpoint="/schedules" views={[
  {name:'Proxmox Backups',key:'items',columns:['id','comment','node','vmid','schedule','next-run','enabled'],actions:[{label:'Toggle',role:'admin',path:(r:any)=>`/schedules/${enc(r.id)}/toggle`},{label:'Delete',role:'admin',method:'DELETE',path:(r:any)=>`/schedules/${enc(r.id)}`}]},
  {name:'TrueNAS Snapshots',key:'truenas',columns:['id','dataset','schedule','lifetime_value','lifetime_unit','enabled'],actions:[{label:'Toggle',role:'admin',path:(r:any)=>`/truenas/schedule/${enc(r.id)}/toggle`}]}
@@ -124,7 +128,7 @@ function Overview({monitoring=false}:{monitoring?:boolean}){
  {monitoring&&<LiveTablePage title="Provider Tasks" subtitle="Read actual backup, restore, maintenance and other task outcomes." endpoint="/tasks" views={[{name:'Proxmox Tasks',key:'proxmox',columns:['upid','node','type','id','starttime','endtime','status'],actions:[{label:'Status',role:'viewer',method:'GET',path:(r:any)=>`/tasks/${enc(r.node)}/${enc(r.upid)}`}]},{name:'TrueNAS Jobs',key:'truenas',columns:['id','method','state','progress','error']}]} />}
  </>;
 }
-export function Dashboard(){return <Overview/>;}
+export function Dashboard(){return <NewOverview/>;}
 export function Monitoring(){return <Overview monitoring/>;}
 export function Settings(){
  const {data,error,loading,refresh}=useApi<any>('/settings',null);const [message,setMessage]=useState(''),[failure,setFailure]=useState(''),[pending,setPending]=useState(false);

@@ -37,7 +37,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
       const measured=snapshot.proxmox?.nodes?.filter(n=>n.status==='online')||[];
       const mean=key=>{const values=measured.map(n=>n[key]).filter(v=>typeof v==='number');return values.length?Math.round(values.reduce((sum,v)=>sum+v,0)/values.length):null;};
       persistence.mutate(state=>{
-        state.metrics.push({time:snapshot.sampledAt,cpu:mean('cpu'),memory:mean('memory')});state.metrics=state.metrics.slice(-2880);
+        state.metrics.push({time:snapshot.sampledAt,cpu:mean('cpu'),memory:mean('memory'),nodes:measured.map(n=>({name:n.name,cpu:n.cpu,memory:n.memoryPercent})),storage:snapshot.proxmox?.storage||[]});state.metrics=state.metrics.slice(-2880);
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           const service=snapshot.services.find(s=>s.provider===existing.provider);

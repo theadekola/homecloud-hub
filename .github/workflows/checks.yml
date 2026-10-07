@@ -10,9 +10,6 @@ jobs:
           node-version: 20
       - name: Check Ubuntu shell syntax
         run: |
-          bash -n deployment/install-agent.sh
-          python3 -m py_compile deployment/node-agent.py
-          python3 deployment/test-node-agent.py
           bash -n install.sh
           bash -n deployment/homecloud-updater
           bash -n deployment/setup-updater.sh

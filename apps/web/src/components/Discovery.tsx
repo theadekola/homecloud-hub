@@ -1,0 +1,20 @@
+import {useState} from 'react';
+import {api} from '../api';
+import {useApi} from '../hooks';
+import {Card,Modal} from './UI';
+import {DataTable} from './DataTable';
+export function downloadReport(data:any){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download=`homecloud-report-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+export default function Discovery({resources=[],reports=[]}:{resources?:any[];reports?:any[]}){
+ const {data:session}=useApi<any>('/auth/me',null);
+ const [search,setSearch]=useState(''),[host,setHost]=useState(''),[open,setOpen]=useState(false),[key,setKey]=useState(''),[error,setError]=useState(''),[packages,setPackages]=useState(false);
+ const enroll=async()=>{setOpen(true);setError('');try{setKey((await api('/discovery/enrollment')).key);}catch(e:any){setError(e.message);}};
+ const rows=packages?reports.flatMap(h=>h.packages.map((p:any)=>({...p,id:`${h.id}:${p.name}`,host:h.hostname,status:h.status==='stale'?'stale':p.status,kind:'Installed package',source:'Discovery agent'}))):resources;
+ const filtered=rows.filter(r=>(!host||r.host===host)&&`${r.name} ${r.host} ${r.kind} ${r.image||''}`.toLowerCase().includes(search.toLowerCase()));
+ return <Card><div className="page-header"><div><h3>Discovered workloads and software</h3><p>Guests come from Proxmox. Host agents report installed packages, services and Docker containers automatically.</p></div>{session?.user?.role==='owner'&&<button className="btn secondary" onClick={enroll}>Connect discovery agent</button>}</div>
+ <div className="header-actions"><input aria-label="Search discovered software" placeholder="Search software or host" value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="Filter by host" value={host} onChange={e=>setHost(e.target.value)}><option value="">All hosts</option>{[...new Set(rows.map(r=>r.host))].sort().map(h=><option key={h}>{h}</option>)}</select><button className="btn secondary" onClick={()=>setPackages(v=>!v)}>{packages?'Show workloads':'Show installed packages'}</button><button className="btn secondary" onClick={()=>downloadReport({exportedAt:new Date().toISOString(),rows:filtered})}>Export report</button></div>
+ {filtered.length?<DataTable rows={filtered.slice(0,500)} columns={['name','host','kind','status','version','image','source'].map(k=>({key:k,label:k.charAt(0).toUpperCase()+k.slice(1)}))}/>:<p>No matching software reported. Connect an agent inside each Ubuntu/Debian host or guest to see its software.</p>}
+ {filtered.length>500&&<p>Showing the first 500 matches. Search to narrow the list; exports include all matches.</p>}
+ {reports.map(h=><p key={h.id} className="muted">{h.hostname}: {h.status} · Last report {new Date(h.receivedAt).toLocaleString()}{h.errors?.length?` · Collection errors: ${h.errors.join('; ')}`:''}</p>)}
+ <Modal open={open} title="Connect read-only discovery" onClose={()=>{setOpen(false);setKey('');}}><p>Run these commands inside each Ubuntu/Debian node, VM or LXC you want to inspect. The agent reports every 30 seconds and does not execute management commands.</p><pre className="live-output">{'sudo apt-get install -y curl python3\ncurl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/deployment/install-agent.sh -o /tmp/homecloud-agent-install.sh\nsudo bash /tmp/homecloud-agent-install.sh'}</pre><p>When prompted, enter this HomeCloud URL:</p><code>{window.location.origin}</code><p>Then paste this discovery key. Keep it private; it allows inventory reports to be submitted.</p>{error?<p role="alert">{error}</p>:<input aria-label="Discovery enrollment key" readOnly value={key} onFocus={e=>e.target.select()}/>}<p>Proxmox node access does not grant access to software inside guests. Install an agent inside each guest for that inventory. Appliances that cannot run this Linux agent still need their own API connection.</p></Modal>
+ </Card>;
+}

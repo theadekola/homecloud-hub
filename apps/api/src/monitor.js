@@ -33,7 +33,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         catch(error){snapshot.services.push({name,provider:name,status:'error',response:Date.now()-started,error:error.message});}
       }));
       try{snapshot.services.push(...await checkServices());}catch(e){snapshot.services.push({name:'Additional service configuration',status:'error',error:e.message});}
-      snapshot.hosts=[...(snapshot.proxmox?.nodes||[]).map(n=>({name:n.name,status:n.status})),...(snapshot.docker?[{name:snapshot.docker.host.hostname,status:'reachable'}]:[]),...(snapshot.truenas?[{name:snapshot.truenas.info.hostname,status:'reachable'}]:[])];
+      snapshot.hosts=[...(snapshot.proxmox?.nodes||[]).map(n=>({name:n.name,status:n.status,cpu:n.cpu,memoryPercent:n.memoryPercent,cores:n.cores,uptime:n.uptime})),...(snapshot.docker?[{name:snapshot.docker.host.hostname,status:'reachable'}]:[]),...(snapshot.truenas?[{name:snapshot.truenas.info.hostname,status:'reachable'}]:[])];
       const measured=snapshot.proxmox?.nodes?.filter(n=>n.status==='online')||[];
       const mean=key=>{const values=measured.map(n=>n[key]).filter(v=>typeof v==='number');return values.length?Math.round(values.reduce((sum,v)=>sum+v,0)/values.length):null;};
       persistence.mutate(state=>{

@@ -3,6 +3,7 @@ Description=Watch for owner-requested HomeCloud updates
 
 [Path]
 PathExists=/opt/homecloud-hub/runtime/update-request.json
+PathExists=/opt/homecloud-hub/runtime/update-check.json
 Unit=homecloud-updater.service
 
 [Install]

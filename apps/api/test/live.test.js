@@ -8,18 +8,23 @@ import path from 'node:path';
 process.env.JWT_SECRET='a'.repeat(64);
 process.env.JWT_REFRESH_SECRET='b'.repeat(64);
 process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-live-test-'));
-const requests=[];
+const requests=[];let nodeDetails=false;
 const upstream=http.createServer(async(req,res)=>{
  let raw='';for await(const chunk of req)raw+=chunk;
  const body=Object.fromEntries(new URLSearchParams(raw));requests.push({path:req.url,method:req.method,body});
  let data;
  if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
+ else if(nodeDetails&&req.url==='/api2/json/nodes/pve/services')data=[{name:'pveproxy',service:'pveproxy',state:'running','unit-state':'enabled'}];
+ else if(nodeDetails&&req.url==='/api2/json/nodes/pve/status')data={cpu:0.65,memory:{used:6,total:8},uptime:9000,cpuinfo:{cpus:8}};
+ else if(nodeDetails&&req.url==='/api2/json/nodes/pve/qemu'&&req.method==='GET')data=[{vmid:102,name:'node-discovered-guest',status:'running',mem:2,maxmem:4}];
+ else if(nodeDetails&&req.url==='/api2/json/nodes/pve/lxc')data=[{vmid:103,name:'actual-lxc',status:'running'}];
  else if(req.url==='/api2/json/cluster/backup'&&req.method==='GET')data=[{id:'job',comment:'Real job',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',enabled:1}];
  else if(req.url==='/api2/json/cluster/backup/job')data=req.method==='GET'?{id:'job',node:'pve',vmid:'101',storage:'backup',mode:'snapshot',enabled:1}:null;
  else if(req.url==='/api2/json/nodes')data=[{node:'pve',status:'online'}];
  else if(req.url==='/api2/json/nodes/pve/storage?content=backup')data=[{storage:'backup',active:1}];
  else if(req.url==='/api2/json/nodes/pve/storage/backup/content?content=backup')data=[{volid:'backup:backup/vzdump-qemu-101.vma.zst',subtype:'qemu',vmid:101,size:1234,ctime:1700000000}];
  else if(req.url==='/api2/json/cluster/backup'&&req.method==='POST')data=null;
+ else if(req.url==='/api2/json/nodes/pve/services/sshd/restart'&&req.method==='POST')data='UPID:service-task';
  else if(req.url.includes('/vzdump')||req.url==='/api2/json/nodes/pve/qemu'||req.url.includes('/prunebackups')||req.url.includes('/status/start'))data='UPID:real-task';
  else {res.statusCode=404;data=null;}
  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data}));
@@ -46,6 +51,8 @@ try{
  await test('Proxmox metrics come from resource measurements',async()=>{
    const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,42);assert.equal(result.nodes[0].memoryPercent,50);assert.equal(result.vms[0].name,'actual-guest');assert.equal(result.storage[0].usage,50);
  });
+ await test('node status fills real measurements and discovers guests beyond cluster summaries',async()=>{nodeDetails=true;try{const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,65);assert.equal(result.nodes[0].memoryPercent,75);assert.equal(result.nodes[0].cores,8);assert.ok(result.vms.some(v=>v.id==='102'));assert.equal(result.lxc[0].id,'103');assert.equal(result.nodeServices[0].name,'pveproxy');}finally{nodeDetails=false;}});
+ await test('node service actions enforce roles, confirmation and return the actual provider task',async()=>{const endpoint='/proxmox/node/pve/service/sshd/restart';assert.equal((await call(endpoint,'POST',{}, {'x-test-role':'operator'})).status,403);const challenge=await call(endpoint,'POST',{});assert.equal(challenge.status,409);const result=await call(endpoint,'POST',{}, {'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:service-task');});
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});
    assert.equal(response.status,200);const sent=requests.find(r=>r.path==='/api2/json/cluster/backup'&&r.method==='POST');assert.equal(sent.body.schedule,'02:00');assert.equal(sent.body['prune-backups'],'keep-last=7');

@@ -16,3 +16,5 @@ secrets/docker/*
 !secrets/docker/.gitkeep
 secrets/ca/*
 !secrets/ca/.gitkeep
+
+__pycache__/

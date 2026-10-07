@@ -40,9 +40,31 @@ const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==u
 export function proxmoxConfigured(){const c=clusterConfig();return !!(c.url&&c.tokenId&&c.tokenSecret)}
 export async function proxmoxSnapshot(){
   const resources=await pve('/cluster/resources');
+  const errors=[],nodeServices=[];
+  const nodes=resources.filter(r=>r.type==='node');
+  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
+    if(node.status!=='online')return;
+    const base=`/nodes/${encodeURIComponent(node.node)}`;
+    await Promise.all(['status','qemu','lxc','services'].map(async type=>{
+      try{const data=await pve(`${base}/${type}`);
+        if(type==='status'){
+          if(!data||Array.isArray(data))throw new Error('Unexpected node status response');
+          if(typeof data.cpu==='number')node.cpu=data.cpu;
+          if(data.memory){node.mem=data.memory.used;node.maxmem=data.memory.total;}
+          node.uptime=data.uptime??node.uptime;node.maxcpu=data.cpuinfo?.cpus??node.maxcpu;
+        }else if(type==='services'){
+          if(!Array.isArray(data))throw new Error('Unexpected service inventory response');
+          for(const service of data)if(service.name&&service['unit-state']!=='not-found')nodeServices.push({id:`${node.node}:${service.service||service.name}`,node:node.node,name:service.name,service:service.service||service.name,status:service.state||service['active-state']||'unknown'});
+        }else{
+          if(!Array.isArray(data))throw new Error('Unexpected guest inventory response');
+          for(const guest of data)if(guest.vmid!=null){const existing=resources.find(r=>r.type===type&&String(r.vmid)===String(guest.vmid));if(existing)Object.assign(existing,guest);else resources.push({...guest,type,node:node.node});}
+        }
+      }catch(e){errors.push(`${node.node} ${type}: ${e.message}`);}
+    }));
+  }));
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;
   const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryPercent:percent(r.mem,r.maxmem),uptime:r.uptime??null}));
-  return {nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
+  return {errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
     storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.maxdisk==null?null:r.maxdisk-(r.disk||0),usage:percent(r.disk,r.maxdisk)}))};
 }

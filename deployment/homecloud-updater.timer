@@ -3,7 +3,7 @@ Description=Check HomeCloud Hub updates every five minutes
 
 [Timer]
 OnBootSec=60
-OnUnitActiveSec=300
+OnUnitActiveSec=60
 Persistent=true
 
 [Install]

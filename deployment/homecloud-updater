@@ -4,6 +4,7 @@ cd /opt/homecloud-hub
 exec 9>/run/homecloud-updater.lock
 flock -n 9 || exit 0
 mkdir -p runtime /var/lib/homecloud-updater
+rm -f runtime/update-check.json
 current=$(git rev-parse HEAD)
 latest=$current
 available=false
@@ -20,7 +21,7 @@ if ! git symbolic-ref --quiet HEAD >/dev/null; then
   write_status
   exit 0
 fi
-git fetch --quiet origin
+timeout 90 git fetch --quiet origin
 latest=$(git rev-parse '@{upstream}')
 if [[ $current != "$latest" ]]; then available=true; message='A new update is available.'; fi
 if [[ -f runtime/update-request.json ]]; then

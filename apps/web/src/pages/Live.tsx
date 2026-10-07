@@ -1,3 +1,4 @@
+import Discovery,{downloadReport} from '../components/Discovery';
 import { useEffect, useState } from 'react';
 import { ClusterConnection } from '../components/ClusterConnection';
 import { AreaChart,Area,ResponsiveContainer,XAxis,YAxis,Tooltip } from 'recharts';
@@ -26,7 +27,7 @@ const labels:any={vmid:'Guest ID',id:'ID',cpu:'CPU',memory:'Memory',memoryPercen
 const field=(name:string,label:string,type='text',placeholder?:string):Field=>({name,label,type,required:true,placeholder});
 const backupFields=[field('name','Job name'),field('node','Proxmox node'),field('vmid','VM/container IDs','text','101,102'),field('storage','Backup storage ID'),field('schedule','Proxmox calendar schedule','text','02:00 or sun 03:00'),{...field('retention','Retention','text','keep-last=7,keep-weekly=4'),required:false}];
 function State({error,loading}:{error?:string;loading?:boolean}){return <Card>{error?<p role="alert" className="login-error">{error}</p>:loading?<p>Loading live data…</p>:<p>No records returned by the connected provider.</p>}</Card>;}
-function Connections({services=[]}:{services?:any[]}){return <div className="live-connections">{services.map(s=><div key={s.name} className="list-row"><b>{s.name}</b><Badge tone={s.status==='reachable'?'green':s.status==='not-configured'?'gray':'red'}>{s.status}</Badge>{s.error&&<span role="alert">{s.error}</span>}</div>)}</div>;}
+function Connections({services=[]}:{services?:any[]}){return <div className="live-connections">{services.filter(s=>s.status!=='not-configured').map(s=><div key={s.name} className="list-row"><b>{s.name}</b><Badge tone={s.status==='reachable'?'green':s.status==='not-configured'?'gray':'red'}>{s.status}</Badge>{s.error&&<span role="alert">{s.error}</span>}</div>)}</div>;}
 export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{title:string;subtitle:string;endpoint:string;views:View[];actions?:Action[];note?:string}){
  const {data,error,loading,refresh}=useApi<any>(endpoint,null);
  const {data:session}=useApi<any>('/auth/me',null);
@@ -57,6 +58,7 @@ export function LiveTablePage({title,subtitle,endpoint,views,actions=[],note}:{t
 const guestActions=(type:string)=>['start','shutdown','stop','reboot'].map(operation=>({label:operation,path:(r:any)=>`/actions/proxmox/${type}/${enc(r.id)}/${operation}`,body:(r:any)=>({node:r.node})}));
 export function Proxmox(){return <><ClusterConnection/><LiveTablePage title="Proxmox" subtitle="Live nodes, guests and storage from the Proxmox API." endpoint="/proxmox" views={[
  {name:'Nodes',key:'nodes',columns:['name','status','cpu','memoryPercent','cores','uptime']},
+ {name:'Node Services',key:'nodeServices',columns:['node','name','status'],actions:['start','stop','restart'].map(operation=>({label:operation,role:'admin',path:(r:any)=>`/proxmox/node/${enc(r.node)}/service/${enc(r.service)}/${operation}`}))},
  {name:'Virtual Machines',key:'vms',columns:['id','name','node','status','cpu','memory','uptime'],actions:[...guestActions('vm'),{label:'Snapshot',path:(r:any)=>`/actions/proxmox/vm/${enc(r.id)}/snapshot`,body:(r:any)=>({node:r.node}),fields:[field('name','Snapshot name')]},{label:'Backup',path:'/proxmox/backup',body:(r:any)=>({node:r.node,vmid:r.id}),fields:[field('storage','Backup storage ID')]}]},
  {name:'LXC Containers',key:'lxc',columns:['id','name','node','status','cpu','memory'],actions:guestActions('lxc')},
  {name:'Storage',key:'storage',columns:['node','name','status','capacity','used','available','usage']}
@@ -111,13 +113,13 @@ export function Users(){return <LiveTablePage title="Users" subtitle="Real appli
 export function Audit(){return <LiveTablePage title="Audit Logs" subtitle="The latest 500 recorded application actions, failures and submitted tasks." endpoint="/audit" views={[{name:'Events',key:'logs',columns:['time','user','action','resource','status','details','ip']}]} note="Queued means the provider accepted a task; check provider task history for its eventual outcome."/>;}
 function Overview({monitoring=false}:{monitoring?:boolean}){
  const {data,error,loading,refresh}=useApi<any>(monitoring?'/monitoring':'/dashboard',null);
- return <><PageHeader title={monitoring?'Monitoring':'Overview'} subtitle="Measurements from connected integrations. Unavailable values remain unknown." actions={<Button disabled={loading} onClick={refresh}>Refresh</Button>}/>
+ return <><PageHeader title={monitoring?'Monitoring':'Overview'} subtitle="Measurements from connected integrations. Unavailable values remain unknown." actions={<><Button disabled={loading} onClick={refresh}>Refresh</Button><Button variant="secondary" disabled={!data} onClick={()=>downloadReport(data)}>Export report</Button></>}/>
  {!data||error?<State error={error} loading={loading}/>:<>
  <p className="muted">Last sample: {new Date(data.sampledAt).toLocaleString()} · History starts when this installation collects data.</p>
  {!monitoring&&<div className="stats-grid six">{[['Servers',data.stats.servers],['VMs',data.stats.vms],['LXC',data.stats.lxc],['Containers',data.stats.containers],['Active Alerts',data.stats.alerts],['Reachable services',`${data.stats.connected}/${data.stats.configured}`]].map(([label,value])=><Stat key={String(label)} label={String(label)} value={value??'Unavailable'}/>)}</div>}
- <Card><h3>Integration and service connectivity</h3><Connections services={data.services}/></Card>
- <Card><h3>Proxmox node averages (%)</h3><p className="muted">Average of reporting online Proxmox nodes. Gaps indicate missing measurements.</p><div style={{height:260}}><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.metrics}><XAxis dataKey="time" tickFormatter={v=>new Date(v).toLocaleTimeString()}/><YAxis domain={[0,100]}/><Tooltip/><Area dataKey="cpu" stroke="#3b82f6" fill="#3b82f622" connectNulls={false}/><Area dataKey="memory" stroke="#8b5cf6" fill="#8b5cf622" connectNulls={false}/></AreaChart></ResponsiveContainer></div></Card>
- <Card><h3>Reported hosts</h3><DataTable rows={data.hosts} columns={[{key:'name',label:'Host'},{key:'status',label:'Reported status'}]}/></Card>
+ <Discovery resources={data.resources} reports={data.reports}/>{data.services?.length>0&&<Card><h3>Connected APIs and service checks</h3><Connections services={data.services}/></Card>}
+ <Card><h3>Proxmox node averages (%)</h3><p className="muted">Average of reporting online Proxmox nodes. Gaps indicate missing measurements.</p>{data.metrics.some((m:any)=>m.cpu!=null||m.memory!=null)?<div style={{height:260}}><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.metrics}><XAxis dataKey="time" tickFormatter={v=>new Date(v).toLocaleTimeString()}/><YAxis domain={[0,100]}/><Tooltip/><Area name="CPU %" dataKey="cpu" stroke="#3b82f6" fill="#3b82f622" connectNulls={false}/><Area name="Memory %" dataKey="memory" stroke="#8b5cf6" fill="#8b5cf622" connectNulls={false}/></AreaChart></ResponsiveContainer></div>:<p>No CPU or memory measurements received yet. Check the node status errors below and grant Sys.Audit on /nodes with propagation to both the Proxmox user and token.</p>}</Card>
+ <Card><h3>Reported hosts</h3><DataTable rows={data.hosts} columns={[{key:'name',label:'Host'},{key:'status',label:'Reported status'},...['cpu','memoryPercent','cores','uptime'].map(key=>({key,label:labels[key]||key,render:(r:any)=>display(key,r[key])}))]}/></Card>
  </>}
  {monitoring&&<LiveTablePage title="Provider Tasks" subtitle="Read actual backup, restore, maintenance and other task outcomes." endpoint="/tasks" views={[{name:'Proxmox Tasks',key:'proxmox',columns:['upid','node','type','id','starttime','endtime','status'],actions:[{label:'Status',role:'viewer',method:'GET',path:(r:any)=>`/tasks/${enc(r.node)}/${enc(r.upid)}`}]},{name:'TrueNAS Jobs',key:'truenas',columns:['id','method','state','progress','error']}]} />}
  </>;

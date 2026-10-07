@@ -1,3 +1,4 @@
+import {authorizeDiscovery,recordReport,discoveryKey,discovered} from './discovery.js';
 import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
@@ -18,7 +19,7 @@ import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createB
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
  const app=express();
  if(process.env.TRUST_PROXY)app.set('trust proxy',Number(process.env.TRUST_PROXY)||1);
- app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'512kb'}));
+ app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'2mb'}));
  app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false}));
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
@@ -34,8 +35,12 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
+ app.post('/api/discovery/report',(req,res)=>{if(!authorizeDiscovery(req.headers.authorization))return res.status(401).json({error:'Invalid discovery key'});recordReport(req.body);monitor.invalidate();res.status(202).json({ok:true});});
  app.use('/api',authenticate);
+ app.get('/api/discovery/enrollment',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({key:discoveryKey()});});
+
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
+ app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
  app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
  const testCluster=async input=>{
@@ -83,12 +88,14 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    }));
    return response;
  };
+ read('/discovery',async()=>discovered(await monitor.sample()));
  read('/dashboard',async()=>{
-   const s=await monitor.sample();return {sampledAt:s.sampledAt,services:s.services,hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,
-     stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:s.docker?.containers.length??null,alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
+   const s=await monitor.sample(),inventory=discovered(s);return {sampledAt:s.sampledAt,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,
+     stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:s.docker||inventory.reports.some(r=>r.status==='online')?inventory.resources.filter(r=>r.kind==='Docker container'&&r.status!=='stale').length:null,alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
- read('/monitoring',async()=>{const s=await monitor.sample();return {...s,proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
+ read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',()=>snapshot('proxmox'));
+ action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
  read('/docker',()=>snapshot('docker'));
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));

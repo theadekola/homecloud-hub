@@ -1,0 +1,31 @@
+name: Application and installer checks
+on: [push, pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check Ubuntu shell syntax
+        run: |
+          bash -n install.sh
+          bash -n deployment/homecloud
+          sh -n deployment/generate-secrets.sh
+          bash install.sh --help
+      - name: Check private secret generation
+        run: |
+          sh deployment/generate-secrets.sh
+          test "$(stat -c %a .env)" = 600
+          if sh deployment/generate-secrets.sh; then exit 1; fi
+          docker compose config --quiet
+          rm .env
+      - run: npm ci --workspaces=false
+        working-directory: apps/api
+      - run: npm test --workspaces=false
+        working-directory: apps/api
+      - run: npm ci --workspaces=false
+        working-directory: apps/web
+      - run: npm run build --workspaces=false
+        working-directory: apps/web

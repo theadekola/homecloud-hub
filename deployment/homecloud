@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ $EUID == 0 ]] || { echo 'Run sudo homecloud ...' >&2; exit 1; }
+cd /opt/homecloud-hub
+command=${1:-help}
+case "$command" in
+  status) docker compose ps;;
+  logs) docker compose logs --tail=100 -f;;
+  start) systemctl start homecloud-hub;;
+  stop) systemctl stop homecloud-hub;;
+  restart) docker compose up -d --wait --wait-timeout 180;;
+  config) "${EDITOR:-nano}" .env;;
+  update)
+    [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Tracked files have local changes; commit or revert them before updating.' >&2; exit 1; }
+    git symbolic-ref --quiet HEAD >/dev/null || { echo 'This installation is pinned to a ref. Check out the desired release manually before rebuilding.' >&2; exit 1; }
+    git pull --ff-only
+    docker compose config --quiet
+    docker compose build --pull
+    docker compose up -d --wait --wait-timeout 180
+    install -m 0755 deployment/homecloud /usr/local/bin/homecloud
+    install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+    systemctl daemon-reload
+    ;;
+  *) echo 'Usage: sudo homecloud {status|logs|start|stop|restart|config|update}';;
+esac

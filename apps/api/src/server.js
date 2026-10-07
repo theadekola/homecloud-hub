@@ -1,0 +1,10 @@
+import 'dotenv/config';
+import { migrate } from './db.js';
+import { createApp } from './app.js';
+import { monitor } from './monitor.js';
+await migrate();
+const server=createApp().listen(Number(process.env.PORT||4000),'0.0.0.0',()=>console.log('HomeCloud Hub live API listening'));
+const sample=()=>monitor.sample(true).catch(error=>console.error('Monitoring:',error.message));
+sample();
+const timer=setInterval(sample,30000);timer.unref();
+for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{clearInterval(timer);server.close(()=>process.exit(0));});

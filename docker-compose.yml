@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
     env_file: .env
     expose:
-      - "4000"
+      - "6000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,12 +58,13 @@ services:
       - edge
     environment:
       DATA_DIR: /app/runtime
+      PORT: "6000"
     volumes:
       - ./runtime:/app/runtime
       - ./secrets/docker:/run/homecloud/docker:ro
       - ./secrets/ca:/run/homecloud/ca:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5

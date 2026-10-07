@@ -4,5 +4,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src ./src
 RUN mkdir -p /app/runtime
-EXPOSE 4000
+ENV PORT=6000
+EXPOSE 6000
 CMD ["npm","start"]

@@ -3,9 +3,9 @@ set -Eeuo pipefail
 umask 077
 fail() { echo "Error: $*" >&2; exit 1; }
 usage() {
-  echo 'Usage: sudo bash install.sh --repo https://github.com/OWNER/REPO.git [--ref BRANCH_OR_TAG] --url http://SERVER-IP [--port 8080] [--https-port 8443]'
+  echo 'Usage: sudo bash install.sh [--repo https://github.com/OWNER/REPO.git] [--ref BRANCH_OR_TAG] [--url http://SERVER-IP] [--port 6002] [--https-port 8443]'
 }
-repo='' ref='' url='' web_port=8080 https_port=8443
+repo='https://github.com/theadekola/homecloud-hub.git' ref='' url='' web_port=6002 https_port=8443
 while (($#)); do
   case "$1" in
     --repo|--ref|--url|--port|--https-port)
@@ -17,7 +17,7 @@ while (($#)); do
   esac
 done
 [[ $repo =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$ ]] || fail 'Supply a public GitHub HTTPS repository with --repo.'
-[[ $url =~ ^https?://[A-Za-z0-9.-]+$ ]] || fail '--url must be http://SERVER-IP or https://hostname without a port or path.'
+[[ -z $url || $url =~ ^https?://[A-Za-z0-9.-]+$ ]] || fail '--url must be http://SERVER-IP or https://hostname without a port or path.'
 for selected_port in "$web_port" "$https_port"; do
   [[ $selected_port =~ ^[1-9][0-9]{0,4}$ ]] && ((selected_port <= 65535)) || fail 'Ports must be between 1 and 65535.'
 done
@@ -30,7 +30,7 @@ command -v systemctl >/dev/null || fail 'Ubuntu with systemd is required.'
 [[ ! -e /opt/homecloud-hub ]] || fail '/opt/homecloud-hub already exists. Use sudo homecloud update for an existing installation.'
 [[ ! -e /usr/local/bin/homecloud && ! -e /etc/systemd/system/homecloud-hub.service ]] || fail 'HomeCloud command or service already exists.'
 apt-get update
-apt-get install -y ca-certificates curl git openssl nano
+apt-get install -y ca-certificates curl git openssl nano iproute2
 if ! command -v docker >/dev/null; then
   for pkg in docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc; do
     if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
@@ -63,6 +63,12 @@ if [[ -n $ref ]]; then git -C "$stage/source" checkout --detach "$ref"; fi
 cd "$stage/source"
 [[ -f docker-compose.yml && -f deployment/homecloud && -f deployment/homecloud-hub.service && -f .env.example ]] || fail 'Repository does not contain the HomeCloud Hub installation files.'
 sh deployment/generate-secrets.sh
+if [[ -z $url ]]; then
+  source deployment/network.sh
+  vm_ip=$(detect_vm_ip) || fail 'Cannot detect the VM IPv4 address. Check its network connection or supply --url.'
+  url="http://$vm_ip"
+  echo "Detected VM IP: $vm_ip"
+fi
 domain=':80'
 if [[ $url == https://* ]]; then
   domain=${url#https://}

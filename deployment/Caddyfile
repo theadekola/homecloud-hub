@@ -3,7 +3,7 @@
 
   @api path /api/*
   handle @api {
-    reverse_proxy api:4000
+    reverse_proxy api:6000
   }
 
   handle {

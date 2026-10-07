@@ -12,13 +12,12 @@ sudo apt-get install -y curl
 curl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/install.sh -o /tmp/homecloud-install.sh
 # Inspect the downloaded installer before running it.
 less /tmp/homecloud-install.sh
-sudo bash /tmp/homecloud-install.sh \
-  --repo https://github.com/theadekola/homecloud-hub.git \
-  --url http://YOUR-UBUNTU-IP \
-  --port 8082
+sudo bash /tmp/homecloud-install.sh
 ```
 
-Open `http://YOUR-UBUNTU-IP:8082` after installation. `--port` defaults to 8080 and maps the host port to Caddy's internal port 80, like `8082:80`. Use an unused host port if Nextcloud or another application already uses 8082. HTTPS uses `--https-port` (default 8443). These ports are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
+The installer detects the VM's IPv4 source address from its default route and prints `http://DETECTED-IP:6002`. No IP or URL argument is required. If no default route is present, it selects a global address from a non-Docker interface; it stops if no usable address exists. `--url` remains available for a specific hostname or interface. Detection runs at installation time; a DHCP address change means you must use the VM's new address in your browser.
+
+The default web port is **6002**, mapped to Caddy's internal port 80. The API runs on **6000 inside Docker**, with requests proxied through the web port. The API port is not published to the host. Chromium browsers block port 6000 as an X11 port, so the browser never connects to it directly. `--port` overrides the web port if 6002 is occupied. HTTPS uses `--https-port` (default 8443). Public port settings are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
 
 For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to HomeCloud's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.0.0` optionally pins an existing Git tag. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
 
@@ -46,9 +45,9 @@ For initial private LAN testing:
 
 ```env
 DOMAIN=:80
-WEB_PORT=8082
+WEB_PORT=6002
 HTTPS_PORT=8443
-WEB_ORIGIN=http://YOUR-UBUNTU-IP:8082
+WEB_ORIGIN=http://YOUR-UBUNTU-IP:6002
 ```
 
 For HTTPS, configure DNS and a real hostname with Caddy:
@@ -62,7 +61,7 @@ WEB_ORIGIN=https://homecloud.your-domain.example
 
 Use HTTPS or a trusted private access tunnel for credentials. Do not expose privileged connectors directly to the internet.
 
-To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=8082` and `WEB_ORIGIN=http://YOUR-UBUNTU-IP:8082`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
+To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=6002` and `WEB_ORIGIN=http://YOUR-UBUNTU-IP:6002`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
 
 ```sh
 docker compose up -d --build

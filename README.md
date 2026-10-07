@@ -24,10 +24,10 @@ sudo apt-get update
 sudo apt-get install -y curl
 curl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/install.sh -o /tmp/homecloud-install.sh
 less /tmp/homecloud-install.sh
-sudo bash /tmp/homecloud-install.sh --repo https://github.com/theadekola/homecloud-hub.git --url http://YOUR-UBUNTU-IP --port 8082
+sudo bash /tmp/homecloud-install.sh
 ```
 
-Replace the IP and choose an unused port. Open `http://YOUR-UBUNTU-IP:8082` and register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
+The installer detects the VM IP automatically and prints `http://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
 For Proxmox, sign in as the owner and open **Proxmox → Add / Edit Cluster**. Test and save the cluster's host, API port, API token and TLS settings directly in the app. Nodes and guests are discovered automatically. The app supports one active cluster; credentials are encrypted on the server.
 

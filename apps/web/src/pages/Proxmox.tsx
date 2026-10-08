@@ -1,3 +1,4 @@
+import ProxmoxTasks from './ProxmoxTasks';
 import {useEffect,useState,ReactNode} from 'react';
 import {Link,useNavigate,useSearchParams} from 'react-router-dom';
 import {Server,Monitor,Box,Cpu,MemoryStick,HardDrive,ShieldCheck,RefreshCw,Plus,Terminal,Archive,ListChecks,ExternalLink} from 'lucide-react';
@@ -55,7 +56,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
  :view==='LXC Containers'?<LxcContainers data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
  :view==='Storage'?<ProxmoxStorage role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
  :view==='Settings'?<Card><h3>Cluster Settings</h3><p className="muted">One active cluster is supported. Editing replaces its connection; nodes and guests are discovered automatically.</p><ClusterConnection compact/>{data?.cluster?.url&&<a className="btn secondary" href={data.cluster.url} target="_blank" rel="noreferrer">Open Proxmox</a>}</Card>
- :view==='Tasks & Logs'?<Card><WidgetHeader title="Tasks & Logs"/>{tasks.error&&<p role="alert">{tasks.error}</p>}{taskTable(recent)}</Card>
+ :view==='Tasks & Logs'?<ProxmoxTasks role={session.data?.user?.role} clusterUrl={data?.cluster?.url} hours={hours}/>
  :view==='Backup'?<Card><h3>Cluster Backups</h3><p className="muted">Use provider-managed schedules and inspect submitted backup tasks.</p><Link className="btn primary" to="/backups">View Backup Jobs</Link><Link className="btn secondary" to="/backups?action=Run%20Backup">Run Guest Backup</Link><Link className="btn secondary" to="/schedules">Schedules</Link></Card>
  :view==='Networks'?<ProxmoxNetworks role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
  :<div className="pve-management" key={view}>{management(view)}</div>}

@@ -14,6 +14,11 @@ const upstream=http.createServer(async(req,res)=>{
  const body=Object.fromEntries(new URLSearchParams(raw));requests.push({path:req.url,method:req.method,body});
  let data;
  if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4,disk:25,maxdisk:100},{type:'lxc',node:'pve',vmid:103,name:'actual-lxc',status:'running',cpu:0.05,mem:1,maxmem:2,disk:4,maxdisk:8,uptime:300},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
+ else if(req.url.startsWith('/api2/json/nodes/pve/tasks?'))data=[{upid:'running-task',node:'pve',type:'vzdump',status:'RUNNING',starttime:Math.floor(Date.now()/1000)}];
+ else if(req.url==='/api2/json/nodes/pve/tasks/running-task/status')data={status:'running'};
+ else if(req.url==='/api2/json/nodes/pve/tasks/running-task'&&req.method==='DELETE')data=null;
+ else if(req.url==='/api2/json/nodes/pve/tasks/test-task/status')data={status:'stopped',exitstatus:'OK'};
+ else if(req.url==='/api2/json/nodes/pve/tasks/test-task/log?limit=500&start=500')data=[{n:501,t:'next page'}];
  else if(req.url==='/api2/json/cluster/status')data=[{type:'cluster',name:'actual-cluster',quorate:1},{type:'node',name:'pve',ip:'192.0.2.10',online:1}];
  else if(req.url==='/api2/json/cluster/nextid')data=104;
  else if(req.url==='/api2/json/nodes/pve/lxc'&&req.method==='POST')data='UPID:create-ct';
@@ -89,6 +94,7 @@ try{
    assert.equal((await call('/proxmox/ct','POST',{...body,disk:-1})).status,400);
    const result=await call('/proxmox/ct','POST',body,{'x-test-role':'operator'});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:create-ct');assert.equal(result.body.result.vmid,'104');
  });
+ await test('cluster task inventory, paged logs and task stopping enforce permissions',async()=>{const list=await call('/proxmox/tasks?hours=168');assert.equal(list.status,200);assert.equal(list.body.tasks[0].upid,'running-task');assert.ok(requests.at(-1).path.includes('source=all&limit=500&since='));assert.equal((await call('/tasks/pve/test-task/log?start=500')).body.logs[0].n,501);assert.equal((await call('/tasks/pve/running-task','DELETE',{}, {'x-test-role':'operator'})).status,403);const c=await call('/tasks/pve/running-task','DELETE',{});assert.equal(c.status,409);const r=await call('/tasks/pve/running-task','DELETE',{}, {'X-HomeCloud-Confirm':c.body.confirmationPhrase});assert.equal(r.status,200);assert.equal(r.body.result.requested,true);const done=await call('/tasks/pve/test-task','DELETE',{});assert.equal((await call('/tasks/pve/test-task','DELETE',{}, {'X-HomeCloud-Confirm':done.body.confirmationPhrase})).status,409);});
  await test('task log viewer returns actual provider log lines',async()=>{const result=await call('/tasks/pve/test-task/log');assert.equal(result.status,200);assert.deepEqual(result.body.logs,[{n:1,t:'actual task log'}]);});
  await test('node power commands require admin and payload-bound confirmation',async()=>{
    const endpoint='/proxmox/node/pve/power/reboot';assert.equal((await call(endpoint,'POST',{}, {'x-test-role':'operator'})).status,403);

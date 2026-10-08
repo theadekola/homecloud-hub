@@ -1,3 +1,4 @@
+import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
 import {storageInventory,storageDetails,createStorage} from './storage.js';
 import {networkInventory,networkDetails,networkWrite} from './network.js';
@@ -187,9 +188,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return result;
  });
  action('post','/restore/:id/run','admin','proxmox.restore',req=>restoreArchive(req.params.id,req.body),true);
+ read('/proxmox/tasks',req=>taskInventory(req.query.hours||24));
+ action('delete','/tasks/:node/:id','admin','proxmox.task.stop',req=>stopTask(req.params.node,req.params.id),true);
  read('/tasks',()=>providerReads([['proxmox','proxmox',()=>pve('/cluster/tasks')],['truenas','truenas',()=>truenas('core.get_jobs',[[],{limit:100}])]]));
  read('/tasks/:node/:id',req=>pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/status`));
- read('/tasks/:node/:id/log',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/log?limit=500`)}));
+ read('/tasks/:node/:id/log',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/log?limit=500${req.query.start?`&start=${integer(req.query.start,'Log offset',0,10000000)}`:''}`)}));
  action('post','/truenas/dataset','admin','truenas.dataset.create',req=>truenas('pool.dataset.create',[{name:required(req.body.name,'Dataset name'),type:'FILESYSTEM'}]));
  action('post','/truenas/snapshot','operator','truenas.snapshot.create',req=>truenas('pool.snapshot.create',[{dataset:required(req.body.dataset,'Dataset'),name:required(req.body.name,'Snapshot name'),recursive:false}]));
  action('delete','/truenas/snapshot/:id','admin','truenas.snapshot.delete',req=>truenas('pool.snapshot.delete',[req.params.id,{defer:false,recursive:false}]),true);

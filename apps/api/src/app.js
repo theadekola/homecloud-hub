@@ -169,6 +169,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/docker/volume/:id',req=>docker(`/volumes/${encode(req.params.id)}`));
  action('post','/docker/volume','operator','docker.volume.create',req=>docker('/volumes/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:required(req.body.name,'Volume name'),Driver:'local'})}));
  action('delete','/docker/volume/:id','admin','docker.volume.remove',req=>docker(`/volumes/${encode(req.params.id)}`,{method:'DELETE'}),true);
+ read('/docker/network/:id',req=>docker('/networks/'+encode(req.params.id)));
  action('post','/docker/network','operator','docker.network.create',req=>docker('/networks/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:required(req.body.name,'Network name'),Driver:'bridge'})}));
  action('delete','/docker/network/:id','admin','docker.network.remove',req=>docker(`/networks/${encode(req.params.id)}`,{method:'DELETE'}),true);
  action('post','/docker/stack/:id/:action','operator','docker.stack.action',async req=>{

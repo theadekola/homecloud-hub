@@ -38,6 +38,13 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/cluster/backup'&&req.method==='GET')data=[{id:'job',comment:'Real job',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',enabled:1}];
  else if(req.url==='/api2/json/cluster/backup/job')data=req.method==='GET'?{id:'job',node:'pve',vmid:'101',storage:'backup',mode:'snapshot',enabled:1}:null;
  else if(req.url==='/api2/json/nodes')data=[{node:'pve',status:'online'}];
+ else if(req.url==='/api2/json/storage'&&req.method==='GET')data=[{storage:'backup',type:'nfs',shared:1}];
+ else if(req.url==='/api2/json/storage'&&req.method==='POST')data=null;
+ else if(req.url==='/api2/json/storage/backup'&&req.method==='PUT')data=null;
+ else if(req.url==='/api2/json/nodes/pve/storage')data=[{storage:'backup',type:'nfs',shared:1,active:1,enabled:1,total:100,used:60,avail:40}];
+ else if(req.url==='/api2/json/nodes/pve/storage/backup/status')data={total:100,used:60,avail:40};
+ else if(req.url==='/api2/json/nodes/pve/storage/backup/content')data=[{volid:'backup:backup/test',content:'backup',size:50}];
+ else if(req.url==='/api2/json/nodes/pve/storage/backup/rrddata?timeframe=day&cf=AVERAGE')data=[{time:1700000000,total:100,used:60}];
  else if(req.url==='/api2/json/nodes/pve/storage?content=backup')data=[{storage:'backup',active:1}];
  else if(req.url==='/api2/json/nodes/pve/storage/backup/content?content=backup')data=[{volid:'backup:backup/vzdump-qemu-101.vma.zst',subtype:'qemu',vmid:101,size:1234,ctime:1700000000}];
  else if(req.url==='/api2/json/cluster/backup'&&req.method==='POST')data=null;
@@ -93,6 +100,16 @@ try{
  await test('LXC details and snapshots use live Proxmox endpoints',async()=>{
    const details=await call('/proxmox/lxc/pve/103/details');assert.equal(details.status,200);assert.equal(details.body.config.hostname,'actual-lxc');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'ct-baseline');assert.equal(details.body.interfaces[0].inet,'192.0.2.60/24');assert.deepEqual(details.body.errors,[]);
    const created=await call('/actions/proxmox/lxc/103/snapshot','POST',{node:'pve',name:'before-upgrade'});assert.equal(created.status,200);assert.equal(created.body.result.task,'UPID:lxc-snapshot');assert.equal(requests.at(-1).body.snapname,'before-upgrade');
+ });
+ await test('storage inventory and history return measured values; writes require admin and confirmation',async()=>{
+   const inventory=await call('/proxmox/storage');assert.equal(inventory.body.resources[0].capacity,100);assert.equal(inventory.body.resources[0].usage,60);assert.equal(inventory.body.resources[0].shared,true);
+   const details=await call('/proxmox/storage/pve/backup');assert.equal(details.body.history[0].used,60);assert.equal(details.body.content[0].size,50);
+   const body={type:'nfs',storage:'test-nfs',server:'192.0.2.4',export:'/backup'};
+   assert.equal((await call('/proxmox/storage','POST',body,{'x-test-role':'operator'})).status,403);
+   const challenge=await call('/proxmox/storage','POST',body);assert.equal(challenge.status,409);
+   const saved=await call('/proxmox/storage','POST',body,{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(saved.status,200);assert.equal(requests.at(-1).body.export,'/backup');
+   const invalid={type:'dir',storage:'bad id',path:'/data'},approval=await call('/proxmox/storage','POST',invalid);assert.equal((await call('/proxmox/storage','POST',invalid,{'X-HomeCloud-Confirm':approval.body.confirmationPhrase})).status,400);
+   const disabled={enabled:false},confirm=await call('/proxmox/storage/backup/enabled','PUT',disabled);assert.equal((await call('/proxmox/storage/backup/enabled','PUT',disabled,{'X-HomeCloud-Confirm':confirm.body.confirmationPhrase})).status,200);assert.equal(requests.at(-1).body.disable,'1');
  });
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});

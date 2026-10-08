@@ -1,4 +1,5 @@
 import {discovered} from './discovery.js';
+import {storageInventory,storageDetails,createStorage} from './storage.js';
 import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
@@ -93,6 +94,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
+ read('/proxmox/storage',()=>storageInventory());
+ read('/proxmox/storage/:node/:id',req=>storageDetails(req.params.node,req.params.id,req.query.timeframe));
+ action('post','/proxmox/storage','admin','proxmox.storage.create',req=>createStorage(req.body),true);
+ action('put','/proxmox/storage/:id/enabled','admin','proxmox.storage.enabled',req=>{if(typeof req.body.enabled!=='boolean')throw httpError('enabled must be a boolean');return pveWrite(`/storage/${encode(req.params.id)}`,'PUT',{disable:req.body.enabled?0:1});},true);
  read('/proxmox/node/:node/details',async req=>{const result={node:req.params.node,errors:[]};await Promise.all(['status','version','config'].map(async key=>{try{result[key]=await pve(`/nodes/${encode(req.params.node)}/${key}`);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));return result;});
 read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/syslog?limit=200`)}));
  read('/proxmox/vm/:node/:id/details',async req=>{

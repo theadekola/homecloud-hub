@@ -10,6 +10,7 @@ import {DataTable} from '../components/DataTable';
 import ClusterNodes from './ClusterNodes';
 import VirtualMachines from './VirtualMachines';
 import LxcContainers from './LxcContainers';
+import ProxmoxStorage from './ProxmoxStorage';
 const tabs=['Overview','Nodes','Virtual Machines','LXC Containers','Storage','Networks','Tasks & Logs','Backup','Settings','Node Services'];
 const bytes=(v:any)=>v==null?'Unknown':Number(v)>=1024**4?`${(v/1024**4).toFixed(1)} TiB`:`${(v/1024**3).toFixed(1)} GiB`;
 const pct=(v:any)=>v==null?'Unknown':`${v}%`;
@@ -51,6 +52,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
  :view==='Nodes'?<ClusterNodes data={data} metrics={history.data?.metrics||[]} tasks={recent} network={network.data} hours={hours} role={session.data?.user?.role} refresh={refresh}/>
  :view==='Virtual Machines'?<VirtualMachines data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
  :view==='LXC Containers'?<LxcContainers data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
+ :view==='Storage'?<ProxmoxStorage role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
  :view==='Settings'?<Card><h3>Cluster Settings</h3><p className="muted">One active cluster is supported. Editing replaces its connection; nodes and guests are discovered automatically.</p><ClusterConnection compact/>{data?.cluster?.url&&<a className="btn secondary" href={data.cluster.url} target="_blank" rel="noreferrer">Open Proxmox</a>}</Card>
  :view==='Tasks & Logs'?<Card><WidgetHeader title="Tasks & Logs"/>{tasks.error&&<p role="alert">{tasks.error}</p>}{taskTable(recent)}</Card>
  :view==='Backup'?<Card><h3>Cluster Backups</h3><p className="muted">Use provider-managed schedules and inspect submitted backup tasks.</p><Link className="btn primary" to="/backups">View Backup Jobs</Link><Link className="btn secondary" to="/backups?action=Run%20Backup">Run Guest Backup</Link><Link className="btn secondary" to="/schedules">Schedules</Link></Card>

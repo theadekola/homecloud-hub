@@ -64,7 +64,7 @@ export async function proxmoxSnapshot(){
     }));
   }));
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;
-  const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryPercent:percent(r.mem,r.maxmem),uptime:r.uptime??null}));
+  const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:r.disk??null,diskTotal:r.maxdisk??null,diskPercent:percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
   let clusterStatus=[];
   try{clusterStatus=await pve('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();
@@ -206,3 +206,4 @@ export async function dockerPrune(kind){
   if(!map[kind])throw new Error('Invalid prune kind');
   return docker(map[kind],{method:'POST'});
 }
+

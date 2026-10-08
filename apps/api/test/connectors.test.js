@@ -5,6 +5,10 @@ import http from 'node:http';
 test('Docker connector handles pulls, port mappings, conflicts and log frames',async()=>{
   let created,buildBody;
   const server=http.createServer(async(req,res)=>{
+    if(req.url==='/containers/json?all=1')return res.end(JSON.stringify([{Id:'container',Names:['/app'],State:'exited',Mounts:[{Type:'volume',Name:'app_data',Destination:'/data',RW:true}]}]));
+    if(req.url==='/images/json'||req.url==='/networks')return res.end('[]');
+    if(req.url==='/info')return res.end('{"Name":"docker-test"}');
+    if(req.url==='/volumes')return res.end(JSON.stringify({Volumes:[{Name:'app_data',Driver:'local',Mountpoint:'/volumes/app_data',CreatedAt:'2026-01-01T00:00:00Z',Labels:{backup:'true'},Options:{type:'none'}}]}));
     if(req.url.startsWith('/build?')){const chunks=[];for await(const chunk of req)chunks.push(chunk);buildBody=Buffer.concat(chunks);assert.equal(req.headers['content-type'],'application/x-tar');if(req.url.includes('broken'))return res.end('{"error":"Build failed"}\n');return res.end('{"stream":"Built"}\n');}
     if(req.url.startsWith('/images/create'))return res.end('{"status":"Pulling"}\n{"status":"Done"}\n');
     if(req.url.startsWith('/containers/create')){
@@ -21,6 +25,10 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
   process.env.DOCKER_API_URL=`http://127.0.0.1:${server.address().port}`;
   try{
     const connector=await import('../src/connectors.js');
+    const inventory=await connector.dockerSnapshot();
+    assert.equal(inventory.volumes[0].created,'2026-01-01T00:00:00Z');
+    assert.equal(inventory.volumes[0].labels.backup,'true');
+    assert.equal(inventory.containers[0].mounts[0].Destination,'/data');
     const result=await connector.dockerCreateContainer({name:'test',image:'nginx',ports:'8080:80'});
     assert.equal(result.Id,'test');
     await connector.dockerBuildImage({tag:'test:latest',dockerfile:'FROM scratch\n'});

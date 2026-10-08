@@ -150,14 +150,14 @@ export async function dockerSnapshot(){
       const cpuDelta=stats?stats.cpu_stats.cpu_usage.total_usage-(stats.precpu_stats?.cpu_usage?.total_usage||0):0;
       const systemDelta=stats?stats.cpu_stats.system_cpu_usage-(stats.precpu_stats?.system_cpu_usage||0):0;
       const cpu=stats&&systemDelta>0?Math.round(cpuDelta/systemDelta*(stats.cpu_stats.online_cpus||stats.cpu_stats.cpu_usage.percpu_usage?.length||1)*1000)/10:null;
-      return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,imageId:c.ImageID,status:c.State,ports:(c.Ports||[]).map(p=>p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort)).join(', '),cpu,memory:stats?.memory_stats?.usage??null,memoryPercent:stats?.memory_stats?.limit?Math.round(stats.memory_stats.usage/stats.memory_stats.limit*100):null,statsError,labels:c.Labels||{}};
+      return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,imageId:c.ImageID,mounts:c.Mounts||[],status:c.State,ports:(c.Ports||[]).map(p=>p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort)).join(', '),cpu,memory:stats?.memory_stats?.usage??null,memoryPercent:stats?.memory_stats?.limit?Math.round(stats.memory_stats.usage/stats.memory_stats.limit*100):null,statsError,labels:c.Labels||{}};
     })));
   }
   return {
     host:{hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
     images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,tags:i.RepoTags||[],digests:i.RepoDigests||[],size:i.Size,created:i.Created,containers:i.Containers})),
     networks:networks.map(n=>({id:n.Id,name:n.Name,driver:n.Driver,scope:n.Scope,subnets:n.IPAM?.Config?.map(c=>c.Subnet).join(', ')||'',internal:n.Internal})),
-    volumes:(volumes.Volumes||[]).map(v=>({id:v.Name,name:v.Name,driver:v.Driver,mountpoint:v.Mountpoint,scope:v.Scope})),
+    volumes:(volumes.Volumes||[]).map(v=>({id:v.Name,name:v.Name,driver:v.Driver,mountpoint:v.Mountpoint,scope:v.Scope,created:v.CreatedAt,labels:v.Labels||{},options:v.Options||{}})),
     stacks:[...new Set(measured.map(c=>c.labels['com.docker.compose.project']).filter(Boolean))].map(name=>({id:name,name,containers:measured.filter(c=>c.labels['com.docker.compose.project']===name).length}))
   };
 }

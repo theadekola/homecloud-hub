@@ -13,7 +13,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { pve,docker,proxmoxVmAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune } from './connectors.js';
+import { pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -102,6 +102,13 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    ].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
    return result;
  });
+ read('/proxmox/lxc/:node/:id/details',async req=>{
+   const base=`/nodes/${encode(req.params.node)}/lxc/${encode(req.params.id)}`,result={node:req.params.node,id:req.params.id,errors:[]};
+   await Promise.all([
+     ['status',`${base}/status/current`],['config',`${base}/config`],['snapshots',`${base}/snapshot`],['interfaces',`${base}/interfaces`]
+   ].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
+   return result;
+ });
  action('post','/proxmox/node/:node/power/:operation','admin','proxmox.node.power',async req=>{
    if(!['reboot','shutdown'].includes(req.params.operation))throw httpError('Unsupported node power action');
    await pveWrite(`/nodes/${encode(req.params.node)}/status`,'POST',{command:req.params.operation});
@@ -123,8 +130,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const {provider,resourceType,resourceId,action:operation}=req.params;const body=req.body||{};
    if(provider==='proxmox'&&resourceType==='vm'){const node=required(body.node,'Node');return {node,task:await proxmoxVmAction(node,resourceId,operation,body)};}
    if(provider==='proxmox'&&resourceType==='lxc'){
-     if(!['start','stop','shutdown','reboot','suspend','resume'].includes(operation))throw httpError('Unsupported LXC action');
-     const node=required(body.node,'Node');return {node,task:await pveWrite(`/nodes/${encode(node)}/lxc/${encode(resourceId)}/status/${operation}`,'POST',{})};
+     const node=required(body.node,'Node');return {node,task:await proxmoxLxcAction(node,resourceId,operation,body)};
    }
    if(provider==='docker'&&resourceType==='container')return dockerAction(resourceId,operation,body);
    throw httpError('Unsupported provider/resource');

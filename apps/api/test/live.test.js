@@ -13,7 +13,7 @@ const upstream=http.createServer(async(req,res)=>{
  let raw='';for await(const chunk of req)raw+=chunk;
  const body=Object.fromEntries(new URLSearchParams(raw));requests.push({path:req.url,method:req.method,body});
  let data;
- if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4,disk:25,maxdisk:100},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
+ if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4,disk:25,maxdisk:100},{type:'lxc',node:'pve',vmid:103,name:'actual-lxc',status:'running',cpu:0.05,mem:1,maxmem:2,disk:4,maxdisk:8,uptime:300},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
  else if(req.url==='/api2/json/cluster/status')data=[{type:'cluster',name:'actual-cluster',quorate:1},{type:'node',name:'pve',ip:'192.0.2.10',online:1}];
  else if(req.url==='/api2/json/cluster/nextid')data=104;
  else if(req.url==='/api2/json/nodes/pve/lxc'&&req.method==='POST')data='UPID:create-ct';
@@ -26,6 +26,11 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/nodes/pve/qemu/101/config')data={name:'actual-guest',cores:2,memory:4096,ostype:'l26',agent:'1'};
  else if(req.url==='/api2/json/nodes/pve/qemu/101/snapshot')data=[{name:'baseline',snaptime:1700000000}];
  else if(req.url==='/api2/json/nodes/pve/qemu/101/agent/network-get-interfaces')data={result:[{name:'eth0','ip-addresses':[{'ip-address':'192.0.2.50','ip-address-type':'ipv4'}]}]};
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/status/current')data={status:'running',cpu:0.05,mem:1,maxmem:2,uptime:300};
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/config')data={hostname:'actual-lxc',cores:1,memory:512,rootfs:'local-lvm:8',ostype:'debian',unprivileged:1};
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/snapshot'&&req.method==='GET')data=[{name:'ct-baseline',snaptime:1700000000}];
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/snapshot'&&req.method==='POST')data='UPID:lxc-snapshot';
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/interfaces')data=[{name:'eth0',inet:'192.0.2.60/24'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/services')data=[{name:'pveproxy',service:'pveproxy',state:'running','unit-state':'enabled'}];
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/status')data={cpu:0.65,memory:{used:6,total:8},uptime:9000,cpuinfo:{cpus:8}};
  else if(nodeDetails&&req.url==='/api2/json/nodes/pve/qemu'&&req.method==='GET')data=[{vmid:102,name:'node-discovered-guest',status:'running',mem:2,maxmem:4}];
@@ -84,6 +89,10 @@ try{
  });
  await test('VM details return live configuration, runtime, snapshots and guest-agent networking',async()=>{
    const details=await call('/proxmox/vm/pve/101/details');assert.equal(details.status,200);assert.equal(details.body.config.name,'actual-guest');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'baseline');assert.equal(details.body.interfaces.result[0].name,'eth0');assert.deepEqual(details.body.errors,[]);
+ });
+ await test('LXC details and snapshots use live Proxmox endpoints',async()=>{
+   const details=await call('/proxmox/lxc/pve/103/details');assert.equal(details.status,200);assert.equal(details.body.config.hostname,'actual-lxc');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'ct-baseline');assert.equal(details.body.interfaces[0].inet,'192.0.2.60/24');assert.deepEqual(details.body.errors,[]);
+   const created=await call('/actions/proxmox/lxc/103/snapshot','POST',{node:'pve',name:'before-upgrade'});assert.equal(created.status,200);assert.equal(created.body.result.task,'UPID:lxc-snapshot');assert.equal(requests.at(-1).body.snapname,'before-upgrade');
  });
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});

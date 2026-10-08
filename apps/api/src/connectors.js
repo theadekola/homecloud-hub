@@ -82,6 +82,14 @@ export async function proxmoxVmAction(node,id,action,payload={}){
   if(action==='delete') return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox VM action: ${action}`);
 }
+export async function proxmoxLxcAction(node,id,action,payload={}){
+  const statusActions=new Set(['start','stop','shutdown','reboot','suspend','resume']);
+  const base=`/nodes/${encodeURIComponent(node)}/lxc/${encodeURIComponent(id)}`;
+  if(statusActions.has(action)) return pve(`${base}/status/${action}`,{method:'POST'});
+  if(action==='snapshot') return pve(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub'})});
+  if(action==='delete-snapshot') return pve(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
+  throw new Error(`Unsupported Proxmox LXC action: ${action}`);
+}
 export async function proxmoxCreateVm(payload){
   const node=payload.node; if(!node) throw new Error('node required');
   const vmid=payload.vmid || await pve('/cluster/nextid');

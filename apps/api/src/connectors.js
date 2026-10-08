@@ -206,4 +206,3 @@ export async function dockerPrune(kind){
   if(!map[kind])throw new Error('Invalid prune kind');
   return docker(map[kind],{method:'POST'});
 }
-

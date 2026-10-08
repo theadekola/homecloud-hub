@@ -221,4 +221,3 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  app.use((error,req,res,next)=>{console.error(error.message);res.status(error.status||502).json({error:error.message||'Request failed'});});
  return app;
 }
-

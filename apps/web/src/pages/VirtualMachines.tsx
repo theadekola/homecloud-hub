@@ -70,4 +70,3 @@ function VmDetails({vm,role,clusterUrl,busy,run,console,snapshot,backup}:{vm:any
   {!!details.data?.errors?.length&&<details className="permission-help"><summary>{details.data.errors.length} VM readings unavailable</summary>{details.data.errors.map((error:string)=><p key={error}>{error}</p>)}</details>}
  </Card><Card className="vm-resource"><div className="widget-title"><h3>Resource Usage</h3><Tag size={15}/></div><div><Meter value={vm.cpu} text={`CPU ${percent(vm.cpu)}`}/><Meter value={vm.memoryPercent} text={`Memory ${vm.memoryTotal!=null?`${bytes(vm.memory)} / ${bytes(vm.memoryTotal)}`:bytes(vm.memory)}`}/><Meter value={vm.diskPercent} text={`Disk ${vm.diskTotal!=null?`${bytes(vm.disk)} / ${bytes(vm.diskTotal)}`:bytes(vm.disk)}`}/></div></Card></div>;
 }
-

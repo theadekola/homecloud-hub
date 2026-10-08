@@ -112,4 +112,3 @@ try{
    failing=false;cpu=20;await monitor.sample(true);assert.equal(state.alerts.find(a=>a.key.startsWith('rule:')).status,'resolved');
  });
 }finally{await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>upstream.close(resolve));}
-

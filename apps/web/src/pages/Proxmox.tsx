@@ -59,4 +59,3 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
 }
 function WidgetHeader({title,action,onClick}:{title:string;action?:string;onClick?:()=>void}){return <div className="widget-title"><h3>{title}</h3>{action&&<button className="pve-text-button" onClick={onClick}>{action} →</button>}</div>;}
 function Spark({rows,node,metric,hours,color}:{rows:any[];node:string;metric:string;hours:string;color:string}){const points=rows.filter(r=>new Date(r.time).getTime()>Date.now()-Number(hours)*3600000).map(r=>({value:r.nodes?.find((n:any)=>n.name===node)?.[metric]??null}));return points.some(r=>r.value!=null)?<div className="pve-spark"><ResponsiveContainer width="100%" height={30}><AreaChart data={points}><Area dataKey="value" stroke={color} fill={`${color}18`} strokeWidth={1.5} isAnimationActive={false} connectNulls={false}/></AreaChart></ResponsiveContainer></div>:null;}
-

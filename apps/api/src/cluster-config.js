@@ -15,7 +15,7 @@ export function validateCluster(input) {
  const ca=String(input.ca||'').trim();if(ca&&(ca.length>65536||!ca.includes('-----BEGIN CERTIFICATE-----')||ca.includes('PRIVATE KEY')))invalid('Enter a PEM CA certificate, not a private key.');
  return {name,host,port,tokenId,tokenSecret:input.tokenSecret,verifyTls:input.verifyTls,ca,url:`https://${host}:${port}`};
 }
-export function createClusterStore(file,secret=()=>process.env.JWT_SECRET) {
+export function createClusterStore(file,secret=()=>process.env.JWT_SECRET,validate=validateCluster) {
  const key=()=>{const value=secret();if(!value||value.length<32)throw new Error('JWT_SECRET must be at least 32 characters to protect saved connections.');return crypto.createHash('sha256').update(value).digest();};
  const read=()=>{
   if(!fs.existsSync(file))return null;
@@ -25,7 +25,7 @@ export function createClusterStore(file,secret=()=>process.env.JWT_SECRET) {
   return JSON.parse(Buffer.concat([decipher.update(Buffer.from(value.data,'base64')),decipher.final()]).toString());
  };
  return {read,save(input){
-  const config=validateCluster(input),iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key(),iv);
+  const config=validate(input),iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key(),iv);
   const data=Buffer.concat([cipher.update(JSON.stringify(config)),cipher.final()]);
   fs.mkdirSync(path.dirname(file),{recursive:true});const temporary=`${file}.tmp`;
   fs.writeFileSync(temporary,JSON.stringify({schema:1,iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),data:data.toString('base64')}),{mode:0o600});

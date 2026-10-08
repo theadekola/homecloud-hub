@@ -1,3 +1,4 @@
+import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
@@ -17,7 +18,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
+import { request,pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -44,6 +45,11 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
+ app.get('/api/connections/docker',authorize('owner'),(req,res)=>res.json({connection:publicDocker()}));
+ const testDocker=async input=>{const saved=dockerStore.read(),config=validateDocker({...input,ca:input.ca||saved?.ca,cert:input.cert||saved?.cert,key:input.key||saved?.key});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();return {config,host:{hostname:info.Name,version:info.ServerVersion}};}catch{throw httpError('Docker connection failed. Check the HTTPS endpoint, client certificate, key, CA and host access.',502)}};
+ app.post('/api/connections/docker/test',authorize('owner'),async(req,res)=>{const {host}=await testDocker(req.body);res.json({ok:true,host});});
+ app.put('/api/connections/docker',authorize('owner'),async(req,res)=>{const {config,host}=await testDocker(req.body);dockerStore.save(config);await monitor.invalidate();await audit(req,'connection.docker.save',config.url,{},'success');res.json({ok:true,connection:publicDocker(),host});});
+ app.delete('/api/connections/docker',authorize('owner'),async(req,res)=>{dockerStore.remove();await monitor.invalidate();await audit(req,'connection.docker.remove','docker',{},'success');res.json({ok:true,connection:publicDocker()});});
  app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
  const testCluster=async input=>{
    const config=validateCluster(input);

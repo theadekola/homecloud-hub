@@ -1,3 +1,4 @@
+import {dockerConfig,dockerTlsConfig} from './docker-config.js';
 import {mergeNodeStorage} from './proxmox-inventory.js';
 import {inspectGuests} from './guest-discovery.js';
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ export function request(url, init={}, tls={}) {
   return new Promise((resolve,reject)=>{
     const target=new URL(url);
     const transport=target.protocol==='https:'?https:http;
-    const req=transport.request(target,{method:init.method||'GET',headers:init.headers,...tls},res=>{
+    const req=transport.request(target,{method:init.method||'GET',headers:{...(init.headers||{}),...(init.body!=null?{'Content-Length':Buffer.byteLength(String(init.body))}:{})},...tls},res=>{
       const chunks=[];let size=0;
       res.on('data',chunk=>{size+=chunk.length;if(size>32*1024*1024){req.destroy(new Error('Connector response exceeds 32 MiB'));return;}chunks.push(chunk);});
       res.on('error',reject);
@@ -122,16 +123,11 @@ export async function proxmoxCreateCt(payload,call=pve){
   return {vmid:String(vmid),task:await call(`/nodes/${encodeURIComponent(payload.node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
 }
 
-const dockerUrl=process.env.DOCKER_API_URL?.replace(/\/$/,'');
-export function dockerConfigured(){return !!dockerUrl}
-function dockerTls(){
-  const read=name=>process.env[name]?fs.readFileSync(process.env[name]):undefined;
-  if(Boolean(process.env.DOCKER_TLS_CERT)!==Boolean(process.env.DOCKER_TLS_KEY))throw new Error('Docker TLS certificate and key must be configured together');
-  return {ca:read('DOCKER_TLS_CA'),cert:read('DOCKER_TLS_CERT'),key:read('DOCKER_TLS_KEY')};
-}
+export function dockerConfigured(){return !!dockerConfig().url}
 export async function docker(path,init={}){
+  const config=dockerConfig(),dockerUrl=config.url;
   if(!dockerUrl) throw Object.assign(new Error('Docker API is not configured'),{status:503});
-  const res=await request(`${dockerUrl}${path}`,init,dockerTls());
+  const res=await request(`${dockerUrl}${path}`,init,dockerTlsConfig(config));
   if(!res.ok && res.status!==304) {
     const text=await res.text().catch(()=> '');
     throw new Error(`Docker HTTP ${res.status}${text?`: ${text}`:''}`);
@@ -203,9 +199,10 @@ export async function dockerCreateContainer(payload){
   return created;
 }
 export async function dockerLogs(id,tail=200){
+  const config=dockerConfig(),dockerUrl=config.url;
   if(!dockerUrl)throw new Error('Docker API is not configured');
   if(!Number.isInteger(tail)||tail<1||tail>10000)throw new Error('Log tail must be between 1 and 10000');
-  const res=await request(`${dockerUrl}/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&timestamps=1&tail=${tail}`,{},dockerTls());
+  const res=await request(`${dockerUrl}/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&timestamps=1&tail=${tail}`,{},dockerTlsConfig(config));
   if(!res.ok)throw new Error(`Docker HTTP ${res.status}`);
   const data=res.buffer;
   if(data.length>=8 && [0,1,2].includes(data[0]) && data[1]===0 && data[2]===0 && data[3]===0){

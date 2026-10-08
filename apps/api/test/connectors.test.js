@@ -13,7 +13,7 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     if(req.url.startsWith('/images/create'))return res.end('{"status":"Pulling"}\n{"status":"Done"}\n');
     if(req.url.startsWith('/containers/create')){
       let body='';for await(const chunk of req)body+=chunk;
-      created=JSON.parse(body);res.setHeader('Content-Type','application/json');return res.end('{"Id":"test"}');
+      assert.equal(req.headers['transfer-encoding'],undefined);assert.equal(Number(req.headers['content-length']),Buffer.byteLength(body));created=JSON.parse(body);res.setHeader('Content-Type','application/json');return res.end('{"Id":"test"}');
     }
     if(req.url.includes('/logs?')){
       const message=Buffer.from('hello\n');const header=Buffer.alloc(8);header[0]=1;header.writeUInt32BE(message.length,4);return res.end(Buffer.concat([header,message]));

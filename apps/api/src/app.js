@@ -1,3 +1,4 @@
+import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
 import {storageInventory,storageDetails,createStorage} from './storage.js';
@@ -232,7 +233,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return (await db.query(`UPDATE users SET status=CASE status WHEN 'active' THEN 'inactive' ELSE 'active' END WHERE id=$1 RETURNING id,name,status`,[req.params.id])).rows[0];
  },true);
  read('/audit',async()=>({logs:(await db.query(`SELECT id::text,created_at AS time,COALESCE(user_email,'system') AS "user",action,resource,details,status,COALESCE(ip,'-') ip FROM audit_logs ORDER BY created_at DESC LIMIT 500`)).rows}),'auditor');
- read('/settings',async()=>({settings:get().settings,integrations:(await monitor.sample()).services,capabilities:{twoFactor:false,notifications:'in-app',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}}));
+ read('/settings',async()=>({system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:(await monitor.sample()).services,capabilities:{twoFactor:false,notifications:'in-app',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}}));
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};
    mutate(s=>s.settings=settings);return settings;

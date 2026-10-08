@@ -1,3 +1,4 @@
+import {applyAppearance} from '../appearance';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Boxes, Container, Database, Network, ShieldCheck, HardDriveDownload,
@@ -18,6 +19,7 @@ const sections = [
 ];
 
 export default function Layout() {
+  useEffect(()=>{applyAppearance();},[]);
   const [collapsed, setCollapsed] = useState(false);
   const [profileOpen,setProfileOpen]=useState(false);
   const profileRef=useRef<HTMLDivElement>(null);

@@ -1,3 +1,4 @@
+import ProxmoxSettings from './ProxmoxSettings';
 import ProxmoxBackups from './ProxmoxBackups';
 import ProxmoxTasks from './ProxmoxTasks';
 import {useEffect,useState,ReactNode} from 'react';
@@ -56,7 +57,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
  :view==='Virtual Machines'?<VirtualMachines data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
  :view==='LXC Containers'?<LxcContainers data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
  :view==='Storage'?<ProxmoxStorage role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
- :view==='Settings'?<Card><h3>Cluster Settings</h3><p className="muted">One active cluster is supported. Editing replaces its connection; nodes and guests are discovered automatically.</p><ClusterConnection compact/>{data?.cluster?.url&&<a className="btn secondary" href={data.cluster.url} target="_blank" rel="noreferrer">Open Proxmox</a>}</Card>
+ :view==='Settings'?<ProxmoxSettings role={session.data?.user?.role}/>
  :view==='Tasks & Logs'?<ProxmoxTasks role={session.data?.user?.role} clusterUrl={data?.cluster?.url} hours={hours}/>
  :view==='Backup'?<ProxmoxBackups role={session.data?.user?.role} hours={hours} onTasks={()=>setView('Tasks & Logs')} onStorage={()=>setView('Storage')}/>
  :view==='Networks'?<ProxmoxNetworks role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>

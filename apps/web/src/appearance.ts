@@ -1,0 +1,4 @@
+export const appearanceDefaults={accent:'#4f46e5',density:'comfortable',animations:true};
+export function loadAppearance(){try{return {...appearanceDefaults,...JSON.parse(localStorage.getItem('homecloud_appearance')||'{}')}}catch{return appearanceDefaults}}
+export function applyAppearance(){const a=loadAppearance();document.documentElement.style.setProperty('--app-accent',/^#[0-9a-f]{6}$/i.test(a.accent)?a.accent:appearanceDefaults.accent);document.documentElement.dataset.density=a.density==='compact'?'compact':'comfortable';document.documentElement.dataset.animations=a.animations?'on':'off';}
+export function saveAppearance(value:typeof appearanceDefaults){localStorage.setItem('homecloud_appearance',JSON.stringify(value));applyAppearance();window.dispatchEvent(new Event('homecloud-appearance'));}

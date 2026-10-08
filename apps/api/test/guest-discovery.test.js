@@ -9,3 +9,7 @@ test('automatic guest inventory runs only fixed read commands and caches actual 
  const result=await inspectGuests(guests,call,'fixture');assert.equal(result.reports[0].containers[0].name,'nextcloud');assert.equal(result.limitations.length,0);assert.equal(calls.length,3);await inspectGuests(guests,call,'fixture');assert.equal(calls.length,3);
 });
 test('missing guest access is reported without invented service inventory',async()=>{const result=await inspectGuests([{id:'103',node:'pve',name:'blocked',status:'running'}],async()=>{throw new Error('Proxmox HTTP 403');},'blocked-fixture');assert.equal(result.reports.length,0);assert.match(result.limitations[0],/403/);});
+test('unsupported guest commands are distinguished from denied permissions',async()=>{
+ const result=await inspectGuests([{id:'501',node:'pve',name:'unsupported',status:'running'}],async()=>{throw Object.assign(new Error('Proxmox HTTP 501'),{providerStatus:501})},'unsupported-fixture');
+ assert.match(result.limitations[0],/does not support/);assert.doesNotMatch(result.limitations[0],/lacks guest-agent access/);
+});

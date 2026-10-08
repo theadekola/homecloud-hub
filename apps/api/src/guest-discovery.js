@@ -35,7 +35,7 @@ export async function inspectGuests(guests,call,connection){
     if(!result?.exited||result.exitcode!==0||result['out-truncated'])throw new Error('Guest inventory incomplete or still running');
     const inventory=windows?JSON.parse(result['out-data']||'{}'):parseLinuxInventory(result['out-data']);
     entry={time:Date.now(),report:{id:`qga-${guest.id}`,hostname:guest.name,node:guest.node,os:os.name||os.id,receivedAt:new Date().toISOString(),status:'online',services:(inventory.services||[]).slice(0,1000),packages:(inventory.packages||[]).slice(0,6000),containers:(inventory.containers||[]).slice(0,1000),errors:[],source:'Proxmox guest API'}};
-   }catch(error){entry={time:Date.now(),error:`${guest.name}: ${error.message}. Existing QEMU guest agent and guest-agent API permissions are required for in-guest inventory.`};}
+   }catch(error){const status=error.providerStatus||Number(error.message.match(/HTTP (\d+)/)?.[1]);const guidance=status===401||status===403?'The token lacks guest-agent access; check its user and token ACLs.':status===501?'This guest or its agent does not support the requested inventory command. Use a Docker Engine connection for Docker inventory.':'Check that QEMU Guest Agent is enabled in VM Options and running inside this guest. A cluster read token alone does not enable guest execution.';entry={time:Date.now(),error:`${guest.name}: ${error.message}. ${guidance}`};}
    cache.set(key,entry);if(cache.size>1000)cache.delete(cache.keys().next().value);
   }
   if(entry.report)reports.push(entry.report);else limitations.push(entry.error);

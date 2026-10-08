@@ -1,3 +1,4 @@
+import {mergeNodeStorage} from './proxmox-inventory.js';
 import {inspectGuests} from './guest-discovery.js';
 import fs from 'node:fs';
 import https from 'node:https';
@@ -15,7 +16,7 @@ export function request(url, init={}, tls={}) {
       res.on('error',reject);
       res.on('end',()=>{
         const buffer=Buffer.concat(chunks);
-        resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,
+        resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,statusText:res.statusMessage,
           text:async()=>buffer.toString('utf8'),json:async()=>JSON.parse(buffer.toString('utf8')),buffer});
       });
     });
@@ -33,7 +34,7 @@ export async function pve(path, init={}, config=clusterConfig()){
   const headers={Authorization:`PVEAPIToken=${pveTokenId}=${pveSecret}`,...(init.headers||{})};
   const res=await request(`${pveUrl}/api2/json${path}`,{...init,headers},{rejectUnauthorized:config.verifyTls, ...(config.ca?{ca:config.ca}:{})});
   const body=await res.json().catch(()=>({}));
-  if(!res.ok) throw Object.assign(new Error(body?.errors?JSON.stringify(body.errors):`Proxmox HTTP ${res.status}`),{status:502});
+  if(!res.ok) throw Object.assign(new Error(body?.errors?JSON.stringify(body.errors):`Proxmox HTTP ${res.status}: ${res.statusText||'Request failed'}`),{status:502});
   return body.data;
 }
 const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]));
@@ -42,17 +43,21 @@ export function proxmoxConfigured(){const c=clusterConfig();return !!(c.url&&c.t
 export async function proxmoxSnapshot(){
   const resources=await pve('/cluster/resources');
   const errors=[],nodeServices=[];
+  try{const listed=await pve('/nodes');if(!Array.isArray(listed))throw new Error('Unexpected node inventory');for(const n of listed){if(!n.node)continue;const existing=resources.find(r=>r.type==='node'&&r.node===n.node);if(existing)Object.assign(existing,n);else resources.push({...n,type:'node'});}}catch(e){errors.push(`Node inventory: ${e.message}`);}
   const nodes=resources.filter(r=>r.type==='node');
   for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
     if(node.status!=='online')return;
     const base=`/nodes/${encodeURIComponent(node.node)}`;
-    await Promise.all(['status','qemu','lxc','services'].map(async type=>{
+    await Promise.all(['status','qemu','lxc','services','storage'].map(async type=>{
       try{const data=await pve(`${base}/${type}`);
         if(type==='status'){
           if(!data||Array.isArray(data))throw new Error('Unexpected node status response');
           if(typeof data.cpu==='number')node.cpu=data.cpu;
           if(data.memory){node.mem=data.memory.used;node.maxmem=data.memory.total;}
           node.uptime=data.uptime??node.uptime;node.maxcpu=data.cpuinfo?.cpus??node.maxcpu;
+        }else if(type==='storage'){
+          if(!Array.isArray(data))throw new Error('Unexpected storage inventory response');
+          mergeNodeStorage(resources,node.node,data);
         }else if(type==='services'){
           if(!Array.isArray(data))throw new Error('Unexpected service inventory response');
           for(const service of data)if(service.name&&service['unit-state']!=='not-found')nodeServices.push({id:`${node.node}:${service.service||service.name}`,node:node.node,name:service.name,service:service.service||service.name,status:service.state||service['active-state']||'unknown'});
@@ -71,7 +76,7 @@ export async function proxmoxSnapshot(){
   const guestInventory=await inspectGuests(guests('qemu'),pve,`${config.url}:${config.tokenId}`);
   return {clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
-    storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.maxdisk==null?null:r.maxdisk-(r.disk||0),usage:percent(r.disk,r.maxdisk)}))};
+    storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),usage:percent(r.disk,r.maxdisk)}))};
 }
 export async function proxmoxVmAction(node,id,action,payload={}){
   const statusActions=new Set(['start','stop','shutdown','reboot','reset','suspend','resume']);
@@ -105,6 +110,7 @@ export async function proxmoxCreateVm(payload){
 }
 export async function proxmoxBackup(payload){
   const node=payload.node; if(!node)throw new Error('node required');
+  if(payload.storage){const stores=await pve('/nodes/'+encodeURIComponent(node)+'/storage');const target=Array.isArray(stores)&&stores.find(s=>s.storage===payload.storage);if(!target||target.active!==1||target.enabled===0)throw new Error('Backup storage '+payload.storage+' is not available on node '+node+'. Choose an active backup target for this node.');if(target.content&&!target.content.split(',').includes('backup'))throw new Error('Selected storage does not support backup content.');}
   return pve(`/nodes/${encodeURIComponent(node)}/vzdump`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({
     vmid:payload.vmid, storage:payload.storage, mode:payload.mode||'snapshot', compress:payload.compress||'zstd', 'notes-template':payload.notes||'HomeCloud Hub'
   })});

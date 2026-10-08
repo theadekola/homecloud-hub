@@ -177,7 +177,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const results=[];for(const container of containers){try{await dockerAction(container.id,operation);results.push({id:container.id,ok:true});}catch(e){results.push({id:container.id,ok:false,error:e.message});}}
    if(results.some(r=>!r.ok))throw httpError(`Stack operation partially failed: ${JSON.stringify(results)}`,502);return {containers:results};
  },true);
- read('/docker/events',async()=>({events:await docker(`/events?since=${Math.floor(Date.now()/1000)-3600}&until=${Math.floor(Date.now()/1000)}`)}));
+ read('/docker/events',async req=>{const hours=integer(req.query.hours||1,'Hours',1,168),until=Math.floor(Date.now()/1000);return {events:await docker(`/events?since=${until-hours*3600}&until=${until}`),since:until-hours*3600,until};});
  read('/backups',async()=>({jobs:await backupJobs(),...await backupArchives()}));
  read('/schedules',()=>providerReads([['items','proxmox',backupJobs],['truenas','truenas',()=>truenas('pool.snapshottask.query')]]));
  for(const path of ['/backups','/schedules'])action('post',path,'admin','proxmox.backup.schedule.create',req=>createBackupJob(req.body));

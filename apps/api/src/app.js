@@ -1,5 +1,6 @@
 import {discovered} from './discovery.js';
 import {storageInventory,storageDetails,createStorage} from './storage.js';
+import {networkInventory,networkDetails,networkWrite} from './network.js';
 import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
@@ -95,6 +96,11 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  read('/monitoring',async()=>{const s=await monitor.sample();return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
  read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
  read('/proxmox/storage',()=>storageInventory());
+ read('/proxmox/network',()=>networkInventory());
+ read('/proxmox/network/:node',req=>networkDetails(req.params.node,req.query.timeframe));
+ action('post','/proxmox/network/:node','admin','proxmox.network.create',req=>networkWrite(req.params.node,req.body),true);
+ action('put','/proxmox/network/:node/:iface','admin','proxmox.network.edit',req=>networkWrite(req.params.node,{...req.body,iface:req.params.iface},true),true);
+ action('put','/proxmox/network/:node','admin','proxmox.network.apply',async req=>({node:req.params.node,task:await pve(`/nodes/${encode(req.params.node)}/network`,{method:'PUT'})}),true);
  read('/proxmox/storage/:node/:id',req=>storageDetails(req.params.node,req.params.id,req.query.timeframe));
  action('post','/proxmox/storage','admin','proxmox.storage.create',req=>createStorage(req.body),true);
  action('put','/proxmox/storage/:id/enabled','admin','proxmox.storage.enabled',req=>{if(typeof req.body.enabled!=='boolean')throw httpError('enabled must be a boolean');return pveWrite(`/storage/${encode(req.params.id)}`,'PUT',{disable:req.body.enabled?0:1});},true);

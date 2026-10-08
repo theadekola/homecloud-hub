@@ -38,6 +38,12 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/cluster/backup'&&req.method==='GET')data=[{id:'job',comment:'Real job',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',enabled:1}];
  else if(req.url==='/api2/json/cluster/backup/job')data=req.method==='GET'?{id:'job',node:'pve',vmid:'101',storage:'backup',mode:'snapshot',enabled:1}:null;
  else if(req.url==='/api2/json/nodes')data=[{node:'pve',status:'online'}];
+ else if(req.url==='/api2/json/nodes/pve/network'&&req.method==='GET')data=[{iface:'vmbr0',type:'bridge',active:1,bridge_ports:'eno1',cidr:'192.0.2.10/24',bridge_vlan_aware:1},{iface:'vmbr0.20',type:'vlan',active:1,'vlan-id':20,'vlan-raw-device':'vmbr0'}];
+ else if(req.url==='/api2/json/nodes/pve/network'&&req.method==='POST')data=null;
+ else if(req.url==='/api2/json/nodes/pve/network'&&req.method==='PUT')data='UPID:network-reload';
+ else if(req.url==='/api2/json/nodes/pve/network/vmbr1'&&req.method==='PUT')data=null;
+ else if(req.url==='/api2/json/nodes/pve/dns')data={dns1:'192.0.2.1',search:'example.test'};
+ else if(req.url==='/api2/json/nodes/pve/rrddata?timeframe=day&cf=AVERAGE')data=[{time:1700000000,netin:125000,netout:250000}];
  else if(req.url==='/api2/json/storage'&&req.method==='GET')data=[{storage:'backup',type:'nfs',shared:1}];
  else if(req.url==='/api2/json/storage'&&req.method==='POST')data=null;
  else if(req.url==='/api2/json/storage/backup'&&req.method==='PUT')data=null;
@@ -110,6 +116,17 @@ try{
    const saved=await call('/proxmox/storage','POST',body,{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(saved.status,200);assert.equal(requests.at(-1).body.export,'/backup');
    const invalid={type:'dir',storage:'bad id',path:'/data'},approval=await call('/proxmox/storage','POST',invalid);assert.equal((await call('/proxmox/storage','POST',invalid,{'X-HomeCloud-Confirm':approval.body.confirmationPhrase})).status,400);
    const disabled={enabled:false},confirm=await call('/proxmox/storage/backup/enabled','PUT',disabled);assert.equal((await call('/proxmox/storage/backup/enabled','PUT',disabled,{'X-HomeCloud-Confirm':confirm.body.confirmationPhrase})).status,200);assert.equal(requests.at(-1).body.disable,'1');
+ });
+ await test('network inventory, traffic and staged writes use real endpoints with role and confirmation checks',async()=>{
+   const inventory=await call('/proxmox/network');assert.equal(inventory.body.interfaces[0].status,'up');assert.equal(inventory.body.interfaces[1]['vlan-id'],20);
+   const detail=await call('/proxmox/network/pve');assert.equal(detail.body.history[0].netin,125000);assert.equal(detail.body.dns.dns1,'192.0.2.1');assert.deepEqual(detail.body.errors,[]);
+   const body={iface:'vmbr1',type:'bridge',bridge_ports:'eno2',autostart:'1',bridge_vlan_aware:'1',cidr:'192.0.2.20/24'};
+   assert.equal((await call('/proxmox/network/pve','POST',body,{'x-test-role':'operator'})).status,403);
+   const challenge=await call('/proxmox/network/pve','POST',body);assert.equal(challenge.status,409);
+   assert.equal((await call('/proxmox/network/pve','POST',body,{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase})).status,200);assert.equal(requests.at(-1).body.bridge_ports,'eno2');assert.equal(requests.at(-1).body.bridge_vlan_aware,'1');
+   const invalid={iface:'bad/name',type:'vlan','vlan-id':5000},bad=await call('/proxmox/network/pve','POST',invalid);assert.equal((await call('/proxmox/network/pve','POST',invalid,{'X-HomeCloud-Confirm':bad.body.confirmationPhrase})).status,400);
+   const edit=await call('/proxmox/network/pve/vmbr1','PUT',body);assert.equal((await call('/proxmox/network/pve/vmbr1','PUT',body,{'X-HomeCloud-Confirm':edit.body.confirmationPhrase})).status,200);assert.equal(requests.at(-1).body.iface,undefined);
+   const apply=await call('/proxmox/network/pve','PUT',{});assert.equal(apply.status,409);const done=await call('/proxmox/network/pve','PUT',{}, {'X-HomeCloud-Confirm':apply.body.confirmationPhrase});assert.equal(done.body.result.task,'UPID:network-reload');
  });
  await test('schedule creation writes provider configuration and running a job returns a task',async()=>{
    const response=await call('/schedules','POST',{name:'Nightly',node:'pve',vmid:'101',storage:'backup',schedule:'02:00',retention:'keep-last=7'});

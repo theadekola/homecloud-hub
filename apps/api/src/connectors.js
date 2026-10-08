@@ -154,7 +154,7 @@ export async function dockerSnapshot(){
     })));
   }
   return {
-    host:{hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem},containers:measured,
+    host:{hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
     images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,size:i.Size,created:i.Created})),
     networks:networks.map(n=>({id:n.Id,name:n.Name,driver:n.Driver,scope:n.Scope,subnets:n.IPAM?.Config?.map(c=>c.Subnet).join(', ')||'',internal:n.Internal})),
     volumes:(volumes.Volumes||[]).map(v=>({id:v.Name,name:v.Name,driver:v.Driver,mountpoint:v.Mountpoint,scope:v.Scope})),

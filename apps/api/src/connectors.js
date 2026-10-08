@@ -132,7 +132,7 @@ export async function docker(path,init={}){
   }
   const text=await res.text();
   if(!text)return {};
-  if(path.startsWith('/images/create?')||path.startsWith('/events?')){
+  if(path.startsWith('/images/create?')||path.startsWith('/build?')||path.startsWith('/events?')){
     const events=text.trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
     const failed=events.find(event=>event.error||event.errorDetail);
     if(failed)throw new Error(failed.error||failed.errorDetail.message||'Image pull failed');
@@ -150,12 +150,12 @@ export async function dockerSnapshot(){
       const cpuDelta=stats?stats.cpu_stats.cpu_usage.total_usage-(stats.precpu_stats?.cpu_usage?.total_usage||0):0;
       const systemDelta=stats?stats.cpu_stats.system_cpu_usage-(stats.precpu_stats?.system_cpu_usage||0):0;
       const cpu=stats&&systemDelta>0?Math.round(cpuDelta/systemDelta*(stats.cpu_stats.online_cpus||stats.cpu_stats.cpu_usage.percpu_usage?.length||1)*1000)/10:null;
-      return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,status:c.State,ports:(c.Ports||[]).map(p=>p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort)).join(', '),cpu,memory:stats?.memory_stats?.usage??null,memoryPercent:stats?.memory_stats?.limit?Math.round(stats.memory_stats.usage/stats.memory_stats.limit*100):null,statsError,labels:c.Labels||{}};
+      return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,imageId:c.ImageID,status:c.State,ports:(c.Ports||[]).map(p=>p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort)).join(', '),cpu,memory:stats?.memory_stats?.usage??null,memoryPercent:stats?.memory_stats?.limit?Math.round(stats.memory_stats.usage/stats.memory_stats.limit*100):null,statsError,labels:c.Labels||{}};
     })));
   }
   return {
     host:{hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
-    images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,size:i.Size,created:i.Created})),
+    images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,tags:i.RepoTags||[],digests:i.RepoDigests||[],size:i.Size,created:i.Created,containers:i.Containers})),
     networks:networks.map(n=>({id:n.Id,name:n.Name,driver:n.Driver,scope:n.Scope,subnets:n.IPAM?.Config?.map(c=>c.Subnet).join(', ')||'',internal:n.Internal})),
     volumes:(volumes.Volumes||[]).map(v=>({id:v.Name,name:v.Name,driver:v.Driver,mountpoint:v.Mountpoint,scope:v.Scope})),
     stacks:[...new Set(measured.map(c=>c.labels['com.docker.compose.project']).filter(Boolean))].map(name=>({id:name,name,containers:measured.filter(c=>c.labels['com.docker.compose.project']===name).length}))
@@ -213,4 +213,14 @@ export async function dockerPrune(kind){
   const map={containers:'/containers/prune',images:'/images/prune',volumes:'/volumes/prune',networks:'/networks/prune'};
   if(!map[kind])throw new Error('Invalid prune kind');
   return docker(map[kind],{method:'POST'});
+}
+
+export async function dockerBuildImage({tag,dockerfile}){
+ if(typeof tag!=='string'||!tag.trim()||typeof dockerfile!=='string'||!dockerfile.trim())throw new Error('Image tag and Dockerfile are required');
+ if(Buffer.byteLength(dockerfile)>262144)throw new Error('Dockerfile must be under 256 KiB');
+ const file=Buffer.from(dockerfile),header=Buffer.alloc(512);
+ header.write('Dockerfile');header.write('0000644\0',100);header.write('0000000\0',108);header.write('0000000\0',116);
+ header.write(file.length.toString(8).padStart(11,'0')+'\0',124);header.write('00000000000\0',136);header.fill(32,148,156);header.write('0',156);header.write('ustar\0',257);header.write('00',263);
+ const checksum=header.reduce((sum,b)=>sum+b,0);header.write(checksum.toString(8).padStart(6,'0')+'\0 ',148);
+ return docker(`/build?t=${encodeURIComponent(tag.trim())}&rm=true`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000,headers:{'Content-Type':'application/x-tar'},body:Buffer.concat([header,file,Buffer.alloc((512-file.length%512)%512+1024)])});
 }

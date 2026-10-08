@@ -17,7 +17,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune } from './connectors.js';
+import { pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -158,6 +158,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return proxmoxCreateCt(req.body);
  });
  action('post','/docker/container','operator','docker.container.create',req=>dockerCreateContainer(req.body));
+ action('post','/docker/image/build','operator','docker.image.build',req=>dockerBuildImage(req.body));
+ read('/docker/image/:id',req=>docker(`/images/${encode(req.params.id)}/json`));
+ action('post','/docker/image/pull','operator','docker.image.pull',req=>docker(`/images/create?fromImage=${encode(required(req.body.image,'Image reference'))}`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000}));
+ action('post','/docker/image/:id/tag','operator','docker.image.tag',req=>docker(`/images/${encode(req.params.id)}/tag?repo=${encode(required(req.body.repository,'Repository'))}&tag=${encode(req.body.tag||'latest')}`,{method:'POST'}));
+ action('delete','/docker/image/:id','admin','docker.image.remove',req=>docker(`/images/${encode(req.params.id)}?force=false`,{method:'DELETE'}),true);
  read('/docker/container/:id/logs',async req=>({logs:await dockerLogs(req.params.id,Number(req.query.tail||200))}));
  action('post','/docker/prune/:kind','admin','docker.prune',req=>dockerPrune(req.params.kind),true);
  action('post','/docker/volume','operator','docker.volume.create',req=>docker('/volumes/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Name:required(req.body.name,'Volume name'),Driver:'local'})}));

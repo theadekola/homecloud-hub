@@ -5,7 +5,7 @@ import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} fr
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
-import {storageInventory,storageDetails,createStorage} from './storage.js';
+import {storageInventory,storageDetails,createStorage,storageSummary} from './storage.js';
 import {networkInventory,networkDetails,networkWrite} from './network.js';
 import { updates } from './updates.js';
 import express from 'express';
@@ -153,7 +153,10 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));
  read('/vpn',()=>snapshot('tailscale'));
- read('/storage',async()=>{const s=await monitor.sample();return {pools:[...(s.proxmox?.storage||[]).map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[])],datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
+ read('/storage',async req=>{const s=await monitor.sample(req.query.refresh==='1'),errors=[];let proxmox=[];
+   if(providers.proxmox.configured())try{const result=await storageInventory();proxmox=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}
+   const pools=[...proxmox.map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[])];
+   return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
  read('/network',async()=>{
    const s=await monitor.sample();const interfaces=[],errors=[];
    for(const node of s.proxmox?.nodes||[])if(node.status==='online')try{interfaces.push(...(await pve(`/nodes/${encode(node.name)}/network`)).map(n=>({...n,id:`${node.name}/${n.iface}`,provider:'proxmox',node:node.name,name:n.iface,address:n.address||n.cidr||null})));}catch(e){errors.push(`${node.name}: ${e.message}`);}

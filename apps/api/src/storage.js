@@ -20,6 +20,14 @@ export async function storageDetails(node,id,timeframe='day'){
  await Promise.all([['status',`${base}/status`],['content',`${base}/content`],['history',`${base}/rrddata?timeframe=${period}&cf=AVERAGE`]].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
  return result;
 }
+export function storageSummary(pools){
+ const groups=new Map();
+ for(const p of pools){const key=p.provider==='proxmox'&&p.shared===true?`proxmox:shared:${p.name}`:`${p.provider}:${p.id}`;const old=groups.get(key);if(!old||(!['online','ONLINE'].includes(old.status)&&['online','ONLINE'].includes(p.status))||(!(old.capacity>0)&&p.capacity>0))groups.set(key,p);}
+ const unique=[...groups.values()],online=unique.filter(p=>['online','ONLINE'].includes(p.status)),measured=online.filter(p=>p.capacity>0&&Number.isFinite(p.used)&&Number.isFinite(p.available));
+ const uncertain=unique.some(p=>p.provider==='proxmox'&&p.shared==null);
+ const complete=!uncertain&&online.length>0&&measured.length===online.length;
+ return {pools:unique.length,online:online.length,measured:measured.length,complete,capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
+}
 export function createStorage(input){
  const type=required(input.type,'Type'),storage=required(input.storage,'Storage ID');
  if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(storage))throw httpError('Storage ID must start with a letter and contain letters, numbers, underscores or hyphens');

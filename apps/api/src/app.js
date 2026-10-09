@@ -1,3 +1,4 @@
+import {snapshotInventory,guestSnapshot} from './snapshots.js';
 import {datasetInventory,datasetCreateInput,datasetRoot,datasetPermissionsInput} from './datasets.js';
 import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
@@ -161,6 +162,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
  read('/storage/disks',async()=>{const s=await monitor.sample(),errors=[];let resources=[];if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString()};});
  read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
+ read('/storage/snapshots/browse',async req=>{const id=required(req.query.id,'Snapshot');const list=await truenas('pool.snapshot.query',[[['id','=',id]]]);if(!list.some(s=>(s.id||s.name)===id))throw httpError('Snapshot not found',404);const split=id.lastIndexOf('@'),dataset=id.slice(0,split),name=id.slice(split+1);if(split<1||!name||/[\/\\]/.test(name)||['.','..'].includes(name))throw httpError('Invalid snapshot path');const root=await datasetRoot(dataset);return {path:`${root}/.zfs/snapshot/${name}`,entries:await truenas('filesystem.listdir',[`${root}/.zfs/snapshot/${name}`,[],{limit:200}])};});
+ read('/storage/snapshots',()=>snapshotInventory({proxmox:providers.proxmox.configured(),truenasEnabled:providers.truenas.configured()}));
+ action('post','/storage/snapshots/guest/create','operator','proxmox.snapshot.create',req=>guestSnapshot(req.body,'create'));
+ action('post','/storage/snapshots/guest/rollback','admin','proxmox.snapshot.rollback',req=>guestSnapshot(req.body,'rollback'),true);
+ action('post','/storage/snapshots/guest/delete','admin','proxmox.snapshot.delete',req=>guestSnapshot(req.body,'delete'),true);
  read('/storage/datasets',async req=>{const s=await monitor.sample(req.query.refresh==='1');return datasetInventory({proxmox:providers.proxmox.configured(),truenasEnabled:providers.truenas.configured(),snapshot:s.truenas||{}});});
  read('/storage/datasets/browse',async req=>({entries:await truenas('filesystem.listdir',[await datasetRoot(req.query.dataset),[],{limit:200}])}));
  read('/storage/datasets/permissions',async req=>({permissions:await truenas('filesystem.getacl',[await datasetRoot(req.query.dataset),true])}));

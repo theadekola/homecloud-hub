@@ -1,3 +1,4 @@
+import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
 import {agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
@@ -157,6 +158,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    if(providers.proxmox.configured())try{const result=await storageInventory();proxmox=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}
    const pools=[...proxmox.map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[])];
    return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
+ read('/storage/disks',async()=>{const s=await monitor.sample(),errors=[];let resources=[];if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString()};});
+ read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
  read('/network',async()=>{
    const s=await monitor.sample();const interfaces=[],errors=[];
    for(const node of s.proxmox?.nodes||[])if(node.status==='online')try{interfaces.push(...(await pve(`/nodes/${encode(node.name)}/network`)).map(n=>({...n,id:`${node.name}/${n.iface}`,provider:'proxmox',node:node.name,name:n.iface,address:n.address||n.cidr||null})));}catch(e){errors.push(`${node.name}: ${e.message}`);}

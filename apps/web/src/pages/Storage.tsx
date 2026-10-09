@@ -1,3 +1,4 @@
+import StorageDisks from './StorageDisks';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Database,HardDrive,Folder,Camera,Activity,RefreshCw,Plus,Shield,Search} from 'lucide-react';
@@ -22,6 +23,7 @@ export default function Storage(){
  const submit=async(e:any)=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));const path=modal==='Add Storage'?'/proxmox/storage':modal==='Create Dataset'?'/truenas/dataset':'/truenas/snapshot';if(await execute(path,'POST',modal==='Add Storage'?{...body,type:addType}:body))setModal('')};
  const storageTasks=(tasks.data.tasks||[]).filter((t:any)=>/vzdump|restore|snapshot|prune|imgcopy|move_volume/i.test(t.type||'')).slice(0,5);
  const truenas=d?.services?.find((s:any)=>s.provider==='truenas')&&['reachable','partial'].includes(d.services.find((s:any)=>s.provider==='truenas')?.status);
+ if(tab==='Disks')return <StorageDisks onTab={change}/>;
  return <section className="storage-overview"><div className="page-header"><div><small className="muted">Storage</small><h1>Storage Overview</h1><p className="muted">Monitor and manage storage across your connected hosts.</p></div><div className="header-actions"><button className="btn secondary" disabled={live.loading} onClick={live.refresh}><RefreshCw size={14}/>Refresh</button>{admin&&<button className="btn primary" onClick={()=>setModal('Add Storage')}><Plus size={14}/>Add Storage</button>}</div></div>
  {(error||live.error)&&<p className="error" role="alert">{error||live.error}</p>}{message&&<p className="storage-feedback" role="status">{message}<button className="btn ghost small" onClick={()=>setMessage('')}>Dismiss</button></p>}
  <div className="storage-overview-stats">{[[Database,'Storage Pools',d?summary.pools:'--',`${summary.online||0} online pools`],[Activity,'Measured Capacity',bytes(summary.capacity),'Online pools; shared capacity counted once'],[HardDrive,'Used Capacity',bytes(summary.used),summary.capacity?`${Math.round(summary.used/summary.capacity*100)}% of measured capacity`:'Measurements incomplete'],[Folder,'Available Capacity',bytes(summary.available),'Provider-reported free space'],[Camera,'Snapshots',d?d.snapshots.length:'--','Reported by TrueNAS'],[Shield,'Active Alerts',d?d.alerts.length:'--','Connected storage providers']].map(([Icon,label,value,sub]:any)=><Card key={label}><div><small className="muted">{label}</small><strong>{value}</strong><small className="muted">{sub}</small></div><span><Icon size={24}/></span></Card>)}</div>

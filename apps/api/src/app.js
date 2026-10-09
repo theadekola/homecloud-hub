@@ -1,5 +1,6 @@
 import {fileURLToPath} from 'node:url';
-import {agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent} from './node-agents.js';
+import {readFileSync} from 'node:fs';
+import {agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
 import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
@@ -33,6 +34,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
  app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name)));
  app.post('/api/node-agent/poll',(req,res)=>{const node=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json(pollAgent(node,req.body));});
+ app.post('/api/node-agent/setup-script',(req,res)=>{authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json({script:readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')});});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
  app.post('/api/auth/register',loginLimiter,async(req,res)=>{
    const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
@@ -93,6 +95,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    await audit(req,label,resource,{result:result??null},status);
    res.json({ok:true,result,message:status==='queued'?'Task accepted. Check task history for completion.':'Operation completed.'});
  });
+ action('post','/node-agents/guest/setup','owner','guest.install-docker',req=>installAgentHost(required(req.body.host,'Guest host')),true);
  const snapshot=async provider=>{
    if(provider==='docker'&&selectedAgentHost())return {...await dockerSnapshot(),sampledAt:new Date().toISOString(),mode:'node-agent'};
    const s=await monitor.sample();const service=s.services.find(x=>x.provider===provider);

@@ -79,6 +79,14 @@ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('l
 const url=`http://127.0.0.1:${server.address().port}`;
 async function call(endpoint,method='GET',body,headers={}){const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 try{
+ await test('guest installation requires owner and confirmation bound to the guest payload',async()=>{
+  const endpoint='/node-agents/guest/setup',body={host:'fixture:lxc/131'};
+  assert.equal((await call(endpoint,'POST',body,{'x-test-role':'viewer'})).status,403);
+  const challenge=await call(endpoint,'POST',body);assert.equal(challenge.status,409);
+  assert.equal((await call(endpoint,'POST',{host:'fixture:lxc/132'},{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase})).status,409);
+  assert.equal((await call(endpoint,'POST',body,{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase})).status,503);
+  assert.equal((await call('/node-agent/setup-script','POST',{})).status,401);
+ });
  await test('node pairing requires owner, public polling requires agent credentials, and revoked agents stop authenticating',async()=>{
   assert.equal((await call('/node-agents/pairing','POST',{}, {'x-test-role':'viewer'})).status,403);
   const pairing=await call('/node-agents/pairing','POST',{});assert.equal(pairing.status,200);

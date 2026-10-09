@@ -15,3 +15,15 @@ test('node pairing is single use, credentials are hashed, requests stay bound to
  await assert.rejects(()=>a.agentContext.run({host:node.id+':lxc/130'},()=>a.agentRequest('/../../host-command')),/Unsupported/);
  a.revokeAgent(node.id);assert.throws(()=>a.authenticateAgent(node.token));assert.equal(a.agentHosts().length,0);
 });
+test('setup is restricted to reported supported guests and versioned agents',async()=>{
+ const node=a.pairNode(a.createPairing().code,'setup-node'),identity=a.authenticateAgent(node.token),hosts=[{id:'lxc/131',name:'portfolio',online:false,setup:true}];
+ a.pollAgent(identity,{hosts,results:[]});
+ await assert.rejects(()=>a.installAgentHost(node.id+':lxc/131'),/Update the installed/);
+ a.pollAgent(identity,{version:2,hosts,results:[]});
+ await assert.rejects(()=>a.installAgentHost(node.id+':node'),/offline/);
+ const promise=a.installAgentHost(node.id+':lxc/131');
+ await assert.rejects(()=>a.installAgentHost(node.id+':lxc/131'),/already running/);
+ const work=a.pollAgent(identity,{version:2,hosts,results:[]}).jobs;assert.equal(work[0].operation,'setup');assert.equal(work[0].host,'lxc/131');
+ a.pollAgent(identity,{version:2,hosts,results:[{id:work[0].id,status:200,body:Buffer.from(JSON.stringify({message:'verified'})).toString('base64')}]});
+ assert.equal((await promise).message,'verified');a.revokeAgent(node.id);
+});

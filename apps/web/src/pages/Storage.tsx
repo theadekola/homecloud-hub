@@ -1,3 +1,4 @@
+import StorageDatasets from './StorageDatasets';
 import StorageDisks from './StorageDisks';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
@@ -23,6 +24,7 @@ export default function Storage(){
  const submit=async(e:any)=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));const path=modal==='Add Storage'?'/proxmox/storage':modal==='Create Dataset'?'/truenas/dataset':'/truenas/snapshot';if(await execute(path,'POST',modal==='Add Storage'?{...body,type:addType}:body))setModal('')};
  const storageTasks=(tasks.data.tasks||[]).filter((t:any)=>/vzdump|restore|snapshot|prune|imgcopy|move_volume/i.test(t.type||'')).slice(0,5);
  const truenas=d?.services?.find((s:any)=>s.provider==='truenas')&&['reachable','partial'].includes(d.services.find((s:any)=>s.provider==='truenas')?.status);
+ if(tab==='Datasets / Volumes')return <StorageDatasets onTab={change}/>;
  if(tab==='Disks')return <StorageDisks onTab={change}/>;
  return <section className="storage-overview"><div className="page-header"><div><small className="muted">Storage</small><h1>Storage Overview</h1><p className="muted">Monitor and manage storage across your connected hosts.</p></div><div className="header-actions"><button className="btn secondary" disabled={live.loading} onClick={live.refresh}><RefreshCw size={14}/>Refresh</button>{admin&&<button className="btn primary" onClick={()=>setModal('Add Storage')}><Plus size={14}/>Add Storage</button>}</div></div>
  {(error||live.error)&&<p className="error" role="alert">{error||live.error}</p>}{message&&<p className="storage-feedback" role="status">{message}<button className="btn ghost small" onClick={()=>setMessage('')}>Dismiss</button></p>}

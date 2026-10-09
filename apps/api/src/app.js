@@ -1,3 +1,4 @@
+import {datasetInventory,datasetCreateInput,datasetRoot,datasetPermissionsInput} from './datasets.js';
 import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
@@ -160,6 +161,9 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
  read('/storage/disks',async()=>{const s=await monitor.sample(),errors=[];let resources=[];if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString()};});
  read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
+ read('/storage/datasets',async req=>{const s=await monitor.sample(req.query.refresh==='1');return datasetInventory({proxmox:providers.proxmox.configured(),truenasEnabled:providers.truenas.configured(),snapshot:s.truenas||{}});});
+ read('/storage/datasets/browse',async req=>({entries:await truenas('filesystem.listdir',[await datasetRoot(req.query.dataset),[],{limit:200}])}));
+ read('/storage/datasets/permissions',async req=>({permissions:await truenas('filesystem.getacl',[await datasetRoot(req.query.dataset),true])}));
  read('/network',async()=>{
    const s=await monitor.sample();const interfaces=[],errors=[];
    for(const node of s.proxmox?.nodes||[])if(node.status==='online')try{interfaces.push(...(await pve(`/nodes/${encode(node.name)}/network`)).map(n=>({...n,id:`${node.name}/${n.iface}`,provider:'proxmox',node:node.name,name:n.iface,address:n.address||n.cidr||null})));}catch(e){errors.push(`${node.name}: ${e.message}`);}
@@ -229,7 +233,9 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/tasks',()=>providerReads([['proxmox','proxmox',()=>pve('/cluster/tasks')],['truenas','truenas',()=>truenas('core.get_jobs',[[],{limit:100}])]]));
  read('/tasks/:node/:id',req=>pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/status`));
  read('/tasks/:node/:id/log',async req=>({logs:await pve(`/nodes/${encode(req.params.node)}/tasks/${encode(req.params.id)}/log?limit=500${req.query.start?`&start=${integer(req.query.start,'Log offset',0,10000000)}`:''}`)}));
- action('post','/truenas/dataset','admin','truenas.dataset.create',req=>truenas('pool.dataset.create',[{name:required(req.body.name,'Dataset name'),type:'FILESYSTEM'}]));
+ action('post','/truenas/dataset','admin','truenas.dataset.create',req=>truenas('pool.dataset.create',[datasetCreateInput(req.body)]));
+ action('put','/truenas/dataset/permissions','admin','truenas.dataset.permissions',async req=>({jobId:await truenas('filesystem.setperm',[datasetPermissionsInput(req.body,await datasetRoot(req.body.dataset))])}),true);
+ action('post','/truenas/dataset/clone','admin','truenas.dataset.clone',req=>truenas('pool.snapshot.clone',[{snapshot:required(req.body.snapshot,'Snapshot'),dataset_dst:datasetCreateInput({name:req.body.name}).name}]));
  action('post','/truenas/snapshot','operator','truenas.snapshot.create',req=>truenas('pool.snapshot.create',[{dataset:required(req.body.dataset,'Dataset'),name:required(req.body.name,'Snapshot name'),recursive:false}]));
  action('delete','/truenas/snapshot/:id','admin','truenas.snapshot.delete',req=>truenas('pool.snapshot.delete',[req.params.id,{defer:false,recursive:false}]),true);
  action('post','/truenas/snapshot/:id/rollback','admin','truenas.snapshot.rollback',req=>truenas('pool.snapshot.rollback',[req.params.id,{recursive:false,recursive_clones:false,force:false}]),true);

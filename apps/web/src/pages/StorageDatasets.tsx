@@ -6,7 +6,7 @@ import {api,confirmedApi} from '../api';
 import {Card,Badge,Modal} from '../components/UI';
 const bytes=(n:any)=>typeof n==='number'&&Number.isFinite(n)?n>=1024**4?`${(n/1024**4).toFixed(1)} TiB`:n>=1024**3?`${(n/1024**3).toFixed(1)} GiB`:n>=1024**2?`${(n/1024**2).toFixed(1)} MiB`:n>=1024?`${(n/1024).toFixed(1)} KiB`:`${n} B`:'Not reported';
 const colors=['#3387ff','#11c98e','#ffac32','#9254ed','#16b9c8','#e25d91'];
-const tabs=['Storage Pools','Disks','Datasets / Volumes','Snapshots','Docker Volumes','Performance','Settings'];
+const tabs=['Storage Pools','Disks','Datasets / Volumes','Snapshots','Shares','Docker Volumes','Performance','Settings'];
 export default function StorageDatasets({onTab}:{onTab:(t:string)=>void}){
  const live=useApi<any>('/storage/datasets',null),session=useApi<any>('/auth/me',null);
  const [search,setSearch]=useState(''),[pool,setPool]=useState('all'),[type,setType]=useState('all'),[selected,setSelected]=useState(''),[page,setPage]=useState(0),[modal,setModal]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[extra,setExtra]=useState<any>(null);

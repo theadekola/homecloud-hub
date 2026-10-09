@@ -79,6 +79,17 @@ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('l
 const url=`http://127.0.0.1:${server.address().port}`;
 async function call(endpoint,method='GET',body,headers={}){const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 try{
+ await test('node pairing requires owner, public polling requires agent credentials, and revoked agents stop authenticating',async()=>{
+  assert.equal((await call('/node-agents/pairing','POST',{}, {'x-test-role':'viewer'})).status,403);
+  const pairing=await call('/node-agents/pairing','POST',{});assert.equal(pairing.status,200);
+  const node=await call('/node-agent/pair','POST',{code:pairing.body.code,name:'paired-pve'});assert.equal(node.status,200);
+  assert.equal((await call('/node-agent/pair','POST',{code:pairing.body.code,name:'replay'})).status,401);
+  assert.equal((await call('/node-agent/poll','POST',{hosts:[],results:[]})).status,401);
+  assert.equal((await call('/node-agent/poll','POST',{hosts:[{id:'lxc/130',name:'guest-docker',online:true}],results:[]},{Authorization:'Bearer '+node.body.token})).status,200);
+  const hosts=await call('/docker/hosts');assert.equal(hosts.body.hosts[0].name,'guest-docker');assert.ok(!JSON.stringify(hosts).includes(node.body.token));
+  assert.equal((await call('/node-agents/'+node.body.id,'DELETE')).status,200);
+  assert.equal((await call('/node-agent/poll','POST',{hosts:[],results:[]},{Authorization:'Bearer '+node.body.token})).status,401);
+ });
  await test('unconfigured dashboard does not invent VM counts, health scores or history',async()=>{
    const response=await call('/dashboard');assert.equal(response.status,200);assert.equal(response.body.stats.vms,null);assert.equal(response.body.stats.containers,null);assert.equal(response.body.stats.health,undefined);assert.deepEqual(response.body.metrics,[]);
    const missing=await call('/docker');assert.equal(missing.status,503);assert.match(missing.body.error,/not configured/);

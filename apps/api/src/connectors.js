@@ -1,3 +1,4 @@
+import {selectedAgentHost,agentRequest} from './node-agents.js';
 import {dockerConfig,dockerTlsConfig} from './docker-config.js';
 import {mergeNodeStorage} from './proxmox-inventory.js';
 import {inspectGuests} from './guest-discovery.js';
@@ -126,8 +127,8 @@ export async function proxmoxCreateCt(payload,call=pve){
 export function dockerConfigured(){return !!dockerConfig().url}
 export async function docker(path,init={}){
   const config=dockerConfig(),dockerUrl=config.url;
-  if(!dockerUrl) throw Object.assign(new Error('Docker API is not configured'),{status:503});
-  const res=await request(`${dockerUrl}${path}`,init,dockerTlsConfig(config));
+  if(!dockerUrl&&!selectedAgentHost()) throw Object.assign(new Error('Docker API is not configured'),{status:503});
+  const res=selectedAgentHost()?await agentRequest(path,init):await request(`${dockerUrl}${path}`,init,dockerTlsConfig(config));
   if(!res.ok && res.status!==304) {
     const text=await res.text().catch(()=> '');
     throw new Error(`Docker HTTP ${res.status}${text?`: ${text}`:''}`);
@@ -200,9 +201,10 @@ export async function dockerCreateContainer(payload){
 }
 export async function dockerLogs(id,tail=200){
   const config=dockerConfig(),dockerUrl=config.url;
-  if(!dockerUrl)throw new Error('Docker API is not configured');
+  if(!dockerUrl&&!selectedAgentHost())throw new Error('Docker API is not configured');
   if(!Number.isInteger(tail)||tail<1||tail>10000)throw new Error('Log tail must be between 1 and 10000');
-  const res=await request(`${dockerUrl}/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&timestamps=1&tail=${tail}`,{},dockerTlsConfig(config));
+  const logPath=`/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&timestamps=1&tail=${tail}`;
+  const res=selectedAgentHost()?await agentRequest(logPath):await request(`${dockerUrl}${logPath}`,{},dockerTlsConfig(config));
   if(!res.ok)throw new Error(`Docker HTTP ${res.status}`);
   const data=res.buffer;
   if(data.length>=8 && [0,1,2].includes(data[0]) && data[1]===0 && data[2]===0 && data[3]===0){

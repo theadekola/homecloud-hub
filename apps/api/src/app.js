@@ -1,3 +1,5 @@
+import {fileURLToPath} from 'node:url';
+import {agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent} from './node-agents.js';
 import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
@@ -18,7 +20,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { request,pve,docker,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
+import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -27,6 +29,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'2mb'}));
  app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false}));
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
+ app.get('/api/node-agent/download',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/homecloud-node-agent.py',import.meta.url))));
+ app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
+ app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name)));
+ app.post('/api/node-agent/poll',(req,res)=>{const node=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json(pollAgent(node,req.body));});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
  app.post('/api/auth/register',loginLimiter,async(req,res)=>{
    const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
@@ -41,6 +47,11 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
  app.use('/api',authenticate);
+ app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
+ app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts()}));
+ app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
+ app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{await audit(req,'node-agent.pairing','nodes',{},'success');res.json(createPairing());});
+ app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});
 
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
@@ -71,7 +82,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{
-   const resource=Object.values(req.params).join('/')||path;
+   const resource=(Object.values(req.params).join('/')||path)+(path.startsWith('/actions/docker')&&selectedAgentHost()?` [${selectedAgentHost()}]`:'');
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
    if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase});
@@ -83,6 +94,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    res.json({ok:true,result,message:status==='queued'?'Task accepted. Check task history for completion.':'Operation completed.'});
  });
  const snapshot=async provider=>{
+   if(provider==='docker'&&selectedAgentHost())return {...await dockerSnapshot(),sampledAt:new Date().toISOString(),mode:'node-agent'};
    const s=await monitor.sample();const service=s.services.find(x=>x.provider===provider);
    if(!s[provider])throw httpError(service?.error||`${provider} is not configured`,service?.status==='error'?502:503);
    return {...s[provider],sampledAt:s.sampledAt,mode:'live'};
@@ -134,7 +146,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return {node:req.params.node,operation:req.params.operation,message:'Power command submitted to Proxmox. Watch node status for the outcome.'};
  },true);
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
- read('/docker',async()=>{if(providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.resources.length&&!inventory.discoveryLimitations.length)return snapshot('docker');return {readOnly:true,discoveryLimitations:inventory.discoveryLimitations,guestReports:inventory.reports.length,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
+ read('/docker',async()=>{if(selectedAgentHost()||providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.resources.length&&!inventory.discoveryLimitations.length)return snapshot('docker');return {readOnly:true,discoveryLimitations:inventory.discoveryLimitations,guestReports:inventory.reports.length,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));
  read('/vpn',()=>snapshot('tailscale'));

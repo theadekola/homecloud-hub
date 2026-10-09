@@ -1,3 +1,4 @@
+export function setDockerHost(id:string){localStorage.setItem('homecloud_docker_host',id);}
 const API = import.meta.env.VITE_API_URL || '';
 let refreshInFlight:Promise<boolean>|null=null;
 function refreshAccessToken(){
@@ -20,6 +21,7 @@ export function clearTokens(){ localStorage.removeItem('homecloud_access_token')
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string): Promise<T> {
   const headers:any = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  const host=localStorage.getItem('homecloud_docker_host');if(host&&(path.startsWith('/docker')||path.startsWith('/actions/docker')))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
   if(confirmation) headers['X-HomeCloud-Confirm']=confirmation;
   let res = await fetch(`${API}/api${path}`, { ...options, headers });

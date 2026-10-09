@@ -1,3 +1,4 @@
+import StoragePerformance from './StoragePerformance';
 import StorageShares from './StorageShares';
 import StorageSnapshots from './StorageSnapshots';
 import StorageDatasets from './StorageDatasets';
@@ -27,6 +28,7 @@ export default function Storage(){
  const storageTasks=(tasks.data.tasks||[]).filter((t:any)=>/vzdump|restore|snapshot|prune|imgcopy|move_volume/i.test(t.type||'')).slice(0,5);
  const truenas=d?.services?.find((s:any)=>s.provider==='truenas')&&['reachable','partial'].includes(d.services.find((s:any)=>s.provider==='truenas')?.status);
  if(tab==='Datasets / Volumes')return <StorageDatasets onTab={change}/>;
+ if(tab==='Performance')return <StoragePerformance onTab={change}/>;
  if(tab==='Shares')return <StorageShares onTab={change}/>;
  if(tab==='Snapshots')return <StorageSnapshots onTab={change}/>;
  if(tab==='Disks')return <StorageDisks onTab={change}/>;

@@ -6,7 +6,7 @@ function refreshAccessToken(){
     const refreshToken=localStorage.getItem('homecloud_refresh_token');
     if(!refreshToken)return false;
     const response=await fetch(`${API}/api/auth/refresh`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken})});
-    if(!response.ok){clearTokens();return false;}
+    if(!response.ok){if(response.status===401)clearTokens();throw Object.assign(new Error(response.status===401?'Session expired. Sign in again.':'Session refresh is temporarily unavailable.'),{status:response.status});}
     const body=await response.json();setTokens(body.accessToken,body.refreshToken);return true;
   })().finally(()=>{refreshInFlight=null;});
   return refreshInFlight;
@@ -20,8 +20,8 @@ export function setTokens(accessToken:string, refreshToken?:string){
 export function clearTokens(){ localStorage.removeItem('homecloud_access_token'); localStorage.removeItem('homecloud_refresh_token'); }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string): Promise<T> {
-  const headers:any = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-  const host=localStorage.getItem('homecloud_docker_host');if(host&&(path.startsWith('/docker')||path.startsWith('/actions/docker')))headers['X-HomeCloud-Docker-Host']=host;
+  const headers:any = { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(options.headers).entries()) };
+  const host=localStorage.getItem('homecloud_docker_host');if(host&&!Object.hasOwn(headers,'x-homecloud-docker-host')&&(path.startsWith('/docker')||path.startsWith('/actions/docker')))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
   if(confirmation) headers['X-HomeCloud-Confirm']=confirmation;
   let res = await fetch(`${API}/api${path}`, { ...options, headers });
@@ -40,13 +40,14 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
 }
 
 export async function confirmedApi<T=any>(path:string, options:RequestInit={}):Promise<T>{
+  const host=localStorage.getItem('homecloud_docker_host')||'';
   try{return await api<T>(path,options)}
   catch(e:any){
     if(e.status===409 && e.body?.confirmationPhrase){
       const phrase=e.body.confirmationPhrase;
       const entered=window.prompt(`This is a sensitive action.\nType exactly:\n${phrase}`);
       if(entered!==phrase) throw new Error('Confirmation cancelled');
-      return api<T>(path,options,phrase);
+      return api<T>(path,{...options,headers:{...Object.fromEntries(new Headers(options.headers).entries()),'X-HomeCloud-Docker-Host':host}},phrase);
     }
     throw e;
   }

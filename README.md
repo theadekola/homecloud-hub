@@ -8,7 +8,7 @@ A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense and Tail
 | --- | --- | --- |
 | Proxmox | Nodes, VMs, LXC, storage, networks, backup jobs, archives and tasks | Create an empty VM; guest lifecycle; VM snapshot; backups; create/toggle/delete backup schedules; retention update/preview/prune; restore archives into unused guest IDs |
 | Docker | Engine information, container measurements/logs, images, volumes, networks and existing Compose projects | Create/lifecycle/remove containers; create/remove volumes and networks; prune unused resources; start/stop/restart existing Compose project containers |
-| TrueNAS | Pools, datasets, disks, snapshots, alerts, snapshot schedules and jobs | Create datasets and snapshots; delete/roll back snapshots; start pool scrubs; create/toggle periodic snapshot tasks with retention lifetimes |
+| TrueNAS | Pools, datasets, disks, snapshots, alerts, snapshot schedules and jobs | Create datasets and snapshots; create/update/toggle/delete SMB and NFS shares; inspect share paths and permissions; delete/roll back snapshots; start pool scrubs; create/toggle periodic snapshot tasks with retention lifetimes |
 | OPNsense | System status, interfaces and services | Start/stop/restart services; reload an interface |
 | Tailscale | Tailnet devices, addresses, authorization, last-seen timestamps and routes | Authorize/deauthorize/remove devices; enable advertised routes or disable routes |
 | Other services | Server-configured HTTP health endpoints | Monitoring only |
@@ -61,8 +61,10 @@ See PRODUCTION.md for connector configuration and validation. Only configure int
 ```sh
 npm install
 npm run build
-npm test -w apps/api
+npm test
 ```
+
+The development web server forwards `/api` to `http://127.0.0.1:6000`. Set `HOMECLOUD_DEV_API_URL` when the local API uses another address. Production continues to use the Caddy proxy. API startup requires database configuration and JWT secrets.
 
 On Windows, if your environment prevents npm workspace links, run `npm install --workspaces=false` separately in `apps/api` and `apps/web`, then run the root build. TLS regression tests use OpenSSL; they are skipped if it is unavailable.
 

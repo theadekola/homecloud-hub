@@ -32,6 +32,8 @@ jobs:
         working-directory: apps/api
       - run: npm ci --workspaces=false
         working-directory: apps/web
+      - run: npm test --workspaces=false
+        working-directory: apps/web
       - run: npm run build --workspaces=false
         working-directory: apps/web
       - name: Build and start the deployment

@@ -1,9 +1,17 @@
+import {isIP} from 'node:net';
 import {truenas,httpError,required,integer} from './infrastructure.js';
 import {pve} from './connectors.js';
+function isCidr(network){
+ if(typeof network!=='string'||/\s|%/.test(network))return false;
+ const parts=network.split('/');
+ if(parts.length!==2||!/^(0|[1-9][0-9]{0,2})$/.test(parts[1]))return false;
+ const family=isIP(parts[0]);
+ return family!==0&&Number(parts[1])<=(family===4?32:128);
+}
 export function shareProtocol(v){if(!['smb','nfs'].includes(v))throw httpError('Unsupported share protocol');return v;}
 export function shareInput(protocol,input){shareProtocol(protocol);const path=required(input.path,'Share path');if(!path.startsWith('/mnt/')||path.split('/').some(p=>['.','..'].includes(p))||/[\x00-\x1f]/.test(path))throw httpError('Use an existing absolute path under /mnt');const body={path,comment:String(input.comment||'').slice(0,1024)};if(typeof input.enabled==='boolean')body.enabled=input.enabled;
  if(protocol==='smb'){body.name=required(input.name,'Share name');if(/[\\/\x00-\x1f]/.test(body.name)||body.name.length>80)throw httpError('Invalid SMB share name');}
- else {if(typeof input.ro==='boolean')body.ro=input.ro;body.networks=Array.isArray(input.networks)?input.networks:[];if(body.networks.some(n=>typeof n!=='string'||!n.includes('/')||/\s/.test(n)))throw httpError('Use CIDR networks such as 192.168.10.0/24');if(!body.networks.length)throw httpError('Specify at least one allowed NFS network');}
+ else {if(typeof input.ro==='boolean')body.ro=input.ro;body.networks=Array.isArray(input.networks)?Array.from(input.networks):[];if(body.networks.some(n=>!isCidr(n)))throw httpError('Use valid IPv4 or IPv6 CIDR networks (prefix 0-32 or 0-128)');if(!body.networks.length)throw httpError('Specify at least one allowed NFS network');}
  return body;
 }
 export async function detectedShare(protocol,id,tn=truenas){shareProtocol(protocol);const number=integer(id,'Share ID');const rows=await tn(`sharing.${protocol}.query`,[[['id','=',number]]]);const share=rows.find(s=>s.id===number);if(!share)throw httpError('Share not found',404);const path=share.path||share.paths?.[0];if(typeof path!=='string'||!path.startsWith('/mnt/')||path.split('/').some(p=>['.','..'].includes(p)))throw httpError('Share has no accessible local path');return {...share,path};}

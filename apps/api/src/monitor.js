@@ -1,3 +1,4 @@
+import {agentContext} from './node-agents.js';
 import crypto from 'node:crypto';
 import { get,mutate } from './store.js';
 import { proxmoxConfigured,proxmoxSnapshot,dockerConfigured,dockerSnapshot } from './connectors.js';
@@ -24,7 +25,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
   async function sample(force=false){
     if(inFlight)return inFlight;
     if(!force&&latest&&Date.now()-Date.parse(latest.sampledAt)<10000)return latest;
-    inFlight=(async()=>{
+    inFlight=agentContext.run({host:''},async()=>{
       const snapshot={sampledAt:new Date().toISOString(),services:[],hosts:[]};
       await Promise.all(Object.entries(sources).map(async([name,source])=>{
         if(!source.configured()){snapshot.services.push({name,provider:name,status:'not-configured',response:null});return;}
@@ -51,7 +52,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
       snapshot.metrics=persistence.get().metrics;
       snapshot.alerts=persistence.get().alerts;
       latest=snapshot;return snapshot;
-    })().finally(()=>{inFlight=null;});
+    }).finally(()=>{inFlight=null;});
     return inFlight;
   }
   return {sample,invalidate:async()=>{latest=null;if(inFlight){await inFlight.catch(()=>{});latest=null;}}};

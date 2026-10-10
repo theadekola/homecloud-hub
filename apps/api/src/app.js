@@ -46,7 +46,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:'3.0.0',time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
-   const email=required(req.body.email,'Email'),password=required(req.body.password,'Password');
+   const email=required(req.body.email,'Email'),password=req.body.password;
+   if(typeof password!=='string'||!password.length)throw httpError('Password is required');
    const user=await verifyPassword(email,password);if(!user)return res.status(401).json({error:'Invalid credentials'});
    await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);
    res.json({user:{id:user.id,email:user.email,name:user.name,role:user.role},...await issueTokens(user)});
@@ -89,7 +90,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{
-   const resource=(Object.values(req.params).join('/')||path)+(path.startsWith('/actions/docker')&&selectedAgentHost()?` [${selectedAgentHost()}]`:'');
+   const resource=(Object.values(req.params).join('/')||path)+((req.params.provider==='docker'||path.startsWith('/docker/'))?` [${selectedAgentHost()||'direct-engine'}]`:'');
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
    if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase});
@@ -226,7 +227,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    if(results.some(r=>!r.ok))throw httpError(`Stack operation partially failed: ${JSON.stringify(results)}`,502);return {containers:results};
  },true);
  read('/docker/events',async req=>{const hours=integer(req.query.hours||1,'Hours',1,168),until=Math.floor(Date.now()/1000);return {events:await docker(`/events?since=${until-hours*3600}&until=${until}`),since:until-hours*3600,until};});
- read('/backups',async()=>({jobs:await backupJobs(),...await backupArchives()}));
+ read('/backups',async()=>{
+   const result=await providerReads([['jobs','proxmox',backupJobs]]);result.points=[];
+   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
+   return result;
+ });
  read('/schedules',()=>providerReads([['items','proxmox',backupJobs],['truenas','truenas',()=>truenas('pool.snapshottask.query')]]));
  for(const path of ['/backups','/schedules'])action('post',path,'admin','proxmox.backup.schedule.create',req=>createBackupJob(req.body));
  action('post','/backups/:id/run','operator','proxmox.backup.run',req=>runBackupJob(req.params.id));
@@ -280,8 +285,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/users',async()=>({users:(await db.query(`SELECT id,name,email,role,status,two_factor_enabled AS "twoFactor",last_login AS "lastLogin" FROM users ORDER BY created_at`)).rows}),'admin');
  action('post','/users','admin','user.create',async req=>{
    const {email,name,password,role='viewer'}=req.body;if(!roles[role]||(role==='owner'&&req.user.role!=='owner')||roles[role]>roles[req.user.role])throw httpError('Role cannot be granted',403);
-   required(email,'Email');required(name,'Name');if(typeof password!=='string'||password.length<12)throw httpError('Password must have at least 12 characters');
-   const hash=await bcrypt.hash(password,12);try{return (await db.query(`INSERT INTO users(email,name,password_hash,role,status) VALUES($1,$2,$3,$4,'active') RETURNING id,email,name,role,status`,[email.toLowerCase(),name,hash,role])).rows[0];}catch(e){if(e.code==='23505')throw httpError('Email already exists',409);throw e;}
+   const normalizedEmail=required(email,'Email').toLowerCase(),normalizedName=required(name,'Name');if(typeof password!=='string'||password.length<12)throw httpError('Password must have at least 12 characters');
+   const hash=await bcrypt.hash(password,12);try{return (await db.query(`INSERT INTO users(email,name,password_hash,role,status) VALUES($1,$2,$3,$4,'active') RETURNING id,email,name,role,status`,[normalizedEmail,normalizedName,hash,role])).rows[0];}catch(e){if(e.code==='23505')throw httpError('Email already exists',409);throw e;}
  });
  action('post','/users/:id/toggle','admin','user.toggle',async req=>{
    if(req.params.id===req.user.sub)throw httpError('You cannot deactivate yourself');

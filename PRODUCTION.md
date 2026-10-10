@@ -183,3 +183,11 @@ For node status/services HTTP 403, in Proxmox open Datacenter → Permissions. A
 The overview uses compact live cards. Node selection filters resources and guests; the time selector filters collected CPU/memory history. Add Widget saves visible widgets in the browser. Refresh requests a fresh measurement; Export downloads the current report. Create VM and Run Backup open their actual action forms. AI Health Check reads the current live status. The infrastructure map shows observed node/guest relationships. API reachability is a measured percentage, not a fabricated security score. Backup counts are provider-reported archives and jobs; Monitoring shows task outcomes.
 
 For updates, use the header Update button or `sudo homecloud update`. GitHub checks run every minute. If the updater is missing, run `cd /opt/homecloud-hub && sudo bash deployment/setup-updater.sh` once.
+
+## Notifications and provider checks
+
+External delivery is optional. Configure channel values listed in `.env.example` in the server `.env` and apply them with `sudo homecloud restart`. Do not commit webhook URLs, bot tokens or SMTP passwords. Owner-only Settings shows delivery status and has a test action. These features do not configure an external channel or recipient automatically.
+
+Delivery state is persisted in `runtime/live-state.json`. Pending deliveries retry during monitoring samples, independently of API response completion. Keep the runtime directory in deployment backups. The queue keeps a maximum of 1,000 pending messages and processes up to 20 per flush. At-least-once retries may duplicate messages after ambiguous network failures.
+
+Provider diagnostics are read-only and owner-only. Run them after updating the VM and record failures by provider and method. Verify writes only against disposable staging guests/datasets using the installed API version and its required privileges. No live share or media changes are part of these checks.

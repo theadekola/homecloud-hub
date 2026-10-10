@@ -64,3 +64,9 @@ npm run build
 ```
 
 If the earlier standalone NFS patch is already applied, reverse that patch first or apply the other changes selectively: this combined patch already contains it. Review and commit the changes before using the production updater; the updater intentionally rejects local tracked edits. Deployment and live-write verification require a separate staging step.
+
+## Follow-up implementation
+
+The remaining Docker monitoring, selected-host resource views and external notification features have now been implemented in the repository. Monitoring includes isolated paired-host reads, host-qualified metrics and alerts, Engine deduplication, offline node reporting and a Docker monitoring table/history view. Storage and Network share the Docker selection without substituting an offline host. Settings exposes optional Discord, Telegram and verified-TLS SMTP delivery, retry status and owner-only test actions.
+
+Settings also provides owner-only read-only API diagnostics for all configured providers. This addresses missing diagnostic tooling; actual compatibility with the user's installed releases and write permissions still requires running those checks and disposable staging write tests after deployment. Notification credentials and destinations must be configured by the owner. No live notifications or infrastructure writes were performed during implementation.

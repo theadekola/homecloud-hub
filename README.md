@@ -13,7 +13,7 @@ A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense and Tail
 | Tailscale | Tailnet devices, addresses, authorization, last-seen timestamps and routes | Authorize/deauthorize/remove devices; enable advertised routes or disable routes |
 | Other services | Server-configured HTTP health endpoints | Monitoring only |
 
-Monitoring samples every 30 seconds. Charts contain collected Proxmox node averages, including gaps for unavailable measurements. Alert rules evaluate actual CPU, memory and storage measurements. Connection errors and TrueNAS alerts are also tracked. Acknowledgment does not repair a condition.
+Monitoring samples every 30 seconds, with bounded reads for all paired Docker hosts and the optional direct Engine. Host-qualified container identities prevent collisions; Engine IDs deduplicate the same Engine reached through multiple connections. Slow or unavailable hosts appear as errors or partial readings rather than being replaced. Charts contain collected Proxmox node averages, including gaps for unavailable measurements. Alert rules evaluate actual CPU, memory and storage measurements. Connection errors and TrueNAS alerts are also tracked. Acknowledgment does not repair a condition.
 
 ## Deployment
 
@@ -72,7 +72,7 @@ On Windows, if your environment prevents npm workspace links, run `npm install -
 
 Provider API versions and token permissions affect functionality. TrueNAS supports JSON-RPC and an explicit legacy WebSocket mode; incompatible methods surface errors. OPNsense interface fields vary by release. This is one connection per provider, not a multi-cluster inventory.
 
-No Compose file deployment, generic Docker-volume/database backup runner, network discovery, firewall-rule editor, email/Discord notifications, app two-factor login, automatic software updates, security scanner or invented health score is provided. Restore, prune and other sensitive actions require typed confirmation. Asynchronous tasks are reported as queued; provider task history shows their outcome.
+No Compose file deployment, generic Docker-volume/database backup runner, network discovery, firewall-rule editor, app two-factor login, automatic software updates, security scanner or invented health score is provided. Restore, prune and other sensitive actions require typed confirmation. Asynchronous tasks are reported as queued; provider task history shows their outcome.
 
 ### Updates from the dashboard
 
@@ -107,3 +107,13 @@ The bridge uses `pct exec` for Linux CTs and `qm guest exec` for Linux VMs. Gues
 The service runs as root on the node, stores its credential in `/etc/homecloud-node-agent.json` with mode 0600, and relays only supported Docker API requests. HomeCloud stores a hash of the agent credential; owner-only pairing codes expire after ten minutes and can be used once. Existing role checks and destructive-action confirmations apply to the selected host. **Revoke Agent** disables its credential; to uninstall locally, stop and disable `homecloud-node-agent.service`, then remove its unit, agent script, and credential file. Inspect failures with `journalctl -u homecloud-node-agent -n 100`.
 
 The bridge bounds request/response sizes; large image builds or truncated QEMU-agent output may require a direct Engine connection. Installed node-agent scripts do not automatically update: the Guest Setup panel shows an update command that retains existing pairing credentials. This workflow has automated API and command-construction tests; live Proxmox guest compatibility must be verified on the deployment.
+
+### Docker host selection and external alerts
+
+Storage and Network now share the Docker host selection with the Docker page. Use their host selector to switch between the direct Engine and paired hosts. An unavailable selection returns an explicit limitation and no substituted Docker inventory. Proxmox and TrueNAS resources remain independent of that choice.
+
+The owner can open **Settings → External Notifications** to see configured channels, pending deliveries and errors, and send a test notification. Add the relevant values from `.env.example` using `sudo homecloud config`, then restart the application with `sudo homecloud restart`. Discord needs `DISCORD_WEBHOOK_URL`; Telegram needs `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`; email needs `SMTP_HOST`, `NOTIFICATION_EMAIL_FROM` and `NOTIFICATION_EMAIL_TO`, plus SMTP authentication when required. Credentials stay on the server. SMTP uses certificate verification and either STARTTLS or implicit TLS on port 465.
+
+Active alerts and recovery events are queued separately per channel. Successful deliveries are deduplicated across restarts; failures retry with bounded exponential backoff. Acknowledgment does not send a recovery notification. A network failure after a provider accepted a message can produce a duplicate on retry; delivery is not guaranteed exactly once. Historical events older than seven days are not newly queued.
+
+Open **Settings → Provider Compatibility Checks** to run read-only checks against configured Proxmox, Docker, TrueNAS, OPNsense and Tailscale APIs. Versions and individual failures are shown without changing guests, exports or files. Passing reads do not certify write compatibility, client access to shares or restore outcomes. Use disposable staging resources for those tests.

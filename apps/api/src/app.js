@@ -1,3 +1,5 @@
+import {providerDiagnostics} from './diagnostics.js';
+import {notifier} from './notifications.js';
 import {storagePerformance} from './storage-performance.js';
 import {shareInventory,shareWrite,detectedShare,shareProtocol} from './shares.js';
 import {snapshotInventory,guestSnapshot} from './snapshots.js';
@@ -56,7 +58,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
  app.use('/api',authenticate);
  app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
- app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts()}));
+ app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts(),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
  app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{await audit(req,'node-agent.pairing','nodes',{},'success');res.json(createPairing());});
  app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});
@@ -107,6 +109,11 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    const s=await monitor.sample();const service=s.services.find(x=>x.provider===provider);
    if(!s[provider])throw httpError(service?.error||`${provider} is not configured`,service?.status==='error'?502:503);
    return {...s[provider],sampledAt:s.sampledAt,mode:'live'};
+ };
+ const selectedDocker=async s=>{
+   if(!selectedAgentHost())return {inventory:s.docker||null,id:'direct',errors:[]};
+   try{return {inventory:await dockerSnapshot({timeoutMs:30000,metrics:false}),id:selectedAgentHost(),errors:[]};}
+   catch{return {inventory:null,id:selectedAgentHost(),errors:['Selected Docker host is unavailable. Inspect its node agent; no other host was substituted.']};}
  };
  const providerReads=async requests=>{
    const s=await monitor.sample();const response={errors:[],connectors:s.services};
@@ -161,8 +168,9 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/vpn',()=>snapshot('tailscale'));
  read('/storage',async req=>{const s=await monitor.sample(req.query.refresh==='1'),errors=[];let proxmox=[];
    if(providers.proxmox.configured())try{const result=await storageInventory();proxmox=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}
+   const selected=await selectedDocker(s);errors.push(...selected.errors);
    const pools=[...proxmox.map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[])];
-   return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],volumes:s.docker?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
+   return {pools,summary:storageSummary(pools),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},volumes:selected.inventory?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
  read('/storage/disks',async()=>{const s=await monitor.sample(),errors=[];let resources=[];if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString()};});
  read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
  read('/storage/snapshots/browse',async req=>{const id=required(req.query.id,'Snapshot');const list=await truenas('pool.snapshot.query',[[['id','=',id]]]);if(!list.some(s=>(s.id||s.name)===id))throw httpError('Snapshot not found',404);const split=id.lastIndexOf('@'),dataset=id.slice(0,split),name=id.slice(split+1);if(split<1||!name||/[\/\\]/.test(name)||['.','..'].includes(name))throw httpError('Invalid snapshot path');const root=await datasetRoot(dataset);return {path:`${root}/.zfs/snapshot/${name}`,entries:await truenas('filesystem.listdir',[`${root}/.zfs/snapshot/${name}`,[],{limit:200}])};});
@@ -185,7 +193,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const s=await monitor.sample();const interfaces=[],errors=[];
    for(const node of s.proxmox?.nodes||[])if(node.status==='online')try{interfaces.push(...(await pve(`/nodes/${encode(node.name)}/network`)).map(n=>({...n,id:`${node.name}/${n.iface}`,provider:'proxmox',node:node.name,name:n.iface,address:n.address||n.cidr||null})));}catch(e){errors.push(`${node.name}: ${e.message}`);}
    interfaces.push(...(s.opnsense?.interfaces||[]).map(n=>({...n,provider:'opnsense'})));
-   return {interfaces,networks:s.docker?.networks||[],services:s.opnsense?.services||[],errors,connectors:s.services.filter(x=>['proxmox','docker','opnsense'].includes(x.provider)),sampledAt:s.sampledAt};
+   const selected=await selectedDocker(s);errors.push(...selected.errors);
+   return {interfaces,dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},networks:selected.inventory?.networks||[],services:s.opnsense?.services||[],errors,connectors:s.services.filter(x=>['proxmox','docker','opnsense'].includes(x.provider)),sampledAt:s.sampledAt};
  });
  action('post','/actions/:provider/:resourceType/:resourceId/:action','operator','infrastructure.action',async req=>{
    const {provider,resourceType,resourceId,action:operation}=req.params;const body=req.body||{};
@@ -295,7 +304,10 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return (await db.query(`UPDATE users SET status=CASE status WHEN 'active' THEN 'inactive' ELSE 'active' END WHERE id=$1 RETURNING id,name,status`,[req.params.id])).rows[0];
  },true);
  read('/audit',async()=>({logs:(await db.query(`SELECT id::text,created_at AS time,COALESCE(user_email,'system') AS "user",action,resource,details,status,COALESCE(ip,'-') ip FROM audit_logs ORDER BY created_at DESC LIMIT 500`)).rows}),'auditor');
- read('/settings',async()=>({system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:(await monitor.sample()).services,capabilities:{twoFactor:false,notifications:'in-app',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}}));
+ read('/diagnostics',()=>providerDiagnostics(),'owner');
+ read('/notifications',()=>notifier.status(),'owner');
+ action('post','/notifications/test','owner','notification.test',req=>notifier.test(required(req.body.channel,'Channel')));
+ read('/settings',async()=>({system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:(await monitor.sample()).services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}}));
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};
    mutate(s=>s.settings=settings);return settings;

@@ -24,7 +24,8 @@ export async function agentRequest(path,init={}){
  if(!/^\/(info|version|containers|images|networks|volumes|system|events|build)([/?]|$)/.test(path)||/[\r\n]/.test(path)||path.length>4096)fail('Unsupported Docker request');
  const method=init.method||'GET';if(!['GET','POST','DELETE'].includes(method))fail('Unsupported method');
  const body=init.body==null?'':(Buffer.isBuffer(init.body)?init.body:Buffer.from(String(init.body),'utf8')).toString('base64');if(body.length>1500000)fail('Request exceeds agent size limit');
- const result=await new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Node agent request timed out'))},330000);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),path,method,body,expiresAt:Date.now()+330000,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});
+ const duration=Math.max(1000,Math.min(Number(init.timeoutMs)||330000,330000));
+ const result=await new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Node agent request timed out'))},duration);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),path,method,body,expiresAt:Date.now()+duration,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});
  const buffer=Buffer.from(result.body,'base64');return {ok:result.status>=200&&result.status<300,status:result.status,buffer,text:async()=>buffer.toString('utf8'),json:async()=>JSON.parse(buffer.toString('utf8'))};
 }
 

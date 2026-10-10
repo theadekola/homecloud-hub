@@ -143,13 +143,14 @@ export async function docker(path,init={}){
   }
   return JSON.parse(text);
 }
-export async function dockerSnapshot(){
-  const [containers,images,info,networks,volumes]=await Promise.all([docker('/containers/json?all=1'),docker('/images/json'),docker('/info'),docker('/networks'),docker('/volumes')]);
+export async function dockerSnapshot({timeoutMs,metrics=true}={}){
+  const read=path=>docker(path,timeoutMs?{timeoutMs}:{});
+  const [containers,images,info,networks,volumes]=await Promise.all([read('/containers/json?all=1'),read('/images/json'),read('/info'),read('/networks'),read('/volumes')]);
   const measured=[];
   for(let i=0;i<containers.length;i+=5){
     measured.push(...await Promise.all(containers.slice(i,i+5).map(async c=>{
       let stats=null,statsError=null;
-      if(c.State==='running'){try{stats=await docker(`/containers/${encodeURIComponent(c.Id)}/stats?stream=false`)}catch(e){statsError=e.message;}}
+      if(metrics&&c.State==='running'){try{stats=await read(`/containers/${encodeURIComponent(c.Id)}/stats?stream=false`)}catch(e){statsError=e.message;}}
       const cpuDelta=stats?stats.cpu_stats.cpu_usage.total_usage-(stats.precpu_stats?.cpu_usage?.total_usage||0):0;
       const systemDelta=stats?stats.cpu_stats.system_cpu_usage-(stats.precpu_stats?.system_cpu_usage||0):0;
       const cpu=stats&&systemDelta>0?Math.round(cpuDelta/systemDelta*(stats.cpu_stats.online_cpus||stats.cpu_stats.cpu_usage.percpu_usage?.length||1)*1000)/10:null;
@@ -157,7 +158,8 @@ export async function dockerSnapshot(){
     })));
   }
   return {
-    host:{hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
+    errors:measured.filter(c=>c.statsError).map(c=>`${c.name}: statistics unavailable`),
+    host:{engineId:info.ID||null,hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
     images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,tags:i.RepoTags||[],digests:i.RepoDigests||[],size:i.Size,created:i.Created,containers:i.Containers})),
     networks:networks.map(n=>({id:n.Id,name:n.Name,driver:n.Driver,scope:n.Scope,subnets:n.IPAM?.Config?.map(c=>c.Subnet).join(', ')||'',internal:n.Internal,gateways:n.IPAM?.Config?.map(c=>c.Gateway).filter(Boolean).join(', ')||'',created:n.Created,labels:n.Labels||{}})),
     volumes:(volumes.Volumes||[]).map(v=>({id:v.Name,name:v.Name,driver:v.Driver,mountpoint:v.Mountpoint,scope:v.Scope,created:v.CreatedAt,labels:v.Labels||{},options:v.Options||{}})),

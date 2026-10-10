@@ -51,6 +51,12 @@ try{
   await c.api('/storage',{headers:new Headers({'X-Test':'present'}),signal:controller.signal});
   assert.equal(new Headers(seen.headers).get('X-Test'),'present');assert.equal(seen.signal,controller.signal);
  });
+ await test('Storage and Network use the same selection while TrueNAS share reads remain separate',async()=>{
+  const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];
+  globalThis.fetch=async(url,options)=>{calls.push([url,new Headers(options.headers).get('X-HomeCloud-Docker-Host')]);return response(200)};
+  await c.api('/storage');await c.api('/network');await c.api('/storage/shares');
+  assert.equal(calls[0][1],'node-a:lxc/101');assert.equal(calls[1][1],'node-a:lxc/101');assert.equal(calls[2][1],null);
+ });
  await test('cancelled confirmation never submits the destructive retry',async()=>{
   const c=await client();let calls=0;globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
   await assert.rejects(c.confirmedApi('/docker/volume/data',{method:'DELETE'}),/cancelled/);assert.equal(calls,1);

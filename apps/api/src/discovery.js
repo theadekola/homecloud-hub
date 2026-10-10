@@ -6,7 +6,7 @@ export function discovered(snapshot){
  for(const c of monitoredDocker(snapshot))resources.push({id:`docker:${c.monitorId}`,containerId:c.id,hostId:c.hostId,node:c.node,name:c.name,host:c.host,kind:'Docker container',status:c.status,source:'Docker API',image:c.image});
  for(const host of reports){
   for(const service of host.services)resources.push({id:`${host.id}:service:${service.name}`,name:service.name,host:host.hostname,node:host.node,kind:'System service',status:host.status==='stale'?'stale':service.status,source:'Proxmox guest API',lastSeen:host.receivedAt});
-  for(const c of host.containers)if(!resources.some(r=>r.source==='Docker API'&&r.containerId===c.id&&(r.host===host.hostname||r.hostId==='direct')))resources.push({id:`${host.id}:docker:${c.id}`,name:c.name,host:host.hostname,node:host.node,kind:'Docker container',status:host.status==='stale'?'stale':c.status,source:'Proxmox guest API',image:c.image,lastSeen:host.receivedAt});
+  for(const c of host.containers)if(!resources.some(r=>r.source==='Docker API'&&r.containerId===c.id&&r.host===host.hostname))resources.push({id:`${host.id}:docker:${c.id}`,name:c.name,host:host.hostname,node:host.node,kind:'Docker container',status:host.status==='stale'?'stale':c.status,source:'Proxmox guest API',image:c.image,lastSeen:host.receivedAt});
  }
  return {resources,reports,discoveryLimitations:[...(snapshot.proxmox?.guestInventory?.limitations||[]),...(snapshot.proxmox?.lxc?.length?['LXC application inventory requires guest access; Proxmox exposes its lifecycle and resource measurements.']:[])]};
 }

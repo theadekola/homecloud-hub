@@ -42,3 +42,7 @@ test('missing CPU measurements do not resolve a Docker threshold alert',async()=
  await monitor.sample(true);cpu=null;await monitor.sample(true);assert.equal(state.alerts[0].status,'active');
  cpu=10;await monitor.sample(true);assert.equal(state.alerts[0].status,'resolved');
 });
+test('guest discovery deduplicates containers only on the same reported host',()=>{
+ const s={docker:inventory('direct'),proxmox:{guestInventory:{reports:[{id:'other',hostname:'other-host',services:[],containers:[{id:'same-id',name:'other-app',status:'running'}]},{id:'matching',hostname:'direct',services:[],containers:[{id:'same-id',name:'app',status:'running'}]}]}}};
+ const rows=discovered(s).resources.filter(r=>r.kind==='Docker container');assert.equal(rows.length,2);assert.ok(rows.some(r=>r.name==='other-app'));
+});

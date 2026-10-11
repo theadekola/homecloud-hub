@@ -17,7 +17,7 @@ export function createDockerFleet({hosts=agentHosts,read=dockerSnapshot,nodes=()
    const started=now();
    try{const data=await agentContext.run({host:h.id},()=>read({timeoutMs:30000}));
     const measured={...row,status:data.errors?.length?'partial':'reachable',error:data.errors?.length?data.errors.join('; '):undefined,response:now()-started,inventory:data};cache.set(h.id,measured);results.push(measured);
-   }catch{results.push({...row,error:'Docker inventory unavailable; inspect the selected host and node agent',lastSeen:cache.get(h.id)?.sampledAt||null});}
+   }catch{results.push({...row,response:now()-started,error:'Docker inventory unavailable; inspect the selected host and node agent',lastSeen:cache.get(h.id)?.sampledAt||null});}
   }));
   return {hosts:results.sort((a,b)=>a.id.localeCompare(b.id))};
  };

@@ -43,3 +43,22 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     await assert.rejects(connector.dockerCreateContainer({name:'test',image:'nginx',ports:'70000:80'}),/Ports/);
   }finally{await new Promise(resolve=>server.close(resolve));}
 });
+
+test('Docker statistics share one time budget across batches',async()=>{
+ let statistics=0;
+ const server=http.createServer((req,res)=>{
+  if(req.url==='/containers/json?all=1')return res.end(JSON.stringify(Array.from({length:6},(_,i)=>({Id:String(i),Names:['/app'+i],State:'running'}))));
+  if(req.url==='/images/json'||req.url==='/networks')return res.end('[]');
+  if(req.url==='/info')return res.end('{"Name":"deadline-test"}');
+  if(req.url==='/volumes')return res.end('{"Volumes":[]}');
+  if(req.url.includes('/stats?')){statistics++;return;}
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ process.env.DOCKER_API_URL=`http://127.0.0.1:${server.address().port}`;
+ try{
+  const {dockerSnapshot}=await import('../src/connectors.js');
+  const started=Date.now(),result=await dockerSnapshot({timeoutMs:100});
+  assert.equal(result.containers.length,6);assert.equal(result.errors.length,6);
+  assert.equal(statistics,5);assert.ok(Date.now()-started<1000);
+ }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));delete process.env.DOCKER_API_URL;}
+});

@@ -144,7 +144,12 @@ export async function docker(path,init={}){
   return JSON.parse(text);
 }
 export async function dockerSnapshot({timeoutMs,metrics=true}={}){
-  const read=path=>docker(path,timeoutMs?{timeoutMs}:{});
+  const deadline=Date.now()+(timeoutMs||15000);
+  const read=path=>{
+    const remaining=deadline-Date.now();
+    if(remaining<=0)throw new Error('Docker measurement time budget exceeded');
+    return docker(path,{timeoutMs:remaining});
+  };
   const [containers,images,info,networks,volumes]=await Promise.all([read('/containers/json?all=1'),read('/images/json'),read('/info'),read('/networks'),read('/volumes')]);
   const measured=[];
   for(let i=0;i<containers.length;i+=5){

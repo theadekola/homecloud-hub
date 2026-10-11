@@ -27,7 +27,7 @@ less /tmp/homecloud-install.sh
 sudo bash /tmp/homecloud-install.sh
 ```
 
-The installer detects the VM IP automatically and prints `http://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
+The installer detects the VM IP automatically and prints `https://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
 ### Get your setup code and register
 
@@ -117,3 +117,9 @@ The owner can open **Settings → External Notifications** to see configured cha
 Active alerts and recovery events are queued separately per channel. Successful deliveries are deduplicated across restarts; failures retry with bounded exponential backoff. Acknowledgment does not send a recovery notification. A network failure after a provider accepted a message can produce a duplicate on retry; delivery is not guaranteed exactly once. Historical events older than seven days are not newly queued.
 
 Open **Settings → Provider Compatibility Checks** to run read-only checks against configured Proxmox, Docker, TrueNAS, OPNsense and Tailscale APIs. Versions and individual failures are shown without changing guests, exports or files. Passing reads do not certify write compatibility, client access to shares or restore outcomes. Use disposable staging resources for those tests.
+
+### Automatic LAN HTTPS on port 6002
+
+New installations detect the VM address and configure HTTPS at `https://VM-IP:6002`. Existing LAN installations migrate during a software update, preserving passwords and tokens and saving `.env.before-https-6002`. Caddy keeps its certificate authority in the existing Docker volume. Public domain configurations retain their chosen ports and certificate settings. No environment-file or Caddyfile edits are required. HTTP uses auxiliary port 6003; open the HTTPS address explicitly after migration.
+
+Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo docker compose --project-directory /opt/homecloud-hub -f /opt/homecloud-hub/docker-compose.yml exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`. Install the certificate in the client’s trusted root store. HomeCloud cannot automatically alter trust stores on users’ computers. Existing paired agents using an old address need to reconnect using the new HTTPS address.

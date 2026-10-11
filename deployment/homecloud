@@ -20,6 +20,7 @@ case "$command" in
     if ! grep -q '^SETUP_TOKEN=' .env; then
       printf '\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 16)" >> .env
     fi
+    python3 deployment/configure-https.py
     docker compose config --quiet
     docker compose build --pull
     docker compose up -d --wait --wait-timeout 180

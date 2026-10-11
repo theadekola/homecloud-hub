@@ -10,7 +10,9 @@ services:
       api:
         condition: service_healthy
     environment:
-      DOMAIN: ${DOMAIN:-:80}
+      DOMAIN: ${DOMAIN:-https://localhost}
+      CADDY_DEFAULT_SNI: ${CADDY_DEFAULT_SNI:-localhost}
+      CADDY_TLS: ${CADDY_TLS:-}
     ports:
       - "${WEB_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"

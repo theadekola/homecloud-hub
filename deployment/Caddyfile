@@ -1,4 +1,9 @@
+{
+  default_sni {$CADDY_DEFAULT_SNI:localhost}
+}
+
 {$DOMAIN} {
+  {$CADDY_TLS}
   encode zstd gzip
 
   @api path /api/*

@@ -3,9 +3,9 @@ set -Eeuo pipefail
 umask 077
 fail() { echo "Error: $*" >&2; exit 1; }
 usage() {
-  echo 'Usage: sudo bash install.sh [--repo https://github.com/OWNER/REPO.git] [--ref BRANCH_OR_TAG] [--url http://SERVER-IP] [--port 6002] [--https-port 8443]'
+  echo 'Usage: sudo bash install.sh [--repo https://github.com/OWNER/REPO.git] [--ref BRANCH_OR_TAG] [--url https://SERVER-IP] [--port 6003] [--https-port 6002]'
 }
-repo='https://github.com/theadekola/homecloud-hub.git' ref='' url='' web_port=6002 https_port=8443
+repo='https://github.com/theadekola/homecloud-hub.git' ref='' url='' web_port=6003 https_port=6002
 while (($#)); do
   case "$1" in
     --repo|--ref|--url|--port|--https-port)
@@ -30,7 +30,7 @@ command -v systemctl >/dev/null || fail 'Ubuntu with systemd is required.'
 [[ ! -e /opt/homecloud-hub ]] || fail '/opt/homecloud-hub already exists. Use sudo homecloud update for an existing installation.'
 [[ ! -e /usr/local/bin/homecloud && ! -e /etc/systemd/system/homecloud-hub.service ]] || fail 'HomeCloud command or service already exists.'
 apt-get update
-apt-get install -y ca-certificates curl git openssl nano iproute2
+apt-get install -y ca-certificates curl git openssl nano iproute2 python3
 if ! command -v docker >/dev/null; then
   for pkg in docker.io docker-compose docker-compose-v2 docker-doc docker-buildx podman-docker containerd runc; do
     if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
@@ -66,7 +66,7 @@ sh deployment/generate-secrets.sh
 if [[ -z $url ]]; then
   source deployment/network.sh
   vm_ip=$(detect_vm_ip) || fail 'Cannot detect the VM IPv4 address. Check its network connection or supply --url.'
-  url="http://$vm_ip"
+  url="https://$vm_ip"
   echo "Detected VM IP: $vm_ip"
 fi
 domain=':80'
@@ -75,6 +75,8 @@ if [[ $url == https://* ]]; then
   if [[ $https_port != 443 ]]; then url="$url:$https_port"; fi
 elif [[ $web_port != 80 ]]; then url="$url:$web_port"; fi
 sed -i "s|^DOMAIN=.*|DOMAIN=$domain|;s|^WEB_ORIGIN=.*|WEB_ORIGIN=$url|;s|^WEB_PORT=.*|WEB_PORT=$web_port|;s|^HTTPS_PORT=.*|HTTPS_PORT=$https_port|" .env
+sed -i "s|^CADDY_TLS=.*|CADDY_TLS=|;s|^CADDY_DEFAULT_SNI=.*|CADDY_DEFAULT_SNI=${domain#https://}|" .env
+python3 deployment/configure-https.py
 docker compose config --quiet
 mv "$stage/source" /opt/homecloud-hub
 cd /opt/homecloud-hub

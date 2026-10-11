@@ -15,9 +15,9 @@ less /tmp/homecloud-install.sh
 sudo bash /tmp/homecloud-install.sh
 ```
 
-The installer detects the VM's IPv4 source address from its default route and prints `http://DETECTED-IP:6002`. No IP or URL argument is required. If no default route is present, it selects a global address from a non-Docker interface; it stops if no usable address exists. `--url` remains available for a specific hostname or interface. Detection runs at installation time; a DHCP address change means you must use the VM's new address in your browser.
+The installer detects the VM's IPv4 source address from its default route and prints `https://DETECTED-IP:6002`. No IP or URL argument is required. If no default route is present, it selects a global address from a non-Docker interface; it stops if no usable address exists. `--url` remains available for a specific hostname or interface. Detection runs at installation time; a DHCP address change means you must use the VM's new address in your browser.
 
-The default web port is **6002**, mapped to Caddy's internal port 80. The API runs on **6000 inside Docker**, with requests proxied through the web port. The API port is not published to the host. Chromium browsers block port 6000 as an X11 port, so the browser never connects to it directly. `--port` overrides the web port if 6002 is occupied. HTTPS uses `--https-port` (default 8443). Public port settings are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
+The default web port is **6002**, mapped to Caddy's internal HTTPS port 443. The API runs on **6000 inside Docker**, with requests proxied through the web port. The API port is not published to the host. Chromium browsers block port 6000 as an X11 port, so the browser never connects to it directly. `--port` overrides the web port if 6002 is occupied. HTTPS uses the main port 6002 by default; HTTP uses auxiliary port 6003. Public port settings are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
 
 For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to HomeCloud's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.0.0` optionally pins an existing Git tag. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
 
@@ -52,10 +52,12 @@ Install Docker Engine and the Compose plugin using https://docs.docker.com/engin
 For initial private LAN testing:
 
 ```env
-DOMAIN=:80
-WEB_PORT=6002
-HTTPS_PORT=8443
-WEB_ORIGIN=http://YOUR-UBUNTU-IP:6002
+DOMAIN=https://YOUR-UBUNTU-IP
+WEB_PORT=6003
+HTTPS_PORT=6002
+CADDY_DEFAULT_SNI=YOUR-UBUNTU-IP
+CADDY_TLS=tls internal
+WEB_ORIGIN=https://YOUR-UBUNTU-IP:6002
 ```
 
 For HTTPS, configure DNS and a real hostname with Caddy:
@@ -69,7 +71,7 @@ WEB_ORIGIN=https://homecloud.your-domain.example
 
 Use HTTPS or a trusted private access tunnel for credentials. Do not expose privileged connectors directly to the internet.
 
-To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=6002` and `WEB_ORIGIN=http://YOUR-UBUNTU-IP:6002`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
+To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=6002` and `WEB_ORIGIN=https://YOUR-UBUNTU-IP:6002`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
 
 ```sh
 docker compose up -d --build
@@ -191,3 +193,9 @@ External delivery is optional. Configure channel values listed in `.env.example`
 Delivery state is persisted in `runtime/live-state.json`. Pending deliveries retry during monitoring samples, independently of API response completion. Keep the runtime directory in deployment backups. The queue keeps a maximum of 1,000 pending messages and processes up to 20 per flush. At-least-once retries may duplicate messages after ambiguous network failures.
 
 Provider diagnostics are read-only and owner-only. Run them after updating the VM and record failures by provider and method. Verify writes only against disposable staging guests/datasets using the installed API version and its required privileges. No live share or media changes are part of these checks.
+
+### Automatic LAN HTTPS on port 6002
+
+New installations detect the VM address and configure HTTPS at `https://VM-IP:6002`. Existing LAN installations migrate during a software update, preserving passwords and tokens and saving `.env.before-https-6002`. Caddy keeps its certificate authority in the existing Docker volume. Public domain configurations retain their chosen ports and certificate settings. No environment-file or Caddyfile edits are required. HTTP uses auxiliary port 6003; open the HTTPS address explicitly after migration.
+
+Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo docker compose --project-directory /opt/homecloud-hub -f /opt/homecloud-hub/docker-compose.yml exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`. Install the certificate in the client’s trusted root store. HomeCloud cannot automatically alter trust stores on users’ computers. Existing paired agents using an old address need to reconnect using the new HTTPS address.

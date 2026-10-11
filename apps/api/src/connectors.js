@@ -1,7 +1,7 @@
 import {selectedAgentHost,agentRequest} from './node-agents.js';
 import {dockerConfig,dockerTlsConfig} from './docker-config.js';
 import {mergeNodeStorage} from './proxmox-inventory.js';
-import {inspectGuests} from './guest-discovery.js';
+import {backgroundGuestInventory} from './guest-discovery.js';
 import fs from 'node:fs';
 import https from 'node:https';
 import http from 'node:http';
@@ -75,7 +75,7 @@ export async function proxmoxSnapshot(){
   let clusterStatus=[];
   try{clusterStatus=await pve('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();
-  const guestInventory=await inspectGuests(guests('qemu'),pve,`${config.url}:${config.tokenId}`);
+  const guestInventory=backgroundGuestInventory(guests('qemu'),pve,`${config.url}:${config.tokenId}`);
   return {clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
     storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),usage:percent(r.disk,r.maxdisk)}))};

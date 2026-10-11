@@ -25,8 +25,11 @@ export function alertConditions(snapshot,rules){
 export function createMonitor(sources=providers,persistence={get,mutate},checkServices=extraServices,fleet=async()=>({hosts:[]}),notify=async()=>{}){
   let latest=null,inFlight=null;
   async function sample(force=false){
+    if(!force&&latest){
+      if(!inFlight&&Date.now()-Date.parse(latest.sampledAt)>=10000)void sample(true).catch(()=>{});
+      return latest;
+    }
     if(inFlight)return inFlight;
-    if(!force&&latest&&Date.now()-Date.parse(latest.sampledAt)<10000)return latest;
     inFlight=agentContext.run({host:''},async()=>{
       const snapshot={sampledAt:new Date().toISOString(),services:[],hosts:[]};
       await Promise.all(Object.entries(sources).map(async([name,source])=>{

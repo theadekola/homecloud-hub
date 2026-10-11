@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseLinuxInventory,inspectGuests} from '../src/guest-discovery.js';
+import {parseLinuxInventory,inspectGuests,backgroundGuestInventory} from '../src/guest-discovery.js';
 const output='__SERVICES__\nnginx.service loaded active running nginx\nbackup.service loaded inactive dead backup\n__PACKAGES__\nnginx\t1.24\tinstalled\nold\t1\tconfig-files\n__DOCKER__\n{"ID":"abc","Names":"nextcloud","Image":"nextcloud:apache","State":"running"}\n__END__\n';
 test('automatic guest inventory runs only fixed read commands and caches actual results',async()=>{
  const parsed=parseLinuxInventory(output);assert.equal(parsed.services[0].status,'running');assert.equal(parsed.packages.length,1);assert.equal(parsed.containers[0].name,'nextcloud');
@@ -22,4 +22,15 @@ test('failed guest checks retry after 30 seconds and recover',async()=>{
  denied=false;await inspectGuests(guests,call,'retry-fixture');assert.equal(calls,1);now+=30001;
  const recovered=await inspectGuests(guests,call,'retry-fixture');assert.equal(recovered.limitations.length,0);assert.equal(recovered.reports.length,1);
  }finally{Date.now=original;}
+});
+
+test('background guest scan returns immediately while an agent is blocked',async()=>{
+ let release;const blocked = new Promise(resolve => {release=resolve;});
+ const guests=[{id:'background',node:'pve',name:'slow-vm',status:'running'}];
+ const call=async path=>{if(path.endsWith('get-osinfo')){await blocked;return {name:'Ubuntu'};}if(path.endsWith('/exec'))return {pid:9};return {exited:true,exitcode:0,'out-data':output};};
+ const first=backgroundGuestInventory(guests,call,'background-fixture');
+ assert.equal(first.reports.length,0);assert.match(first.limitations[0],/background/);
+ release();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(backgroundGuestInventory(guests,call,'background-fixture').reports.length,1);
+ assert.equal(backgroundGuestInventory([],call,'background-fixture').reports.length,0);
 });

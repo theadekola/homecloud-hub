@@ -42,3 +42,21 @@ export async function inspectGuests(guests,call,connection){
  }));
  return {reports,limitations};
 }
+
+// Guest application scans must not block node and storage measurements.
+const scans = new Map();
+export function backgroundGuestInventory(guests, call, connection) {
+ let scan = scans.get(connection);
+ if (!scan) {
+  scan = {result: {reports: [], limitations: ['Guest application discovery is running in the background.']}, pending: null};
+  scans.set(connection, scan);
+  if (scans.size > 100) scans.delete(scans.keys().next().value);
+ }
+ if (!scan.pending) {
+  scan.pending = inspectGuests(guests, call, connection).then(result => {scan.result = result;}).catch(() => {
+   scan.result = {reports: [], limitations: ['Guest application discovery could not complete; it will retry.']};
+  }).finally(() => {scan.pending = null;});
+ }
+ const active = new Set(guests.filter(g => g.status === 'running').map(g => `qga-${g.id}`));
+ return {...scan.result, reports: scan.result.reports.filter(r => active.has(r.id))};
+}

@@ -46,3 +46,13 @@ test('guest discovery deduplicates containers only on the same reported host',()
  const s={docker:inventory('direct'),proxmox:{guestInventory:{reports:[{id:'other',hostname:'other-host',services:[],containers:[{id:'same-id',name:'other-app',status:'running'}]},{id:'matching',hostname:'direct',services:[],containers:[{id:'same-id',name:'app',status:'running'}]}]}}};
  const rows=discovered(s).resources.filter(r=>r.kind==='Docker container');assert.equal(rows.length,2);assert.ok(rows.some(r=>r.name==='other-app'));
 });
+
+test('cached measurements remain available while a provider refresh is blocked',async()=>{
+ const state={rules:[],alerts:[],metrics:[]};let release,blocked=false;
+ const monitor=createMonitor({proxmox:{configured:()=>true,read:async()=>{if(blocked)await new Promise(resolve=>{release=resolve;});return {nodes:[],storage:[],errors:[]};}}},{get:()=>state,mutate:fn=>fn(state)},async()=>[]);
+ const first=await monitor.sample(true);blocked=true;
+ const refreshing=monitor.sample(true);
+ assert.equal(await monitor.sample(),first);
+ release();await refreshing;
+ assert.notEqual(await monitor.sample(),first);
+});

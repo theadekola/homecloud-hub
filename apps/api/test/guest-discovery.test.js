@@ -13,3 +13,13 @@ test('unsupported guest commands are distinguished from denied permissions',asyn
  const result=await inspectGuests([{id:'501',node:'pve',name:'unsupported',status:'running'}],async()=>{throw Object.assign(new Error('Proxmox HTTP 501'),{providerStatus:501})},'unsupported-fixture');
  assert.match(result.limitations[0],/does not support/);assert.doesNotMatch(result.limitations[0],/lacks guest-agent access/);
 });
+
+test('failed guest checks retry after 30 seconds and recover',async()=>{
+ const original=Date.now;let now=original();Date.now=()=>now;
+ try{let denied=true,calls=0;const call=async path=>{calls++;if(denied)throw Object.assign(new Error('Permission denied'),{providerStatus:403});if(path.endsWith('get-osinfo'))return {name:'Ubuntu'};if(path.endsWith('/exec'))return {pid:7};return {exited:true,exitcode:0,'out-data':output};};
+ const guests=[{id:'retry',node:'pve',name:'retry-vm',status:'running'}];
+ assert.match((await inspectGuests(guests,call,'retry-fixture')).limitations[0],/token lacks/);
+ denied=false;await inspectGuests(guests,call,'retry-fixture');assert.equal(calls,1);now+=30001;
+ const recovered=await inspectGuests(guests,call,'retry-fixture');assert.equal(recovered.limitations.length,0);assert.equal(recovered.reports.length,1);
+ }finally{Date.now=original;}
+});

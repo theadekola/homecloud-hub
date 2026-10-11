@@ -36,7 +36,7 @@ export async function pve(path, init={}, config=clusterConfig()){
   const headers={Authorization:`PVEAPIToken=${pveTokenId}=${pveSecret}`,...(init.headers||{})};
   const res=await request(`${pveUrl}/api2/json${path}`,{...init,headers},{rejectUnauthorized:config.verifyTls, ...(config.ca?{ca:config.ca}:{})});
   const body=await res.json().catch(()=>({}));
-  if(!res.ok) throw Object.assign(new Error(body?.errors?JSON.stringify(body.errors):`Proxmox HTTP ${res.status}: ${res.statusText||'Request failed'}`),{status:502});
+  if(!res.ok) throw Object.assign(new Error(body?.errors?JSON.stringify(body.errors):`Proxmox HTTP ${res.status}: ${res.statusText||'Request failed'}`),{status:502,providerStatus:res.status});
   return body.data;
 }
 const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]));

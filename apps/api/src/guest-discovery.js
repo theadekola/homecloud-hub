@@ -17,7 +17,7 @@ export async function inspectGuests(guests,call,connection){
   if(guest.status!=='running')return;
   const key=`${connection}:${guest.node}:${guest.id}`;
   let entry=cache.get(key);
-  if(!entry||Date.now()-entry.time>300000){
+  if(!entry||Date.now()-entry.time>(entry.error?30000:300000)){
    try{
     const base=`/nodes/${encodeURIComponent(guest.node)}/qemu/${encodeURIComponent(guest.id)}/agent`;
     const info=await call(`${base}/get-osinfo`,{timeoutMs:4000}),os=info?.result||info;

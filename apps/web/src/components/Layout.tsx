@@ -1,7 +1,7 @@
 import {applyAppearance} from '../appearance';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Boxes, Container, Database, Network, ShieldCheck, HardDriveDownload,
+  LayoutDashboard, Boxes, Container, Database, Network, HardDriveDownload,
   CalendarClock, History, RotateCcw, Activity, Bell, Sparkles, Users, ScrollText, Settings,
   Menu, Cloud, ChevronDown, LogOut
 } from 'lucide-react';
@@ -12,7 +12,7 @@ import { clearTokens } from '../api';
 
 const sections = [
   { title: 'OVERVIEW', items: [['Dashboard','/',LayoutDashboard]] },
-  { title: 'INFRASTRUCTURE', items: [['Proxmox','/proxmox',Boxes],['Docker','/docker',Container],['Storage','/storage',Database],['Network','/network',Network],['VPN','/vpn',ShieldCheck]] },
+  { title: 'INFRASTRUCTURE', items: [['Proxmox','/proxmox',Boxes],['Docker','/docker',Container],['Storage','/storage',Database],['Network','/network',Network]] },
   { title: 'DATA PROTECTION', items: [['Backups','/backups',HardDriveDownload],['Schedules','/schedules',CalendarClock],['Retention Policies','/retention',History],['Restore Points','/restore',RotateCcw]] },
   { title: 'MONITORING', items: [['Monitoring','/monitoring',Activity],['Alerts','/alerts',Bell],['AI Assistant','/ai',Sparkles]] },
   { title: 'MANAGEMENT', items: [['Users','/users',Users],['Audit Logs','/audit',ScrollText],['Settings','/settings',Settings]] },

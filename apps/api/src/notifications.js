@@ -39,6 +39,7 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
  const configured=()=>notificationChannels(env);
  const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>!r.sentAt).length,
   failures:queue.filter(r=>!r.sentAt&&r.error).map(r=>({channel:r.channel,error:r.error,nextAttempt:r.nextAttempt})).slice(-20),
+  history:queue.slice(-200).map(r=>({id:r.id,channel:r.channel,event:r.event,createdAt:r.createdAt,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null})),
   lastSent:queue.filter(r=>r.sentAt).at(-1)?.sentAt||null};};
  async function deliver(alerts){
   if(inFlight)return inFlight;

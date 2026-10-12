@@ -93,3 +93,16 @@
 .restore-overview .card{padding:16px}.restore-overview td{padding:10px}.restore-name{overflow-wrap:anywhere;max-width:320px}.restore-overview .task-details dd{overflow-wrap:anywhere}.restore-overview .header-actions{margin-bottom:10px}.restore-overview .btn{margin:2px}
 
 .backup-hub>.tabs{margin-bottom:18px;overflow-x:auto}.backup-hub .page-header{margin-bottom:14px}.backup-hub .page-header h1{font-size:26px}.backup-hub .live-output{max-height:360px;overflow:auto}.backup-hub .live-connections{display:none}.backup-hub table td{padding:9px}.backup-hub .form-grid{gap:12px}
+
+/* Match Proxmox and Backups cards to the Storage overview. */
+.pve-page .card,.backup-hub .card,.pve-stat{background:linear-gradient(135deg,#101e2e,#0b1724);border:1px solid #203247;border-radius:15px;box-shadow:none}
+.pve-stats,.backup-stats{gap:12px}
+.pve-stat,.backup-stats .vm-stat{min-height:136px;padding:18px!important;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.pve-stat i,.backup-stats .vm-stat-icon{width:60px;height:60px;min-width:60px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#2b315b;color:#8970ff;order:2;font-style:normal}
+.backup-stats .vm-stat>div{order:1;min-width:0}.pve-stat>div{min-width:0}
+.pve-stat strong,.backup-stats .vm-stat strong{display:block;font-size:27px!important;line-height:1.2;margin:10px 0;overflow-wrap:anywhere}
+.pve-stat small,.backup-stats .vm-stat small{font-size:12px;color:#9aafca;line-height:1.45}
+.pve-stat span{font-size:12px;color:#9aafca}.pve-page .card,.backup-hub .card{padding:18px}
+.pve-page .card h3,.backup-hub .card h3{font-size:17px;margin:0 0 14px}
+.backup-hub .vm-list-card{align-self:start;min-height:0}.backup-hub .backup-workspace{align-items:start}.backup-hub .vm-toolbar{gap:8px}.backup-hub .vm-toolbar input,.backup-hub .vm-toolbar select{font-size:13px;min-height:38px}.backup-hub .backup-side{gap:12px}.backup-hub .backup-side .card{margin-bottom:0}
+@media(max-width:950px){.pve-stat i{display:flex}.pve-stat i,.backup-stats .vm-stat-icon{width:44px;height:44px;min-width:44px}.pve-stat,.backup-stats .vm-stat{padding:14px!important;min-height:120px}.pve-stat strong,.backup-stats .vm-stat strong{font-size:23px!important}}

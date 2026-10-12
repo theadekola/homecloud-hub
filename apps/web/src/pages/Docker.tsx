@@ -5,7 +5,8 @@ import DockerEvents from './DockerEvents';
 import DockerStacks from './DockerStacks';
 import DockerVolumes from './DockerVolumes';
 import DockerImages from './DockerImages';
-import {useState} from 'react';
+import {useState,useEffect} from 'react';
+import {useSearchParams} from 'react-router-dom';
 import {Container,Layers,Cpu,MemoryStick,Database,RefreshCw,Plus,Play,Square,RotateCcw,FileText} from 'lucide-react';
 import {useApi} from '../hooks';
 import {api,confirmedApi} from '../api';
@@ -15,6 +16,8 @@ export default function Docker(){
  const live=useApi<any>('/docker',null),session=useApi<any>('/auth/me',null),data=live.data,rows=data?.containers||[],host=data?.host;
  const role=session.data?.user?.role,admin=['owner','admin'].includes(role||''),operator=admin||role==='operator',enabled=operator&&!!host&&!data?.readOnly;
  const [view,setView]=useState('Containers'),[search,setSearch]=useState(''),[status,setStatus]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState<any>(null),[logs,setLogs]=useState(''),[modal,setModal]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const [params]=useSearchParams();
+ useEffect(()=>{if(params.get('tab')==='Networks')setView('Networks');},[params.get('tab')]);
  const execute=async(path:string,method='POST',body:any={})=>{setBusy(true);setError('');try{const r=await confirmedApi(path,{method,body:method==='GET'?undefined:JSON.stringify(body)});setMessage('Docker operation completed.');await live.refresh();return r;}catch(e:any){setError(e.message);return null;}finally{setBusy(false);}};
  const action=(r:any,a:string)=>execute(`/actions/docker/container/${encodeURIComponent(r.id)}/${a}`);
  const inspect=async(r:any)=>{setSelected(r);setLogs('Loading logs...');setModal('Logs');try{setLogs((await api(`/docker/container/${encodeURIComponent(r.id)}/logs`)).logs||'No log output.');}catch(e:any){setLogs(e.message);}};

@@ -25,6 +25,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
  const live=useApi<any>('/proxmox',null),tasks=useApi<any>('/tasks',null),history=useApi<any>('/dashboard',null),network=useApi<any>('/network',null),session=useApi<any>('/auth/me',null);
  const [view,setView]=useState('Overview'),[hours,setHours]=useState('24'),[busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[taskResult,setTaskResult]=useState<any>(null);
  const [params]=useSearchParams(),navigate=useNavigate();
+ useEffect(()=>{const requested=params.get('tab');if(requested&&tabs.includes(requested))setView(requested);},[params.get('tab')]);
  useEffect(()=>{if(params.get('action')==='Create VM')setView('Virtual Machines');if(params.get('action')==='Create CT')setView('LXC Containers');},[params.get('action')]);
  const data=live.data,nodes=data?.nodes||[],vms=data?.vms||[],lxc=data?.lxc||[],storage=data?.storage||[],errors=data?.errors||[],services=data?.nodeServices||[];
  const cluster=data?.clusterStatus?.find((r:any)=>r.type==='cluster'),online=nodes.filter((n:any)=>n.status==='online').length;

@@ -40,8 +40,9 @@ jobs:
         run: |
           sh deployment/generate-secrets.sh > /dev/null
           docker compose up -d --build --wait --wait-timeout 180
-          curl --fail http://localhost:6002/api/health
-          node deployment/check-registration.mjs
+          docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/homecloud-ci-root.crt
+          curl --fail --show-error --cacert /tmp/homecloud-ci-root.crt https://localhost:6002/api/health
+          NODE_EXTRA_CA_CERTS=/tmp/homecloud-ci-root.crt node deployment/check-registration.mjs
       - name: Deployment logs and cleanup
         if: always()
         run: |

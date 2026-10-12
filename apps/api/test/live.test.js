@@ -1,3 +1,4 @@
+import {issueGrant} from '../src/ssh-access.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -77,7 +78,7 @@ const noData={sampledAt:new Date().toISOString(),services:[{name:'docker',provid
 const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'user',email:'owner@test',name:'Test',role:req.headers['x-test-role']||'owner'};next();},authorize:requireRole,audit:async(...args)=>audit.push(args),monitor:{sample:async()=>structuredClone(noData),invalidate:()=>{}},db:{query:async()=>({rows:[],rowCount:0})}});
 const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
 const url=`http://127.0.0.1:${server.address().port}`;
-async function call(endpoint,method='GET',body,headers={}){const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
+async function call(endpoint,method='GET',body,headers={}){if(headers['X-HomeCloud-Confirm']&&(/^\/proxmox\/node\//.test(endpoint)||/^\/actions\/proxmox\//.test(endpoint)))headers={...headers,'X-HomeCloud-SSH-Grant':issueGrant('user',method,endpoint,body)};const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 try{
  await test('guest installation requires owner and confirmation bound to the guest payload',async()=>{
   const endpoint='/node-agents/guest/setup',body={host:'fixture:lxc/131'};
@@ -132,7 +133,7 @@ try{
  });
  await test('LXC details and snapshots use live Proxmox endpoints',async()=>{
    const details=await call('/proxmox/lxc/pve/103/details');assert.equal(details.status,200);assert.equal(details.body.config.hostname,'actual-lxc');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'ct-baseline');assert.equal(details.body.interfaces[0].inet,'192.0.2.60/24');assert.deepEqual(details.body.errors,[]);
-   const created=await call('/actions/proxmox/lxc/103/snapshot','POST',{node:'pve',name:'before-upgrade'});assert.equal(created.status,200);assert.equal(created.body.result.task,'UPID:lxc-snapshot');assert.equal(requests.at(-1).body.snapname,'before-upgrade');
+   const created=await call('/actions/proxmox/lxc/103/snapshot','POST',{node:'pve',name:'before-upgrade'},{'X-HomeCloud-SSH-Grant':issueGrant('user','POST','/actions/proxmox/lxc/103/snapshot',{node:'pve',name:'before-upgrade'})});assert.equal(created.status,200);assert.equal(created.body.result.task,'UPID:lxc-snapshot');assert.equal(requests.at(-1).body.snapname,'before-upgrade');
  });
  await test('storage inventory and history return measured values; writes require admin and confirmation',async()=>{
    const inventory=await call('/proxmox/storage');assert.equal(inventory.body.resources[0].capacity,100);assert.equal(inventory.body.resources[0].usage,60);assert.equal(inventory.body.resources[0].shared,true);

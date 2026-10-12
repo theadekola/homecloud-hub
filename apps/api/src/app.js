@@ -1,3 +1,4 @@
+import {actionTarget,consumeGrant,connectSSH,shellSession,closeShell} from './ssh-access.js';
 import net from 'node:net';
 import {providerDiagnostics} from './diagnostics.js';
 import {notifier} from './notifications.js';
@@ -91,12 +92,18 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
+ app.post('/api/ssh/connect',authorize('admin'),async(req,res)=>{try{res.json(await connectSSH(req.body,req.user.sub));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
+ app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);const output=s.output;s.output='';res.json({output,closed:s.closed});});
+ app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(typeof req.body.input==='string'&&req.body.input.length<=8192)s.stream.write(req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});
+ app.delete('/api/ssh/session/:id',authorize('admin'),(req,res)=>{closeShell(req.params.id,req.user.sub);res.json({ok:true});});
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{
    const resource=(Object.values(req.params).join('/')||path)+((req.params.provider==='docker'||path.startsWith('/docker/'))?` [${selectedAgentHost()||'direct-engine'}]`:'');
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
    if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase});
+   req.sshLabel=label;const sshTarget=actionTarget(req);
+   if(sshTarget&&!consumeGrant(req.headers['x-homecloud-ssh-grant'],req.user.sub,req.method,req.path.replace(/^\/api/,''),req.body))return res.status(428).json({error:'Target SSH authentication required',sshTarget});
    let result;
    try{result=await handler(req);}catch(error){await audit(req,label,resource,{error:error.message},'failed');throw error;}
    monitor.invalidate();

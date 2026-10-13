@@ -1,4 +1,4 @@
-import {actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH} from './ssh-access.js';
+import {actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH,sftpOperation} from './ssh-access.js';
 import net from 'node:net';
 import {providerDiagnostics} from './diagnostics.js';
 import {notifier} from './notifications.js';
@@ -95,8 +95,9 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/ssh/connections',authorize('admin'),(req,res)=>{try{res.json(publicSavedSSH(req.user.sub));}catch(e){res.status(500).json({error:'Saved connections unavailable'});}});
  app.post('/api/ssh/fingerprint',authorize('admin'),async(req,res)=>{try{await connectSSH({host:req.body.host,port:req.body.port,target:req.body.target,username:'host-key-probe',password:'unused'},req.user.sub);res.status(400).json({error:'Host verification unavailable'});}catch(e){if(e.fingerprint)res.json({fingerprint:e.fingerprint});else res.status(400).json({error:'Unable to read SSH host key'});}});
  app.post('/api/ssh/connect',authorize('admin'),async(req,res)=>{try{res.json(await connectSSH(req.body,req.user.sub));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
- app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);const output=s.output;s.output='';res.json({output,closed:s.closed});});
- app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(typeof req.body.input==='string'&&req.body.input.length<=8192)s.stream.write(req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});
+ app.post('/api/ssh/sftp/:id',authorize('admin'),async(req,res)=>{try{res.json(await sftpOperation(req.params.id,req.user.sub,req.body));}catch(e){res.status(e.status||422).json({error:e.message});}});
+ app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});const output=s.output;s.output='';res.json({output,closed:s.closed});});
+ app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});if(typeof req.body.input==='string'&&req.body.input.length<=8192)s.stream.write(req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});
  app.delete('/api/ssh/session/:id',authorize('admin'),(req,res)=>{closeShell(req.params.id,req.user.sub);res.json({ok:true});});
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{

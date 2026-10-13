@@ -4,7 +4,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Boxes, Container, Database, Network, HardDriveDownload,
   CalendarClock, History, RotateCcw, Activity, Bell, Sparkles, Users, ScrollText, Settings,
-  Terminal, Menu, Cloud, ChevronDown, LogOut
+  Terminal, FolderOpen, Menu, Cloud, ChevronDown, LogOut
 } from 'lucide-react';
 import { useState,useEffect,useRef } from 'react';
 import UpdateButton from './UpdateButton';
@@ -16,7 +16,7 @@ const sections = [
   { title: 'INFRASTRUCTURE', items: [['Proxmox','/proxmox',Boxes],['Docker','/docker',Container],['Storage','/storage',Database],['Network','/network',Network]] },
   { title: 'DATA PROTECTION', items: [['Backups','/backups',HardDriveDownload]] },
   { title: 'MONITORING', items: [['Monitoring','/monitoring',Activity],['Alerts','/alerts',Bell],['AI Assistant','/ai',Sparkles]] },
-  { title: 'TOOLS', items: [['Shell','/tools/shell',Terminal]] },
+  { title: 'TOOLS', items: [['Shell','/tools/shell',Terminal],['SFTP Files','/tools/sftp',FolderOpen]] },
   { title: 'MANAGEMENT', items: [['Users','/users',Users],['Audit Logs','/audit',ScrollText],['Settings','/settings',Settings]] },
 ];
 

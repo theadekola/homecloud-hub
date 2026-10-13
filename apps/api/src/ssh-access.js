@@ -16,7 +16,7 @@ const binding=(user,method,path,body)=>crypto.createHash('sha256').update(JSON.s
 export function issueGrant(user,method,path,body){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{binding:binding(user,method,path,body),expires:Date.now()+60000});return token;}
 export function consumeGrant(token,user,method,path,body){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body);}
 export async function connectSSH(input,user){
- if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:'shell'};}
+ if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:input.mode==='sftp'?'sftp':'shell'};}
  if(input.useSavedPassword){const existing=savedSSH(user,input.target);if(!existing||existing.host!==input.host||existing.port!==Number(input.port||22)||existing.username!==input.username)throw failure('Enter a password for the changed connection');input={...input,password:existing.password};}
  if(typeof input.host!=='string'||!input.host||input.host.length>253||/[\s/]/.test(input.host))throw failure('Enter the target SSH hostname or IP address');
  if(!/^(node|vm|lxc):/.test(input.target||''))throw failure('Invalid target');
@@ -30,10 +30,23 @@ export async function connectSSH(input,user){
    const nodeMatch=input.path.match(/^\/proxmox\/node\/([^/]+)\//),guestMatch=input.path.match(/^\/actions\/proxmox\/(vm|lxc)\/([^/]+)\//);const expected=nodeMatch?`node:${decodeURIComponent(nodeMatch[1])}`:guestMatch?`${guestMatch[1]}:${input.body?.node}:${decodeURIComponent(guestMatch[2])}`:null;if(expected!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body)};
   }finally{client.end();}
  }
- const stream=await new Promise((resolve,reject)=>client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));
+ let stream;try{stream=await new Promise((resolve,reject)=>input.mode==='sftp'?client.sftp((e,s)=>e?reject(e):resolve(s)):client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));}catch(e){client.end();throw e;}
  if(input.save===true){const vault=connectionVault(),all=vault.read()||{};all[`${user}:${input.target}`]={host:input.host,port,username:input.username,password:input.password,fingerprint:input.fingerprint};vault.save(all);}
- const id=crypto.randomUUID(),s={user,client,stream,output:'',touched:Date.now(),closed:false};sessions.set(id,s);stream.on('data',d=>{s.output=(s.output+d.toString()).slice(-262144)});stream.on('close',()=>{s.closed=true;client.end()});client.on('error',()=>s.closed=true);return {id};
+ const id=crypto.randomUUID(),s={user,client,stream,mode:input.mode==='sftp'?'sftp':'shell',output:'',touched:Date.now(),closed:false};sessions.set(id,s);if(s.mode==='shell')stream.on('data',d=>{s.output=(s.output+d.toString()).slice(-262144)});stream.on('close',()=>{s.closed=true;client.end()});client.on('error',()=>s.closed=true);return {id};
 }
 export function shellSession(id,user){const s=sessions.get(id);if(!s||s.user!==user)throw failure('Shell session unavailable',404);s.touched=Date.now();return s;}
-export function closeShell(id,user){const s=shellSession(id,user);s.stream.close();s.client.end();sessions.delete(id);}
+export function closeShell(id,user){const s=shellSession(id,user);if(s.mode==='sftp')s.stream.end();else s.stream.close();s.client.end();sessions.delete(id);}
 const timer=setInterval(()=>{for(const [id,s]of sessions)if(Date.now()-s.touched>60000){s.client.end();sessions.delete(id)}for(const [id,g]of grants)if(g.expires<Date.now())grants.delete(id)},15000);timer.unref();
+
+const remotePath=value=>{if(typeof value!=='string'||!value.startsWith('/')||value.includes('\0')||value.length>4096)throw failure('Enter an absolute remote path');return path.posix.normalize(value)};
+const call=(s,method,...args)=>new Promise((resolve,reject)=>s[method](...args,(e,result)=>e?reject(failure(e.message,422)):resolve(result)));
+export async function sftpOperation(id,user,input){
+ const session=shellSession(id,user);if(session.mode!=='sftp')throw failure('Not an SFTP session');if(input.action==='keepalive')return {ok:true};const s=session.stream,p=remotePath(input.path||'/');
+ if(input.action==='list'){const entries=await call(s,'readdir',p);return {path:p,entries:entries.map(e=>({name:e.filename,directory:e.attrs.isDirectory(),link:e.attrs.isSymbolicLink(),size:e.attrs.size,modified:e.attrs.mtime,mode:e.attrs.mode})).sort((a,b)=>Number(b.directory)-Number(a.directory)||a.name.localeCompare(b.name))};}
+ if(input.action==='mkdir'){await call(s,'mkdir',p);return {ok:true};}
+ if(input.action==='rename'){await call(s,'rename',p,remotePath(input.destination));return {ok:true};}
+ if(input.action==='delete'){const stat=await call(s,'lstat',p);await call(s,stat.isDirectory()?'rmdir':'unlink',p);return {ok:true};}
+ if(input.action==='read'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0)throw failure('Invalid offset');const handle=await call(s,'open',p,'r');try{const buffer=Buffer.alloc(262144);const bytes=await new Promise((resolve,reject)=>s.read(handle,buffer,0,buffer.length,offset,(e,n)=>e?reject(e):resolve(n)));return {data:buffer.subarray(0,bytes).toString('base64'),done:bytes===0};}finally{await call(s,'close',handle);}}
+ if(input.action==='write'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0||typeof input.data!=='string'||input.data.length>350000)throw failure('Invalid upload chunk');const buffer=Buffer.from(input.data,'base64');const handle=await call(s,'open',p,offset===0?'wx':'r+');try{await call(s,'write',handle,buffer,0,buffer.length,offset);return {ok:true};}finally{await call(s,'close',handle);}}
+ throw failure('Unsupported file operation');
+}

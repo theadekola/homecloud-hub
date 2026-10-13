@@ -161,7 +161,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/proxmox/vm/:node/:id/details',async req=>{
    const base=`/nodes/${encode(req.params.node)}/qemu/${encode(req.params.id)}`,result={node:req.params.node,id:req.params.id,errors:[]};
    await Promise.all([
-     ['status',`${base}/status/current`],['config',`${base}/config`],['snapshots',`${base}/snapshot`],['interfaces',`${base}/agent/network-get-interfaces`]
+     ['status',`${base}/status/current`],['config',`${base}/config`],['snapshots',`${base}/snapshot`],['interfaces',`${base}/agent/network-get-interfaces`],['history',`${base}/rrddata?timeframe=hour&cf=AVERAGE`],['os',`${base}/agent/get-osinfo`]
    ].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
    return result;
  });

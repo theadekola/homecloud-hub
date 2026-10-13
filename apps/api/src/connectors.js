@@ -203,7 +203,7 @@ export async function dockerCreateContainer(payload){
   }
   await docker(`/images/create?fromImage=${encodeURIComponent(payload.image)}`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000});
   const created=await docker(`/containers/create?name=${encodeURIComponent(payload.name)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  await docker(`/containers/${created.Id}/start`,{method:'POST'});
+  if(payload.start===true)await docker(`/containers/${created.Id}/start`,{method:'POST'});
   return created;
 }
 export async function dockerLogs(id,tail=200){

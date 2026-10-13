@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 test('Docker connector handles pulls, port mappings, conflicts and log frames',async()=>{
-  let created,buildBody;
+  let created,buildBody,starts=0;
   const server=http.createServer(async(req,res)=>{
     if(req.url==='/containers/json?all=1')return res.end(JSON.stringify([{Id:'container',Names:['/app'],State:'exited',Mounts:[{Type:'volume',Name:'app_data',Destination:'/data',RW:true}]}]));
     if(req.url==='/images/json'||req.url==='/networks')return res.end('[]');
@@ -18,6 +18,7 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     if(req.url.includes('/logs?')){
       const message=Buffer.from('hello\n');const header=Buffer.alloc(8);header[0]=1;header.writeUInt32BE(message.length,4);return res.end(Buffer.concat([header,message]));
     }
+    if(req.url==='/containers/test/start'){starts++;res.statusCode=204;return res.end();}
     if(req.url.includes('/stop')){res.statusCode=409;return res.end('conflict');}
     res.statusCode=204;res.end();
   });
@@ -30,7 +31,7 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     assert.equal(inventory.volumes[0].labels.backup,'true');
     assert.equal(inventory.containers[0].mounts[0].Destination,'/data');
     const result=await connector.dockerCreateContainer({name:'test',image:'nginx',ports:'8080:80'});
-    assert.equal(result.Id,'test');
+    assert.equal(result.Id,'test');assert.equal(starts,0);await connector.dockerCreateContainer({name:'test',image:'nginx',start:true});assert.equal(starts,1);await connector.dockerCreateContainer({name:'test',image:'nginx',ports:'8080:80',start:false});assert.equal(starts,1);
     await connector.dockerBuildImage({tag:'test:latest',dockerfile:'FROM scratch\n'});
     assert.equal(buildBody.subarray(0,10).toString(),'Dockerfile');
     assert.equal(buildBody.subarray(512,525).toString(),'FROM scratch\n');

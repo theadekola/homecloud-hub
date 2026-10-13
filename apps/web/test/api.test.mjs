@@ -7,7 +7,8 @@ const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarge
 let generation=0;
 async function client(){
  const values=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
- globalThis.window={prompt:()=>null};
+ globalThis.CustomEvent??=class extends Event{constructor(type,options){super(type);this.detail=options?.detail}};
+ globalThis.window={prompt:()=>null,dispatchEvent:e=>{values.set('lastEvent',e.type)}};
  return import(`data:text/javascript;base64,${Buffer.from(compiled+`\n// ${++generation}`).toString('base64')}`);
 }
 const response=(status,body={})=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
@@ -21,7 +22,7 @@ try{
  });
  await test('rejected refresh tokens clear the session',async()=>{
   const c=await client();c.setTokens('old','refresh');globalThis.fetch=async()=>response(401);
-  await assert.rejects(c.api('/auth/me'),{status:401});assert.equal(c.getAccessToken(),'');assert.equal(localStorage.getItem('homecloud_refresh_token'),null);
+  await assert.rejects(c.api('/auth/me'),{status:401});assert.equal(c.getAccessToken(),'');assert.equal(localStorage.getItem('homecloud_refresh_token'),null);assert.equal(localStorage.getItem('lastEvent'),'homecloud-session-expired');
  });
  await test('simultaneous expired requests share one token refresh and retry successfully',async()=>{
   const c=await client();c.setTokens('old','refresh');let refreshes=0;

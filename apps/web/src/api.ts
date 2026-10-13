@@ -4,11 +4,11 @@ let refreshInFlight:Promise<boolean>|null=null;
 function refreshAccessToken(){
   if(!refreshInFlight)refreshInFlight=(async()=>{
     const refreshToken=localStorage.getItem('homecloud_refresh_token');
-    if(!refreshToken)return false;
+    if(!refreshToken){clearTokens();return false;}
     const response=await fetch(`${API}/api/auth/refresh`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken})});
     if(!response.ok){if(response.status===401)clearTokens();throw Object.assign(new Error(response.status===401?'Session expired. Sign in again.':'Session refresh is temporarily unavailable.'),{status:response.status});}
     const body=await response.json();setTokens(body.accessToken,body.refreshToken);return true;
-  })().finally(()=>{refreshInFlight=null;});
+  })().catch(e=>{if(e.status!==401)window.dispatchEvent?.(new CustomEvent('homecloud-session-unavailable',{detail:e.message||'Connection temporarily unavailable'}));throw e;}).finally(()=>{refreshInFlight=null;});
   return refreshInFlight;
 }
 
@@ -17,7 +17,7 @@ export function setTokens(accessToken:string, refreshToken?:string){
   localStorage.setItem('homecloud_access_token',accessToken);
   if(refreshToken) localStorage.setItem('homecloud_refresh_token',refreshToken);
 }
-export function clearTokens(){ localStorage.removeItem('homecloud_access_token'); localStorage.removeItem('homecloud_refresh_token'); }
+export function clearTokens(){ localStorage.removeItem('homecloud_access_token'); localStorage.removeItem('homecloud_refresh_token'); window.dispatchEvent?.(new Event('homecloud-session-expired')); }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string): Promise<T> {
   const headers:any = { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(options.headers).entries()) };

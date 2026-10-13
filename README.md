@@ -1,6 +1,6 @@
 # HomeCloud Hub 3
 
-A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense and Tailscale API connections. The application has no demo mode, seeded infrastructure records, random charts or simulated successful operations.
+A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense API connections. The application has no demo mode, seeded infrastructure records, random charts or simulated successful operations.
 
 ## Implemented integrations
 
@@ -10,7 +10,6 @@ A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense and Tail
 | Docker | Engine information, container measurements/logs, images, volumes, networks and existing Compose projects | Create/lifecycle/remove containers; create/remove volumes and networks; prune unused resources; start/stop/restart existing Compose project containers |
 | TrueNAS | Pools, datasets, disks, snapshots, alerts, snapshot schedules and jobs | Create datasets and snapshots; create/update/toggle/delete SMB and NFS shares; inspect share paths and permissions; delete/roll back snapshots; start pool scrubs; create/toggle periodic snapshot tasks with retention lifetimes |
 | OPNsense | System status, interfaces and services | Start/stop/restart services; reload an interface |
-| Tailscale | Tailnet devices, addresses, authorization, last-seen timestamps and routes | Authorize/deauthorize/remove devices; enable advertised routes or disable routes |
 | Other services | Server-configured HTTP health endpoints | Monitoring only |
 
 Monitoring samples every 30 seconds, with bounded reads for all paired Docker hosts and the optional direct Engine. Host-qualified container identities prevent collisions; Engine IDs deduplicate the same Engine reached through multiple connections. Slow or unavailable hosts appear as errors or partial readings rather than being replaced. Charts contain collected Proxmox node averages, including gaps for unavailable measurements. Alert rules evaluate actual CPU, memory and storage measurements. Connection errors and TrueNAS alerts are also tracked. Acknowledgment does not repair a condition.
@@ -116,7 +115,7 @@ The owner can open **Settings → External Notifications** to see configured cha
 
 Active alerts and recovery events are queued separately per channel. Successful deliveries are deduplicated across restarts; failures retry with bounded exponential backoff. Acknowledgment does not send a recovery notification. A network failure after a provider accepted a message can produce a duplicate on retry; delivery is not guaranteed exactly once. Historical events older than seven days are not newly queued.
 
-Open **Settings → Provider Compatibility Checks** to run read-only checks against configured Proxmox, Docker, TrueNAS, OPNsense and Tailscale APIs. Versions and individual failures are shown without changing guests, exports or files. Passing reads do not certify write compatibility, client access to shares or restore outcomes. Use disposable staging resources for those tests.
+Open **Settings → Provider Compatibility Checks** to run read-only checks against configured Proxmox, Docker, TrueNAS, OPNsense APIs. Versions and individual failures are shown without changing guests, exports or files. Passing reads do not certify write compatibility, client access to shares or restore outcomes. Use disposable staging resources for those tests.
 
 ### Automatic LAN HTTPS on port 6002
 

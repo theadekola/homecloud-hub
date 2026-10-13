@@ -1,3 +1,4 @@
+import {canAccessPage} from '../permissions';
 import {applyAppearance} from '../appearance';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
@@ -35,7 +36,7 @@ export default function Layout() {
       <div className="nav-scroll">
         {sections.map(sec => <div className="nav-section" key={sec.title}>
           {!collapsed && <div className="nav-title">{sec.title}</div>}
-          {sec.items.map(([label,path,Icon]: any) => <NavLink key={path} to={path} end={path === '/'} className={({isActive}) => `nav-item ${isActive?'active':''}`}>
+          {sec.items.filter(([,path]:any)=>canAccessPage(path,session?.user?.role)).map(([label,path,Icon]: any) => <NavLink key={path} to={path} end={path === '/'} className={({isActive}) => `nav-item ${isActive?'active':''}`}>
             <Icon size={18}/>{!collapsed && <span>{label}</span>}
           </NavLink>)}
         </div>)}

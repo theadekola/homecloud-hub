@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useNavigate,useSearchParams} from 'react-router-dom';
 import {Archive,CheckCircle,AlertTriangle,Database,Calendar,RefreshCw,Plus,Play,RotateCcw,ShieldCheck} from 'lucide-react';
 import {PieChart,Pie,Cell,Tooltip,ResponsiveContainer} from 'recharts';
 import {useApi} from '../hooks';
@@ -11,6 +11,8 @@ export default function ProxmoxBackups({role,hours,onTasks,onStorage}:{role?:str
  const live=useApi<any>('/backups',null),tasks=useApi<any>(`/proxmox/tasks?hours=${hours}`,null),stores=useApi<any>('/proxmox/storage',null),guests=useApi<any>('/proxmox',null),navigate=useNavigate();
  const [search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[view,setView]=useState('jobs'),[kind,setKind]=useState('all'),[page,setPage]=useState(0),[size,setSize]=useState(10),[modal,setModal]=useState<'run'|'schedule'|'policy'|null>(null),[current,setCurrent]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const admin=['owner','admin'].includes(role||''),operator=admin||role==='operator',jobs=live.data?.jobs||[],raw=live.data?.points||[],resources=stores.data?.resources||[];
+ const [params,setParams]=useSearchParams();
+ useEffect(()=>{if(params.get('action')==='Run Backup'&&role){if(operator)setModal('run');else setError('Your role cannot run backups.');const next=new URLSearchParams(params);next.delete('action');setParams(next,{replace:true});}},[params.get('action'),role]);
  // The same shared archive can be visible from multiple cluster nodes.
  const points=raw.filter((p:any,i:number)=>raw.findIndex((s:any)=>s.storage===p.storage&&s.volid===p.volid&&(s.node===p.node||resources.some((r:any)=>r.node===p.node&&r.name===p.storage&&r.shared===true)&&resources.some((r:any)=>r.node===s.node&&r.name===s.storage&&r.shared===true)))===i);
  const backupTasks=(tasks.data?.tasks||[]).filter((t:any)=>t.type==='vzdump'),success=backupTasks.filter((t:any)=>t.status==='OK'),failed=backupTasks.filter((t:any)=>t.endtime&&t.status&&t.status!=='OK'),next=jobs.filter((j:any)=>j.enabled!==0&&j.enabled!==false&&j['next-run']).sort((a:any,b:any)=>a['next-run']-b['next-run'])[0];

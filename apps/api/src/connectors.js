@@ -71,7 +71,10 @@ export async function proxmoxSnapshot(){
     }));
   }));
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;
-  const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:r.disk??null,diskTotal:r.maxdisk??null,diskPercent:percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
+  const vmFilesystems=new Map();
+  const running=resources.filter(r=>r.type==='qemu'&&r.status==='running');
+  for(let offset=0;offset<running.length;offset+=4)await Promise.all(running.slice(offset,offset+4).map(async r=>{try{const response=await pve(`/nodes/${encodeURIComponent(r.node)}/qemu/${encodeURIComponent(r.vmid)}/agent/get-fsinfo`);vmFilesystems.set(String(r.vmid),guestFilesystemUsage(response));}catch{}}));
+  const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.used??null):(r.disk??null),diskTotal:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.total??null):(r.maxdisk??null),diskFree:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.free??null):null,diskCapacity:r.maxdisk??null,diskPercent:type==='qemu'?percent(vmFilesystems.get(String(r.vmid))?.used,vmFilesystems.get(String(r.vmid))?.total):percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
   let clusterStatus=[];
   try{clusterStatus=await pve('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();
@@ -236,3 +239,4 @@ export async function dockerBuildImage({tag,dockerfile}){
  const checksum=header.reduce((sum,b)=>sum+b,0);header.write(checksum.toString(8).padStart(6,'0')+'\0 ',148);
  return docker(`/build?t=${encodeURIComponent(tag.trim())}&rm=true`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000,headers:{'Content-Type':'application/x-tar'},body:Buffer.concat([header,file,Buffer.alloc((512-file.length%512)%512+1024)])});
 }
+export function guestFilesystemUsage(response){const rows=Array.isArray(response)?response:response?.result;if(!Array.isArray(rows))return null;const seen=new Set();let used=0,total=0;for(const row of rows){const capacity=row['total-bytes'],usage=row['used-bytes'],key=row.name||row.mountpoint;if(!key||seen.has(key)||typeof capacity!=='number'||typeof usage!=='number'||capacity<=0||usage<0||usage>capacity||['tmpfs','devtmpfs','overlay','squashfs','proc','sysfs'].includes(row.type))continue;seen.add(key);total+=capacity;used+=usage;}return total?{used,total,free:total-used}:null;}

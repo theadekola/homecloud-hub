@@ -43,7 +43,7 @@ export async function confirmedApi<T=any>(path:string, options:RequestInit={}):P
  const host=localStorage.getItem('homecloud_docker_host')||'';let confirmation:string|undefined,grant='';
  for(let attempt=0;attempt<4;attempt++){
   try{return await api<T>(path,{...options,headers:{...Object.fromEntries(new Headers(options.headers).entries()),'X-HomeCloud-Docker-Host':host,...(grant?{'X-HomeCloud-SSH-Grant':grant}:{})}},confirmation)}catch(e:any){
-   if(e.status===409&&e.body?.confirmationPhrase){const phrase=e.body.confirmationPhrase;if(window.prompt(`Type exactly:\n${phrase}`)!==phrase)throw new Error('Confirmation cancelled');confirmation=phrase;continue;}
+   if(e.status===409&&e.body?.confirmationPhrase){const phrase=e.body.confirmationPhrase;if(e.body.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,path,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));confirmation=phrase;continue;}if(window.prompt(`Type exactly:\n${phrase}`)!==phrase)throw new Error('Confirmation cancelled');confirmation=phrase;continue;}
    if(e.status===428&&e.body?.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,path,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));continue;}
    throw e;
   }

@@ -14,6 +14,9 @@ async function client(){
 const response=(status,body={})=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage};
 try{
+ await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
+  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
+ });
  await test('temporary refresh failures preserve both session tokens and report availability',async()=>{
   const c=await client();c.setTokens('old','refresh');
   globalThis.fetch=async url=>response(url.endsWith('/auth/refresh')?503:401);

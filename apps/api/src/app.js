@@ -104,8 +104,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    const resource=(Object.values(req.params).join('/')||path)+((req.params.provider==='docker'||path.startsWith('/docker/'))?` [${selectedAgentHost()||'direct-engine'}]`:'');
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
-   if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase});
    req.sshLabel=label;const sshTarget=actionTarget(req);
+   if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase,sshTarget});
    if(sshTarget&&!consumeGrant(req.headers['x-homecloud-ssh-grant'],req.user.sub,req.method,req.path.replace(/^\/api/,''),req.body))return res.status(428).json({error:'Target SSH authentication required',sshTarget});
    let result;
    try{result=await handler(req);}catch(error){await audit(req,label,resource,{error:error.message},'failed');throw error;}

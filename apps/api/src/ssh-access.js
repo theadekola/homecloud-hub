@@ -4,6 +4,7 @@ import {Client} from 'ssh2';
 import crypto from 'node:crypto';
 const connectionVault=()=>createClusterStore(path.join(process.env.DATA_DIR||'runtime','ssh-connections.json'),()=>process.env.JWT_SECRET,v=>v);
 export function savedSSH(user,target){return connectionVault().read()?.[`${user}:${target}`]||null;}
+export function publicSavedSSH(user){return Object.fromEntries(Object.entries(connectionVault().read()||{}).filter(([key])=>key.startsWith(user+':')).map(([key,value])=>[key.slice(user.length+1),{host:value.host,port:value.port,username:value.username,fingerprint:value.fingerprint,hasPassword:true}]));}
 const sessions=new Map(),grants=new Map();
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 export function actionTarget(req){
@@ -16,6 +17,7 @@ export function issueGrant(user,method,path,body){const token=crypto.randomBytes
 export function consumeGrant(token,user,method,path,body){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body);}
 export async function connectSSH(input,user){
  if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:'shell'};}
+ if(input.useSavedPassword){const existing=savedSSH(user,input.target);if(!existing||existing.host!==input.host||existing.port!==Number(input.port||22)||existing.username!==input.username)throw failure('Enter a password for the changed connection');input={...input,password:existing.password};}
  if(typeof input.host!=='string'||!input.host||input.host.length>253||/[\s/]/.test(input.host))throw failure('Enter the target SSH hostname or IP address');
  if(!/^(node|vm|lxc):/.test(input.target||''))throw failure('Invalid target');
  const port=Number(input.port||22);if(!Number.isInteger(port)||port<1||port>65535)throw failure('Invalid SSH port');

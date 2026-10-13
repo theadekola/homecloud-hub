@@ -1,4 +1,4 @@
-import {actionTarget,consumeGrant,connectSSH,shellSession,closeShell} from './ssh-access.js';
+import {actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH} from './ssh-access.js';
 import net from 'node:net';
 import {providerDiagnostics} from './diagnostics.js';
 import {notifier} from './notifications.js';
@@ -92,6 +92,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
+ app.get('/api/ssh/connections',authorize('admin'),(req,res)=>{try{res.json(publicSavedSSH(req.user.sub));}catch(e){res.status(500).json({error:'Saved connections unavailable'});}});
  app.post('/api/ssh/fingerprint',authorize('admin'),async(req,res)=>{try{await connectSSH({host:req.body.host,port:req.body.port,target:req.body.target,username:'host-key-probe',password:'unused'},req.user.sub);res.status(400).json({error:'Host verification unavailable'});}catch(e){if(e.fingerprint)res.json({fingerprint:e.fingerprint});else res.status(400).json({error:'Unable to read SSH host key'});}});
  app.post('/api/ssh/connect',authorize('admin'),async(req,res)=>{try{res.json(await connectSSH(req.body,req.user.sub));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
  app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);const output=s.output;s.output='';res.json({output,closed:s.closed});});

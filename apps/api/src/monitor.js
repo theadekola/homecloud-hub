@@ -17,7 +17,7 @@ export function alertConditions(snapshot,rules){
   for(const rule of rules.filter(r=>r.enabled!==false))for(const resource of resources){
     if(rule.provider!=='all'&&rule.provider!==resource.provider)continue;
     const value=resource[rule.metric];
-    if(typeof value==='number'&&value>=rule.threshold)conditions.push({key:`rule:${rule.id}:${resource.provider}:${resource.id}`,title:rule.name,source:resource.host?`${resource.host} / ${resource.name}`:resource.name,connectorId:resource.connectorId,metric:rule.metric,resourceId:resource.id,provider:resource.provider,severity:rule.severity,details:`${rule.metric}: ${value}% (threshold ${rule.threshold}%)`});
+    if(typeof value==='number'&&value>=rule.threshold)conditions.push({key:`rule:${rule.id}:${resource.provider}:${resource.id}`,ruleId:rule.id,title:rule.name,source:resource.host?`${resource.host} / ${resource.name}`:resource.name,connectorId:resource.connectorId,metric:rule.metric,resourceId:resource.id,provider:resource.provider,severity:rule.severity,details:`${rule.metric}: ${value}% (threshold ${rule.threshold}%)`});
   }
   for(const a of snapshot.truenas?.alerts||[])if(!a.dismissed)conditions.push({key:`truenas:${a.id||a.uuid}`,title:a.klass||'TrueNAS alert',source:'TrueNAS',provider:'truenas',severity:['CRITICAL','ALERT','EMERGENCY'].includes(a.level)?'critical':'warning',details:a.formatted||a.text||JSON.stringify(a.args)});
   return conditions;
@@ -52,7 +52,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
             if(existing.provider==='docker'&&existing.metric){const row=monitoredDocker(snapshot).find(c=>c.monitorId===existing.resourceId);const value=existing.metric==='memory'?row?.memoryPercent:row?.cpu;if(row&&typeof value!=='number')continue;}existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
         }
         for(const condition of conditions){const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
-          if(current){current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
+          if(current){current.ruleId=condition.ruleId||current.ruleId;current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
         }
         state.alerts=state.alerts.slice(0,1000);
       });

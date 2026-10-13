@@ -1,0 +1,6 @@
+export async function targetSSHHost(target,query){
+ const [kind,node,id]=String(target||'').split(':');if(!['node','vm','lxc'].includes(kind)||!node)throw Object.assign(new Error('Invalid SSH target'),{status:400});
+ if(kind==='node'){const rows=await query('/cluster/status');const host=rows.find(r=>r.type==='node'&&r.name===node)?.ip;if(host)return host;}
+ else{const resources=await query('/cluster/resources');if(!resources.some(r=>r.node===node&&String(r.vmid)===id&&r.type===(kind==='vm'?'qemu':'lxc')))throw Object.assign(new Error('Target does not belong to this cluster node'),{status:403});const base=`/nodes/${encodeURIComponent(node)}/${kind==='vm'?'qemu':'lxc'}/${encodeURIComponent(id)}`;const result=await query(kind==='vm'?base+'/agent/network-get-interfaces':base+'/interfaces');const rows=result?.result||result;const candidates=(Array.isArray(rows)?rows:[]).flatMap(r=>[r.inet?.split('/')[0],...(r['ip-addresses']||[]).map(a=>a['ip-address'])]);const host=candidates.find(a=>a&&!a.includes(':')&&!a.startsWith('127.')&&a!=='0.0.0.0');if(host)return host;}
+ throw Object.assign(new Error('Target SSH address is not reported by Proxmox. Enable guest-agent networking before approving this action.'),{status:422});
+}

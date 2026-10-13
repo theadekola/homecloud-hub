@@ -107,6 +107,11 @@ try{
    const missing=await call('/docker');assert.equal(missing.status,503);assert.match(missing.body.error,/not configured/);
  });
  await test('guest backup rejects storage absent on its selected node before submitting a task',async()=>{const {proxmoxBackup}=await import('../src/connectors.js');const before=requests.filter(r=>r.url?.includes('/vzdump')).length;await assert.rejects(()=>proxmoxBackup({node:'pve',vmid:'101',storage:'missing-other-node'}),/not available on node pve/);assert.equal(requests.filter(r=>r.url?.includes('/vzdump')).length,before);});
+ await test('operators can request action approval but cannot open arbitrary SSH shells or approve a different host',async()=>{
+  assert.equal((await call('/ssh/connect','POST',{host:'attacker',target:'vm:pve:101',mode:'shell'},{'x-test-role':'operator'})).status,403);
+  assert.equal((await call('/ssh/fingerprint','POST',{host:'attacker',target:'vm:pve:101'},{'x-test-role':'operator'})).status,403);
+  const result=await call('/ssh/connect','POST',{mode:'authorize',host:'attacker',port:22,target:'vm:pve:101',fingerprint:'fake',username:'root',password:'wrong'},{'x-test-role':'operator'});assert.equal(result.status,403);assert.match(result.body.error,/actual target/);
+ });
  await test('Proxmox metrics come from resource measurements',async()=>{
    const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,42);assert.equal(result.nodes[0].memoryPercent,50);assert.equal(result.vms[0].name,'actual-guest');assert.equal(result.vms[0].memoryTotal,4);assert.equal(result.vms[0].diskPercent,25);assert.equal(result.vms[0].diskFree,60);assert.equal(result.vms.find(v=>v.id==='102')?.disk??null,null);assert.equal(result.storage[0].usage,60);assert.equal(result.storage[0].available,40);assert.equal(result.clusterStatus[0].quorate,1);assert.equal(result.nodes[0].ip,'192.0.2.10');
  });

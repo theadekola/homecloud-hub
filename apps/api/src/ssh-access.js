@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 const connectionVault=()=>createClusterStore(path.join(process.env.DATA_DIR||'runtime','ssh-connections.json'),()=>process.env.JWT_SECRET,v=>v);
 export function savedSSH(user,target){return connectionVault().read()?.[`${user}:${target}`]||null;}
 export function publicSavedSSH(user){return Object.fromEntries(Object.entries(connectionVault().read()||{}).filter(([key])=>key.startsWith(user+':')).map(([key,value])=>[key.slice(user.length+1),{host:value.host,port:value.port,username:value.username,fingerprint:value.fingerprint,hasPassword:true}]));}
+export function deleteSavedSSH(user,target){const vault=connectionVault(),all=vault.read()||{};delete all[`${user}:${target}`];vault.save(all);}
 const sessions=new Map(),grants=new Map();
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 export function actionTarget(req){
@@ -16,6 +17,7 @@ const binding=(user,method,path,body)=>crypto.createHash('sha256').update(JSON.s
 export function issueGrant(user,method,path,body){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{binding:binding(user,method,path,body),expires:Date.now()+60000});return token;}
 export function consumeGrant(token,user,method,path,body){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body);}
 export async function connectSSH(input,user){
+ if(input.mode==='authorize'&&(input.saved||input.useSavedPassword))throw failure('Action approval requires a freshly entered target password',403);
  if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:input.mode==='sftp'?'sftp':'shell'};}
  if(input.useSavedPassword){const existing=savedSSH(user,input.target);if(!existing||existing.host!==input.host||existing.port!==Number(input.port||22)||existing.username!==input.username)throw failure('Enter a password for the changed connection');input={...input,password:existing.password};}
  if(typeof input.host!=='string'||!input.host||input.host.length>253||/[\s/]/.test(input.host))throw failure('Enter the target SSH hostname or IP address');
@@ -31,6 +33,7 @@ export async function connectSSH(input,user){
   }finally{client.end();}
  }
  let stream;try{stream=await new Promise((resolve,reject)=>input.mode==='sftp'?client.sftp((e,s)=>e?reject(e):resolve(s)):client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));}catch(e){client.end();throw e;}
+ if(input.save===false&&input.mode!=='authorize')deleteSavedSSH(user,input.target);
  if(input.save===true){const vault=connectionVault(),all=vault.read()||{};all[`${user}:${input.target}`]={host:input.host,port,username:input.username,password:input.password,fingerprint:input.fingerprint};vault.save(all);}
  const id=crypto.randomUUID(),s={user,client,stream,mode:input.mode==='sftp'?'sftp':'shell',output:'',touched:Date.now(),closed:false};sessions.set(id,s);if(s.mode==='shell')stream.on('data',d=>{s.output=(s.output+d.toString()).slice(-262144)});stream.on('close',()=>{s.closed=true;client.end()});client.on('error',()=>s.closed=true);return {id};
 }
@@ -47,6 +50,6 @@ export async function sftpOperation(id,user,input){
  if(input.action==='rename'){await call(s,'rename',p,remotePath(input.destination));return {ok:true};}
  if(input.action==='delete'){const stat=await call(s,'lstat',p);await call(s,stat.isDirectory()?'rmdir':'unlink',p);return {ok:true};}
  if(input.action==='read'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0)throw failure('Invalid offset');const handle=await call(s,'open',p,'r');try{const buffer=Buffer.alloc(262144);const bytes=await new Promise((resolve,reject)=>s.read(handle,buffer,0,buffer.length,offset,(e,n)=>e?reject(e):resolve(n)));return {data:buffer.subarray(0,bytes).toString('base64'),done:bytes===0};}finally{await call(s,'close',handle);}}
- if(input.action==='write'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0||typeof input.data!=='string'||input.data.length>350000)throw failure('Invalid upload chunk');const buffer=Buffer.from(input.data,'base64');const handle=await call(s,'open',p,offset===0?'wx':'r+');try{await call(s,'write',handle,buffer,0,buffer.length,offset);return {ok:true};}finally{await call(s,'close',handle);}}
+ if(input.action==='write'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0||typeof input.data!=='string'||input.data.length>350000)throw failure('Invalid upload chunk');const buffer=Buffer.from(input.data,'base64');const handle=await call(s,'open',p,offset===0?(input.replace===true?'w':'wx'):'r+');try{await call(s,'write',handle,buffer,0,buffer.length,offset);return {ok:true};}finally{await call(s,'close',handle);}}
  throw failure('Unsupported file operation');
 }

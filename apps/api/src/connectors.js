@@ -81,7 +81,7 @@ export async function proxmoxSnapshot(){
   const guestInventory=backgroundGuestInventory(guests('qemu'),pve,`${config.url}:${config.tokenId}`);
   return {clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
-    storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),usage:percent(r.disk,r.maxdisk)}))};
+    storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),content:r.content??null,usage:percent(r.disk,r.maxdisk)}))};
 }
 export async function proxmoxVmAction(node,id,action,payload={}){
   const statusActions=new Set(['start','stop','shutdown','reboot','reset','suspend','resume']);

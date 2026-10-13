@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {issueGrant,consumeGrant,actionTarget} from '../src/ssh-access.js';
@@ -7,10 +10,10 @@ test('target identification distinguishes nodes VMs and containers',()=>{assert.
 import ssh2 from 'ssh2';
 const {Server}=ssh2;
 import crypto from 'node:crypto';
-import {connectSSH} from '../src/ssh-access.js';
+import {connectSSH,closeShell,savedSSH} from '../src/ssh-access.js';
 test('SSH authorization rejects unknown host keys and wrong passwords then issues an exact-action grant',async()=>{
  const {privateKey}=crypto.generateKeyPairSync('rsa',{modulusLength:2048});const key=privateKey.export({type:'pkcs1',format:'pem'});
- const server=new Server({hostKeys:[key]},client=>{client.on('error',()=>{});client.on('authentication',ctx=>ctx.method==='password'&&ctx.username==='root'&&ctx.password==='correct'?ctx.accept():ctx.reject());client.on('ready',()=>client.on('session',accept=>{const session=accept();session.on('exec',(accept,reject,info)=>{if(info.command!=='id -u')return reject();const stream=accept();stream.write('0\n');stream.exit(0);stream.end();});}));});
+ const server=new Server({hostKeys:[key]},client=>{client.on('error',()=>{});client.on('authentication',ctx=>ctx.method==='password'&&ctx.username==='root'&&ctx.password==='correct'?ctx.accept():ctx.reject());client.on('ready',()=>client.on('session',accept=>{const session=accept();session.on('pty',accept=>accept());session.on('shell',accept=>{const stream=accept();stream.on('data',()=>{});});session.on('exec',(accept,reject,info)=>{if(info.command!=='id -u')return reject();const stream=accept();stream.write('0\n');stream.exit(0);stream.end();});}));});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const input={host:'127.0.0.1',port:server.address().port,username:'root',password:'correct',target:'node:pve',mode:'authorize',path:'/proxmox/node/pve/power/reboot',method:'POST',body:{}};
- try{let fingerprint;await assert.rejects(()=>connectSSH(input,'alice'),e=>{fingerprint=e.fingerprint;return e.status===409&&fingerprint.startsWith('SHA256:')});await assert.rejects(()=>connectSSH({...input,fingerprint,password:'wrong'},'alice'),/authentication/);const result=await connectSSH({...input,fingerprint},'alice');assert.equal(consumeGrant(result.token,'alice','POST',input.path,{}),true);await assert.rejects(()=>connectSSH({...input,fingerprint,target:'node:other'},'alice'),/does not match/);}finally{server.close();}
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ssh-save-'));const oldDir=process.env.DATA_DIR,oldSecret=process.env.JWT_SECRET;process.env.DATA_DIR=directory;process.env.JWT_SECRET='test-secret-'.repeat(4);try{let fingerprint;await assert.rejects(()=>connectSSH(input,'alice'),e=>{fingerprint=e.fingerprint;return e.status===409&&fingerprint.startsWith('SHA256:')});await assert.rejects(()=>connectSSH({...input,fingerprint,password:'wrong'},'alice'),/authentication/);const result=await connectSSH({...input,fingerprint},'alice');assert.equal(consumeGrant(result.token,'alice','POST',input.path,{}),true);await assert.rejects(()=>connectSSH({...input,fingerprint,target:'node:other'},'alice'),/does not match/);const shell=await connectSSH({...input,mode:'shell',fingerprint,save:true},'alice');closeShell(shell.id,'alice');assert.equal(savedSSH('bob',input.target),null);assert.equal(savedSSH('alice',input.target).password,'correct');assert.equal(fs.readFileSync(path.join(directory,'ssh-connections.json'),'utf8').includes('correct'),false);await assert.rejects(()=>connectSSH({saved:true,target:input.target},'bob'),e=>e.status===404);const again=await connectSSH({saved:true,target:input.target},'alice');closeShell(again.id,'alice');}finally{server.close();if(oldDir===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=oldDir;if(oldSecret===undefined)delete process.env.JWT_SECRET;else process.env.JWT_SECRET=oldSecret;fs.rmSync(directory,{recursive:true,force:true});}
 });

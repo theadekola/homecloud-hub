@@ -92,6 +92,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
+ app.post('/api/ssh/fingerprint',authorize('admin'),async(req,res)=>{try{await connectSSH({host:req.body.host,port:req.body.port,target:req.body.target,username:'host-key-probe',password:'unused'},req.user.sub);res.status(400).json({error:'Host verification unavailable'});}catch(e){if(e.fingerprint)res.json({fingerprint:e.fingerprint});else res.status(400).json({error:'Unable to read SSH host key'});}});
  app.post('/api/ssh/connect',authorize('admin'),async(req,res)=>{try{res.json(await connectSSH(req.body,req.user.sub));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
  app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);const output=s.output;s.output='';res.json({output,closed:s.closed});});
  app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(typeof req.body.input==='string'&&req.body.input.length<=8192)s.stream.write(req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});

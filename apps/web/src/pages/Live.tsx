@@ -1,3 +1,4 @@
+import ConnectionManager from '../components/ConnectionManager';
 import {canToggleAccount} from '../permissions';
 import DockerMonitoring from '../components/DockerMonitoring';
 import IntegrationChecks from '../components/IntegrationChecks';
@@ -132,15 +133,16 @@ function Overview({monitoring=false}:{monitoring?:boolean}){
 export function Dashboard(){return <NewOverview/>;}
 export function Monitoring(){return <Overview monitoring/>;}
 export function Settings(){
+ const [settingsQuery,setSettingsQuery]=useSearchParams();const connectionTab=settingsQuery.get('tab')==='Connections';
  const {data,error,loading,refresh}=useApi<any>('/settings',null);const [message,setMessage]=useState(''),[failure,setFailure]=useState(''),[pending,setPending]=useState(false);
  const {data:session}=useApi<any>('/auth/me',null);
  const save=async(e:any)=>{e.preventDefault();setPending(true);setFailure('');try{const values=Object.fromEntries(new FormData(e.currentTarget));await api('/settings',{method:'PUT',body:JSON.stringify(values)});setMessage('Settings saved.');refresh();window.dispatchEvent(new Event('homecloud-settings'));}catch(e:any){setFailure(e.message);}finally{setPending(false);}};
- return <><PageHeader title="Settings" subtitle="Application settings and real integration status."/>{error||!data?<State error={error} loading={loading}/>:<>
+ return <><PageHeader title="Settings" subtitle="Application settings and connections."/><Tabs items={['General','Connections']} active={connectionTab?'Connections':'General'} onChange={tab=>{const next=new URLSearchParams(settingsQuery);next.set('tab',tab);next.delete('setup');setSettingsQuery(next);}}/>{connectionTab?<ConnectionManager/>:<>{error||!data?<State error={error} loading={loading}/>:<>
  <Card><form className="form-grid" onSubmit={save} key={JSON.stringify(data.settings)}><label>Site Name<input name="siteName" required defaultValue={data.settings.siteName}/></label><label>Description<input name="description" defaultValue={data.settings.description}/></label><label>Page refresh interval (seconds)<input name="refresh" type="number" min="15" max="300" defaultValue={data.settings.refresh}/></label><button type="submit" className="btn primary" disabled={pending||ranks[session?.user?.role]<40}>Save</button></form>{failure&&<p role="alert">{failure}</p>}{message&&<p role="status">{message}</p>}</Card>
- <Card><h3>Integrations</h3><Connections services={data.integrations}/><p>Owners can configure Proxmox through Add / Edit Cluster on the Proxmox page. Configure other integrations in the server environment, then restart the API. Saved credentials are never returned to this page.</p></Card>
+ <Card><h3>Integrations</h3><Connections services={data.integrations}/><p>Manage Proxmox and Docker from Settings → Connections. Configure other integrations in the server environment, then restart the API. Saved credentials are never returned to this page.</p></Card>
  {session?.user?.role==='owner'&&<IntegrationChecks/>}
  <Card><h3>Capabilities</h3><p>API monitoring polls every 30 seconds. Notifications appear in this app and configured external channels. Owners can install software updates using the header Update button. An orange dot indicates a newer version. Application two-factor login is not implemented; use your deployment access controls.</p></Card>
- </>}</>;
+ </>}</>}</>;
 }
 export function AI(){const[msg,setMsg]=useState(''),[messages,setMessages]=useState<any[]>([]),[pending,setPending]=useState(false),[error,setError]=useState('');
  const send=async(e:any)=>{e.preventDefault();if(!msg.trim()||pending)return;const message=msg;setMsg('');setPending(true);setError('');setMessages(m=>[...m,{role:'user',text:message}]);try{const response:any=await api('/ai/chat',{method:'POST',body:JSON.stringify({message})});setMessages(m=>[...m,{role:'assistant',text:response.result.answer}]);}catch(e:any){setError(e.message);}finally{setPending(false);}};

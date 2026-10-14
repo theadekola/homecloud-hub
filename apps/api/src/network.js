@@ -1,9 +1,9 @@
 import {pve} from './connectors.js';
 import {encode,required,integer,httpError,pveWrite} from './infrastructure.js';
 export async function networkInventory(){
- const nodes=await pve('/nodes'),interfaces=[],errors=[];
+ const nodes=await pve('/nodes'),interfaces=[],errors=[];if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async n=>{
-  try{for(const row of await pve(`/nodes/${encode(n.node)}/network`))interfaces.push({...row,id:`${n.node}/${row.iface}`,node:n.node,name:row.iface,address:row.cidr||row.address||null,status:row.active===1?'up':row.active===0?'down':'unknown'});}catch(e){errors.push(`${n.node}: ${e.message}`);}
+  try{for(const row of await pve(`/nodes/${encode(n.node)}/network`))interfaces.push({...row,id:`${n.node}/${row.iface}`,node:n.node,name:row.iface,address:row.cidr||row.address||null,status:[1,'1',true].includes(row.active)?'up':[0,'0',false].includes(row.active)?'down':'unknown'});}catch(e){errors.push(`${n.node}: ${e.message}`);}
  }));
  return {nodes,interfaces,errors,sampledAt:new Date().toISOString()};
 }

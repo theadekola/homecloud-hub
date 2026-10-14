@@ -10,6 +10,7 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     if(req.url==='/info')return res.end('{"Name":"docker-test"}');
     if(req.url==='/volumes')return res.end(JSON.stringify({Volumes:[{Name:'app_data',Driver:'local',Mountpoint:'/volumes/app_data',CreatedAt:'2026-01-01T00:00:00Z',Labels:{backup:'true'},Options:{type:'none'}}]}));
     if(req.url.startsWith('/build?')){const chunks=[];for await(const chunk of req)chunks.push(chunk);buildBody=Buffer.concat(chunks);assert.equal(req.headers['content-type'],'application/x-tar');if(req.url.includes('broken'))return res.end('{"error":"Build failed"}\n');return res.end('{"stream":"Built"}\n');}
+    if(req.url==='/images/nginx/json'){res.statusCode=404;return res.end('{"message":"No such image"}');}
     if(req.url.startsWith('/images/create'))return res.end('{"status":"Pulling"}\n{"status":"Done"}\n');
     if(req.url.startsWith('/containers/create')){
       let body='';for await(const chunk of req)body+=chunk;

@@ -199,7 +199,7 @@ export async function docker(path,init={}){
   const res=selectedAgentHost()?await agentRequest(path,init):await request(`${dockerUrl}${path}`,init,dockerTlsConfig(config));
   if(!res.ok && res.status!==304) {
     const text=await res.text().catch(()=> '');
-    throw new Error(`Docker HTTP ${res.status}${text?`: ${text}`:''}`);
+    throw Object.assign(new Error(`Docker HTTP ${res.status}${text?`: ${text}`:''}`),{dockerStatus:res.status});
   }
   const text=await res.text();
   if(!text)return {};
@@ -269,7 +269,10 @@ export async function dockerCreateContainer(payload){
     body.ExposedPorts[`${payload.containerPort}/tcp`]={};
     body.HostConfig.PortBindings[`${payload.containerPort}/tcp`]=[{HostPort:String(payload.port)}];
   }
-  await docker(`/images/create?fromImage=${encodeURIComponent(payload.image)}`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000});
+  // Use the local image first, including locally built and untagged images.
+  // Only a genuine missing-image response permits a registry pull.
+  try{await docker(`/images/${encodeURIComponent(payload.image)}/json`);}
+  catch(error){if(error.dockerStatus!==404)throw error;await docker(`/images/create?fromImage=${encodeURIComponent(payload.image)}`,{method:'POST',timeoutMs:Number(process.env.ACTION_TIMEOUT_MS)||300000});}
   const created=await docker(`/containers/create?name=${encodeURIComponent(payload.name)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(payload.start===true)await docker(`/containers/${created.Id}/start`,{method:'POST'});
   return created;

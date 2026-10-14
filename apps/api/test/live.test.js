@@ -157,7 +157,14 @@ try{
  });
  await test('network inventory, traffic and staged writes use real endpoints with role and confirmation checks',async()=>{
    const inventory=await call('/proxmox/network');assert.equal(inventory.body.interfaces[0].status,'up');assert.equal(inventory.body.interfaces[1].status,'up');assert.equal(inventory.body.interfaces[1]['vlan-id'],20);
+   const map=await call('/network');assert.equal(map.body.interfaces[0].status,'up');assert.ok(map.body.interfaces[0].displayAddresses.includes('192.0.2.10/24'));
    const detail=await call('/proxmox/network/pve');assert.equal(detail.body.history[0].netin,125000);assert.equal(detail.body.dns.dns1,'192.0.2.1');assert.deepEqual(detail.body.errors,[]);
+   const dns={search:'example.test',dns1:'',dns2:'2001:db8::1',dns3:'',expectedConfig:{search:'example.test',dns1:'192.0.2.1',dns2:'',dns3:''}};
+   assert.equal((await call('/network/dns/pve','PUT',dns,{'x-test-role':'operator'})).status,403);
+   const dnsChallenge=await call('/network/dns/pve','PUT',dns);assert.equal(dnsChallenge.status,409);
+   const dnsSaved=await call('/network/dns/pve','PUT',dns,{'X-HomeCloud-Confirm':dnsChallenge.body.confirmationPhrase});assert.equal(dnsSaved.status,200);assert.equal(requests.at(-1).body.dns1,undefined);assert.equal(requests.at(-1).body.dns2,'2001:db8::1');
+   const staleDns={...dns,expectedConfig:{...dns.expectedConfig,dns1:'192.0.2.99'}},staleChallenge=await call('/network/dns/pve','PUT',staleDns);
+   const beforeDns=requests.filter(r=>r.method==='PUT'&&r.path.endsWith('/dns')).length;assert.equal((await call('/network/dns/pve','PUT',staleDns,{'X-HomeCloud-Confirm':staleChallenge.body.confirmationPhrase})).status,409);assert.equal(requests.filter(r=>r.method==='PUT'&&r.path.endsWith('/dns')).length,beforeDns);
    const body={iface:'vmbr1',type:'bridge',bridge_ports:'eno2',autostart:'1',bridge_vlan_aware:'1',cidr:'192.0.2.20/24'};
    assert.equal((await call('/proxmox/network/pve','POST',body,{'x-test-role':'operator'})).status,403);
    const challenge=await call('/proxmox/network/pve','POST',body);assert.equal(challenge.status,409);

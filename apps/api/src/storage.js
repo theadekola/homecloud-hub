@@ -1,18 +1,21 @@
 import {pve} from './connectors.js';
 import {required,httpError,pveWrite,encode} from './infrastructure.js';
 
-export async function storageInventory(){
- const errors=[],resources=[];
- const nodes=await pve('/nodes');if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];
- try{configs=await pve('/storage');}catch(e){errors.push(`Storage configuration: ${e.message}`);}
+export async function storageInventory(query=pve){
+ const errors=[],resources=[],readNodes=[];
+ const nodes=await query('/nodes');if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];
+ try{configs=await query('/storage');}catch(e){errors.push(`Storage configuration: ${e.message}`);}
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
-  try{const entries=await pve(`/nodes/${encode(node.node)}/storage`);
+  try{const entries=await query(`/nodes/${encode(node.node)}/storage`);
+   if(!Array.isArray(entries))throw new Error('Invalid node storage response');
    for(const row of entries){const config=configs.find(c=>c.storage===row.storage)||{};
     resources.push({id:`${node.node}/${row.storage}`,name:row.storage,node:node.node,type:row.type||config.type||'Unknown',shared:row.shared==null?(config.shared==null?null:Boolean(config.shared)):Boolean(row.shared),status:row.enabled===0?'disabled':row.active===1?'online':row.active===0?'offline':'unknown',capacity:row.total??null,used:row.used??null,available:row.avail??null,usage:row.total>0&&typeof row.used==='number'?row.used/row.total*100:null,content:row.content||config.content||null});
    }
+   readNodes.push(node.node);
   }catch(e){errors.push(`${node.node} storage: ${e.message}`);}
  }));
- return {resources,errors,nodes:nodes.map(n=>n.node),reportedNodes:[...new Set(resources.map(r=>r.node))],sampledAt:new Date().toISOString()};
+ const missingNodes=nodes.map(n=>n.node).filter(n=>!readNodes.includes(n)),coverage={complete:missingNodes.length===0&&!errors.some(e=>e.startsWith('Storage configuration:')),expectedNodes:nodes.map(n=>n.node),readNodes,missingNodes};
+ return {resources,errors,coverage,nodes:nodes.map(n=>n.node),reportedNodes:[...new Set(resources.map(r=>r.node))],sampledAt:new Date().toISOString()};
 }
 export async function storageDetails(node,id,timeframe='day',includeHistory=true){
  const base=`/nodes/${encode(node)}/storage/${encode(id)}`,result={errors:[]};
@@ -20,13 +23,13 @@ export async function storageDetails(node,id,timeframe='day',includeHistory=true
  await Promise.all([['status',`${base}/status`],['content',`${base}/content`],...(includeHistory?[['history',`${base}/rrddata?timeframe=${period}&cf=AVERAGE`]]:[])].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
  return result;
 }
-export function storageSummary(pools){
- const groups=new Map();
- for(const p of pools){const key=p.provider==='proxmox'&&p.shared===true?`proxmox:shared:${p.name}`:`${p.provider}:${p.id}`;const old=groups.get(key);if(!old||(!['online','ONLINE'].includes(old.status)&&['online','ONLINE'].includes(p.status))||(!(old.capacity>0)&&p.capacity>0))groups.set(key,p);}
+export function storageSummary(pools,coverage={complete:true}){
+ const groups=new Map(),rank=p=>(['online','ONLINE'].includes(p.status)?2:0)+(p.capacity>0&&Number.isFinite(p.used)&&Number.isFinite(p.available)?1:0);
+ for(const p of pools){const key=p.provider==='proxmox'&&p.shared===true?`proxmox:shared:${p.name}`:`${p.provider}:${p.id}`;const old=groups.get(key);if(!old||rank(p)>rank(old))groups.set(key,p);}
  const unique=[...groups.values()],online=unique.filter(p=>['online','ONLINE'].includes(p.status)),measured=online.filter(p=>p.capacity>0&&Number.isFinite(p.used)&&Number.isFinite(p.available));
  const uncertain=unique.some(p=>p.provider==='proxmox'&&p.shared==null);
- const complete=!uncertain&&online.length>0&&measured.length===online.length;
- return {pools:unique.length,online:online.length,measured:measured.length,complete,capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
+ const complete=coverage.complete!==false&&!uncertain&&online.length>0&&measured.length===online.length;
+ return {pools:unique.length,online:online.length,measured:measured.length,complete,coverage,measuredCapacity:measured.reduce((n,p)=>n+p.capacity,0),capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
 }
 export function createStorage(input,write=pveWrite){
  const type=required(input.type,'Type'),storage=required(input.storage,'Storage ID');

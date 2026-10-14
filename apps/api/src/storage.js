@@ -3,7 +3,7 @@ import {required,httpError,pveWrite,encode} from './infrastructure.js';
 
 export async function storageInventory(){
  const errors=[],resources=[];
- const nodes=await pve('/nodes');let configs=[];
+ const nodes=await pve('/nodes');if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];
  try{configs=await pve('/storage');}catch(e){errors.push(`Storage configuration: ${e.message}`);}
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
   try{const entries=await pve(`/nodes/${encode(node.node)}/storage`);
@@ -12,12 +12,12 @@ export async function storageInventory(){
    }
   }catch(e){errors.push(`${node.node} storage: ${e.message}`);}
  }));
- return {resources,errors,sampledAt:new Date().toISOString()};
+ return {resources,errors,nodes:nodes.map(n=>n.node),reportedNodes:[...new Set(resources.map(r=>r.node))],sampledAt:new Date().toISOString()};
 }
-export async function storageDetails(node,id,timeframe='day'){
+export async function storageDetails(node,id,timeframe='day',includeHistory=true){
  const base=`/nodes/${encode(node)}/storage/${encode(id)}`,result={errors:[]};
  const period=['hour','day','week','month','year'].includes(timeframe)?timeframe:'day';
- await Promise.all([['status',`${base}/status`],['content',`${base}/content`],['history',`${base}/rrddata?timeframe=${period}&cf=AVERAGE`]].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
+ await Promise.all([['status',`${base}/status`],['content',`${base}/content`],...(includeHistory?[['history',`${base}/rrddata?timeframe=${period}&cf=AVERAGE`]]:[])].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
  return result;
 }
 export function storageSummary(pools){

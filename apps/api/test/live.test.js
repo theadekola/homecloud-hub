@@ -147,7 +147,7 @@ try{
  });
  await test('storage inventory and history return measured values; writes require admin and confirmation',async()=>{
    const inventory=await call('/proxmox/storage');assert.equal(inventory.body.resources[0].capacity,100);assert.equal(inventory.body.resources[0].usage,60);assert.equal(inventory.body.resources[0].shared,true);
-   const details=await call('/proxmox/storage/pve/backup');assert.equal(details.body.history[0].used,60);assert.equal(details.body.content[0].size,50);
+   const details=await call('/proxmox/storage/pve/backup');assert.equal(details.body.history[0].used,60);assert.equal(details.body.content[0].size,50);const before=requests.length;const compact=await call('/proxmox/storage/pve/backup?history=0');assert.equal(compact.status,200);assert.equal(compact.body.history,undefined);assert.equal(compact.body.content[0].size,50);assert.equal(requests.slice(before).some(r=>r.path.includes('/rrddata')),false);
    const body={type:'nfs',storage:'test-nfs',server:'192.0.2.4',export:'/backup'};
    assert.equal((await call('/proxmox/storage','POST',body,{'x-test-role':'operator'})).status,403);
    const challenge=await call('/proxmox/storage','POST',body);assert.equal(challenge.status,409);

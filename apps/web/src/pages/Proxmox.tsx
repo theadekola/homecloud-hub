@@ -61,7 +61,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
  :view==='LXC Containers'?<LxcContainers data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} refresh={refresh}/>
  :view==='Storage'?<ProxmoxStorage role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
  :view==='Settings'?<ProxmoxSettings role={session.data?.user?.role}/>
- :view==='Tasks & Logs'?<ProxmoxTasks role={session.data?.user?.role} clusterUrl={data?.cluster?.url} hours={hours}/>
+ :view==='Tasks & Logs'?<ProxmoxTasks data={data} role={session.data?.user?.role} clusterUrl={data?.cluster?.url} hours={hours}/>
  :view==='Backup'?<ProxmoxBackups role={session.data?.user?.role} hours={hours} onTasks={()=>setView('Tasks & Logs')} onStorage={()=>setView('Storage')}/>
  :view==='Networks'?<ProxmoxNetworks role={session.data?.user?.role} clusterUrl={data?.cluster?.url}/>
  :<div className="pve-management" key={view}>{management(view)}</div>}

@@ -1,3 +1,4 @@
+import {shellExpired} from './ssh-idle.js';
 import {StringDecoder} from 'node:string_decoder';
 import path from 'node:path';
 import {createClusterStore} from './cluster-config.js';
@@ -45,9 +46,9 @@ export async function connectSSH(input,user){
  if(input.save===true){const vault=connectionVault(),all=vault.read()||{};all[`${user}:${input.target}`]={host:input.host,port,username:input.username,password:input.password,fingerprint:input.fingerprint};vault.save(all);}
  const id=crypto.randomUUID(),s={user,client,stream,mode:input.mode==='sftp'?'sftp':'shell',output:'',touched:Date.now(),closed:false};sessions.set(id,s);const decoder=new StringDecoder('utf8'),closed=()=>{if(s.closed)return;s.output=(s.output+decoder.end()).slice(-262144);s.closed=true;s.onOutput?.();};if(s.mode==='shell')stream.on('data',d=>{s.output=(s.output+decoder.write(d)).slice(-262144);s.onOutput?.();});stream.on('close',()=>{closed();client.end()});client.on('error',closed);client.on('close',closed);return {id};
 }
-export function shellSession(id,user){const s=sessions.get(id);if(!s||s.user!==user)throw failure('Shell session unavailable',404);s.touched=Date.now();return s;}
+export function shellSession(id,user){const s=sessions.get(id);if(!s||s.user!==user||shellExpired(s))throw failure('Shell session unavailable',404);if(s.mode==='sftp')s.touched=Date.now();return s;}
 export function closeShell(id,user){const s=shellSession(id,user);s.releaseOutput?.();if(s.mode==='sftp')s.stream.end();else s.stream.close();s.client.end();sessions.delete(id);}
-const timer=setInterval(()=>{for(const [id,s]of sessions)if(Date.now()-s.touched>60000){s.client.end();sessions.delete(id)}for(const [id,g]of grants)if(g.expires<Date.now())grants.delete(id)},15000);timer.unref();
+const timer=setInterval(()=>{for(const [id,s]of sessions)if(shellExpired(s)){s.releaseOutput?.();s.client.end();sessions.delete(id)}for(const [id,g]of grants)if(g.expires<Date.now())grants.delete(id)},15000);timer.unref();
 
 const remotePath=value=>{if(typeof value!=='string'||!value.startsWith('/')||value.includes('\0')||value.length>4096)throw failure('Enter an absolute remote path');return path.posix.normalize(value)};
 const call=(s,method,...args)=>new Promise((resolve,reject)=>s[method](...args,(e,result)=>e?reject(failure(e.message,422)):resolve(result)));

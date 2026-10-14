@@ -17,6 +17,7 @@ export default function Shell({mode='shell'}:{mode?:'shell'|'sftp'}){
  useEffect(()=>{
   if(!consoleActive)return;
   window.scrollTo(0,0);
+  document.documentElement.classList.add('shell-scroll-locked');
   const viewport=window.visualViewport;
   const layout=()=>{
    const page=pageRef.current;if(!page)return;
@@ -24,7 +25,7 @@ export default function Shell({mode='shell'}:{mode?:'shell'|'sftp'}){
    page.style.setProperty('--shell-height',`${Math.max(0,bottom-page.getBoundingClientRect().top-12)}px`);
   };
   layout();window.addEventListener('resize',layout);viewport?.addEventListener('resize',layout);viewport?.addEventListener('scroll',layout);
-  return()=>{window.removeEventListener('resize',layout);viewport?.removeEventListener('resize',layout);viewport?.removeEventListener('scroll',layout);};
+  return()=>{document.documentElement.classList.remove('shell-scroll-locked');window.removeEventListener('resize',layout);viewport?.removeEventListener('resize',layout);viewport?.removeEventListener('scroll',layout);};
  },[consoleActive]);
  const openSession=(host:any,id:string)=>{setTabs(current=>[...current,{...host,id}]);setActive(id);setSelected(host)};
  const closeTab=(id:string)=>{setTabs(current=>current.filter(t=>t.id!==id));if(active===id)setActive(tabs.find(t=>t.id!==id)?.id||'')};

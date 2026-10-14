@@ -1,5 +1,5 @@
 import {readShellOutput,shellInputQueue} from '../shell-stream';
-import {useSSHSession} from '../ssh-session';
+import {useShellPresence,useSSHSession} from '../ssh-session';
 import {sendShellInput,copyTerminalSelection,fullscreenTerminal} from '../ssh-transfer';
 import {useEffect,useRef,useState} from 'react';
 import {Terminal} from '@xterm/xterm';
@@ -21,6 +21,7 @@ export function SSHLogin({target,host='',action,connection,editing=false,mode='s
 export default function SSHTerminal({target,host,sessionId,onDisconnect,active=true,name}:{target:string;host?:string;sessionId?:string;active?:boolean;name?:string;onDisconnect?:()=>void}){
  const [id,setId]=useState(sessionId||''),[error,setError]=useState(''),ref=useRef<HTMLDivElement>(null),terminalRef=useRef<Terminal|null>(null),fitRef=useRef<FitAddon|null>(null),shellRef=useRef<HTMLDivElement>(null);
  useSSHSession(id);
+ useShellPresence(id);
  useEffect(()=>{
   if(!id||!ref.current)return;
   const terminal=new Terminal({fontSize:13,theme:{background:'#07111d'},cursorBlink:true}),fit=new FitAddon(),controller=new AbortController();

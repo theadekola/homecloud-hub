@@ -1561,3 +1561,19 @@
 @media(max-width:1200px){.traffic-ring-summary{flex-direction:column}.traffic-ring-legend{width:100%}}
 @media(max-width:1050px){.network-traffic .traffic-workspace{grid-template-columns:minmax(0,1fr)}.network-traffic .device-summary{grid-template-columns:1fr 1fr}.network-traffic .device-summary>.card:last-child{grid-column:1/-1}}
 @media(max-width:700px){.network-traffic>.network-panel-head{flex-wrap:wrap}.network-traffic .device-summary{grid-template-columns:1fr}.network-traffic .device-summary>.card:last-child{grid-column:auto}.network-traffic .network-panel-head .header-actions{flex-wrap:wrap}}
+
+/* Active shell owns the available viewport; xterm owns its scrollback. */
+.shell-console-active{height:var(--shell-height,calc(100dvh - 100px));display:flex;flex-direction:column;min-height:0;overflow:hidden;overflow-anchor:none}
+.shell-console-active>.page-header{display:none}
+.shell-console-active>.shell-tabs{flex:none}
+.shell-console-active>.shell-active-view{flex:1;min-height:0}
+.shell-console-active>.shell-active-view>.card{height:100%;box-sizing:border-box;margin:0;min-height:0}
+.shell-console-active .ssh-shell{display:flex;flex-direction:column;height:100%;min-height:0}
+.shell-console-active .shell-session-toolbar{flex:none}
+.shell-console-active .shell-session-toolbar .header-actions{flex-wrap:wrap;margin-bottom:0}
+.shell-console-active .ssh-terminal{flex:1;height:auto;min-height:0;min-width:0}
+.ssh-terminal .xterm{height:100%}
+.ssh-terminal .xterm-viewport,.ssh-terminal .xterm-scrollable-element{overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto}
+.shell-console-active .ssh-shell>.error{flex:none;margin:6px 0;max-height:60px;overflow:auto}
+.ssh-shell:fullscreen{display:flex;flex-direction:column;box-sizing:border-box;height:100%}
+.ssh-shell:fullscreen .ssh-terminal{flex:1;height:auto;min-height:0}

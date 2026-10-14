@@ -5,7 +5,7 @@
 3. Select an installation ISO. ISO storage and disk storage can be different. Changing nodes or refreshing media clears the ISO selection.
 4. Choose CD-ROM first to boot the installer, or disk first with CD-ROM fallback. Without an ISO, HomeCloud creates an empty VM with disk-only boot.
 5. Choose VirtIO SCSI for typical Linux guests, or SATA for guest images lacking VirtIO disk drivers. Android requires an x86 VM-compatible distribution and appropriate guest drivers; selecting an ISO does not guarantee distribution compatibility.
-6. Submit creation. HomeCloud allocates a fresh VM ID and queues a stopped VM with automatic startup disabled. Check task history for completion, refresh the VM inventory, then start the VM.
+6. Submit creation. HomeCloud allocates a fresh VM ID and queues a stopped VM with automatic startup disabled. Check task history for completion, refresh the VM inventory, then start the VM. HomeCloud asks for fresh authentication on the containing Proxmox node, so first boot does not depend on a guest SSH server or guest agent.
 7. Use Open installation console, or Console in VM details, to open Proxmox noVNC. Sign in to Proxmox with an account permitted to access that console and complete the installer.
 8. After installation, eject the ISO or change to disk-first boot in Proxmox. Install the QEMU guest agent inside the guest if supported. Enabling its VM configuration does not install guest software.
 

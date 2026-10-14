@@ -1,13 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {proxmoxCreateCt} from '../src/connectors.js';
-test('CT creation allocates a fresh ID and creates a stopped unprivileged guest',async()=>{
- const calls=[];
- const result=await proxmoxCreateCt({name:'test-ct',node:'pve1',ostemplate:'local:vztmpl/debian.tar.zst',storage:'local-lvm',cores:2,memory:1024,disk:8,bridge:'vmbr0',sshKey:'ssh-ed25519 TEST'},async(path,init)=>{calls.push({path,init});return init?'UPID:pve1:create:':123;});
+test('CT creation validates template/root storage, allocates a fresh ID and provisions a stopped unprivileged guest',async()=>{
+ const calls=[];const password='fixture-root-password';
+ const result=await proxmoxCreateCt({name:'test-ct',node:'pve1',ostemplate:'local:vztmpl/debian.tar.zst',storage:'local-lvm',cores:2,memory:1024,disk:8,bridge:'vmbr0',password,sshKey:'ssh-ed25519 TEST'},async(path,init)=>{
+  calls.push({path,init});if(path.endsWith('/storage'))return [{storage:'local-lvm',active:1,enabled:1,content:'rootdir'},{storage:'local',active:1,enabled:1,content:'vztmpl'}];
+  if(path.includes('/content'))return [{content:'vztmpl',volid:'local:vztmpl/debian.tar.zst'}];return init?'UPID:pve1:create:':123;
+ });
  assert.equal(result.vmid,'123');assert.match(result.task,/UPID/);
- assert.equal(calls[0].path,'/cluster/nextid');assert.equal(calls[1].path,'/nodes/pve1/lxc');
- const body=new URLSearchParams(calls[1].init.body);
- assert.equal(body.get('unprivileged'),'1');assert.equal(body.get('start'),'0');assert.equal(body.get('rootfs'),'local-lvm:8');assert.equal(body.get('ostemplate'),'local:vztmpl/debian.tar.zst');assert.equal(body.get('force'),null);assert.equal(body.get('ssh-public-keys'),'ssh-ed25519 TEST');
+ assert.equal(calls[2].path,'/cluster/nextid');assert.equal(calls[3].path,'/nodes/pve1/lxc');
+ const body=new URLSearchParams(calls[3].init.body);
+ assert.equal(body.get('unprivileged'),'1');assert.equal(body.get('start'),'0');assert.equal(body.get('onboot'),'0');assert.equal(body.get('rootfs'),'local-lvm:8');assert.equal(body.get('password'),password);assert.equal(body.get('ostemplate'),'local:vztmpl/debian.tar.zst');assert.equal(body.get('force'),null);assert.equal(body.get('ssh-public-keys'),'ssh-ed25519 TEST');assert.equal(JSON.stringify(result).includes(password),false);
 });
 
 import {proxmoxCreateVm,proxmoxInstallationMedia} from '../src/connectors.js';

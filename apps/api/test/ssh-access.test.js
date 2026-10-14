@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {issueGrant,consumeGrant,actionTarget} from '../src/ssh-access.js';
 test('SSH grants are single-use and bound to identity method target and payload',()=>{const body={node:'pve'},path='/actions/proxmox/vm/100/reboot';let token=issueGrant('alice','POST',path,body);assert.equal(consumeGrant(token,'bob','POST',path,body),false);assert.equal(consumeGrant(token,'alice','POST',path,body),false);token=issueGrant('alice','POST',path,body);assert.equal(consumeGrant(token,'alice','POST',path,{node:'other'}),false);token=issueGrant('alice','POST',path,body);assert.equal(consumeGrant(token,'alice','POST',path,body),true);assert.equal(consumeGrant(token,'alice','POST',path,body),false);});
-test('target identification distinguishes nodes VMs and containers',()=>{assert.equal(actionTarget({sshLabel:'proxmox.node.power',params:{node:'pve'},body:{}}),'node:pve');assert.equal(actionTarget({params:{provider:'proxmox',resourceType:'lxc',resourceId:'103'},body:{node:'pve'}}),'lxc:pve:103');});
+test('target identification distinguishes nodes VMs and containers',()=>{assert.equal(actionTarget({sshLabel:'proxmox.node.power',params:{node:'pve'},body:{}}),'node:pve');assert.equal(actionTarget({params:{provider:'proxmox',resourceType:'lxc',resourceId:'103'},body:{node:'pve'}}),'node:pve');});
 
 import ssh2 from 'ssh2';
 const {Server}=ssh2;

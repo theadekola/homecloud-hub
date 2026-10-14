@@ -10,7 +10,15 @@ const sessions=new Map(),grants=new Map();
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 export function actionTarget(req){
  if(req.params.node&&/^proxmox\.(node\.power|service)$/.test(req.sshLabel||''))return `node:${req.params.node}`;
- if(req.params.provider==='proxmox'&&['vm','lxc'].includes(req.params.resourceType))return `${req.params.resourceType}:${req.body.node}:${req.params.resourceId}`;
+ if(req.params.provider==='proxmox'&&['vm','lxc'].includes(req.params.resourceType))return `node:${req.body.node}`;
+ return null;
+}
+export function approvalTargetForPath(path,body={}){
+ if(typeof path!=='string')return null;
+ const node=path.match(/^\/proxmox\/node\/([^/]+)\/(?:power\/(?:reboot|shutdown)|service\/[^/]+\/(?:start|stop|restart))$/);
+ if(node)return `node:${decodeURIComponent(node[1])}`;
+ const guest=path.match(/^\/actions\/proxmox\/(?:vm|lxc)\/\d+\/(?:start|stop|shutdown|reboot|reset|suspend|resume|snapshot|delete-snapshot|clone|delete)$/);
+ if(guest&&typeof body.node==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(body.node))return `node:${body.node}`;
  return null;
 }
 const binding=(user,method,path,body)=>crypto.createHash('sha256').update(JSON.stringify([user,method,path,body])).digest('hex');
@@ -28,8 +36,7 @@ export async function connectSSH(input,user){
  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',e=>{client.end();reject(fingerprint&&input.fingerprint!==fingerprint?Object.assign(failure('Verify the target SSH host fingerprint before connecting',409),{fingerprint}):failure('SSH authentication or connection failed: '+e.message,422))});client.connect({host:input.host,port,username:input.username,password:input.password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>{fingerprint='SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'');return input.fingerprint===fingerprint;}})});
  if(input.mode==='authorize'){
   try{const uid=await new Promise((resolve,reject)=>client.exec('id -u',(err,stream)=>{if(err)return reject(err);let text='';stream.on('data',d=>text+=d);stream.on('close',()=>resolve(text.trim()));}));if(uid!=='0')throw failure('Protected actions require the target root account',403);
-   if(typeof input.path!=='string'||!/^\/(proxmox\/node\/|actions\/proxmox\/)/.test(input.path))throw failure('Invalid action path');
-   const nodeMatch=input.path.match(/^\/proxmox\/node\/([^/]+)\//),guestMatch=input.path.match(/^\/actions\/proxmox\/(vm|lxc)\/([^/]+)\//);const expected=nodeMatch?`node:${decodeURIComponent(nodeMatch[1])}`:guestMatch?`${guestMatch[1]}:${input.body?.node}:${decodeURIComponent(guestMatch[2])}`:null;if(expected!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body)};
+   const expected=approvalTargetForPath(input.path,input.body);if(!expected||input.method!=='POST')throw failure('Invalid action path');if(expected!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body)};
   }finally{client.end();}
  }
  let stream;try{stream=await new Promise((resolve,reject)=>input.mode==='sftp'?client.sftp((e,s)=>e?reject(e):resolve(s)):client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));}catch(e){client.end();throw e;}

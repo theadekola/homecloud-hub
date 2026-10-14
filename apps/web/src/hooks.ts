@@ -7,7 +7,7 @@ export function useApi<T>(path: string, initial: T, refreshMs?:number) {
   const [data,setData] = useState<T>(initial);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
-  const initialValue=useRef(initial);
+  const initialValue=useRef(initial),resourcePath=useRef(path);
   const pending=useRef<AbortController|null>(null),generation=useRef(0);
   const refresh = useCallback(async()=>{
     if(pending.current)return;
@@ -16,6 +16,7 @@ export function useApi<T>(path: string, initial: T, refreshMs?:number) {
     catch(e:any){ if(ticket===generation.current&&!controller.signal.aborted)setError(e.message); } finally { if(ticket===generation.current){pending.current=null;setLoading(false);} }
   },[path]);
   useEffect(()=>{
+    if(resourcePath.current!==path){resourcePath.current=path;setData(initialValue.current);setError('');setLoading(true);}
     refresh();
     let timer=refreshMs===0?undefined:window.setInterval(refresh,refreshMs??interval);
     const reset=()=>{window.clearInterval(timer);timer=refreshMs===0?undefined:window.setInterval(refresh,refreshMs??interval);};
@@ -25,5 +26,6 @@ export function useApi<T>(path: string, initial: T, refreshMs?:number) {
     window.addEventListener('homecloud-connection',connectionChanged);
     return()=>{++generation.current;pending.current?.abort();pending.current=null;window.clearInterval(timer);window.removeEventListener('homecloud-refresh',reset);window.removeEventListener('homecloud-settings',refresh);window.removeEventListener('homecloud-connection',connectionChanged);};
   },[refresh,refreshMs]);
-  return {data,setData,loading,error,refresh};
+  const current=resourcePath.current===path;
+  return {data:current?data:initialValue.current,setData,loading:current?loading:true,error:current?error:'',refresh};
 }

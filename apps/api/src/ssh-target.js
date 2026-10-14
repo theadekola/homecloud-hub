@@ -1,3 +1,8 @@
+export async function assertGuestPlacement(node,id,kind,query){
+ if(typeof node!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(node)||!/^\d+$/.test(String(id))||!['qemu','lxc'].includes(kind))throw Object.assign(new Error('Invalid guest target'),{status:400});
+ const rows=await query('/cluster/resources');
+ if(!Array.isArray(rows)||!rows.some(r=>r.node===node&&String(r.vmid)===String(id)&&r.type===kind))throw Object.assign(new Error('Guest does not belong to the selected Proxmox node'),{status:403});
+}
 export async function targetSSHHost(target,query){
  const [kind,node,id]=String(target||'').split(':');if(!['node','vm','lxc'].includes(kind)||!node)throw Object.assign(new Error('Invalid SSH target'),{status:400});
  if(kind==='node'){const rows=await query('/cluster/status');const host=rows.find(r=>r.type==='node'&&r.name===node)?.ip;if(host)return host;}

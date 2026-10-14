@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
+const source=fs.readFileSync(new URL('../src/backup-selection.ts',import.meta.url),'utf8'),code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText;const {restoreLocation}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+test('archive selection survives encoded restore navigation',()=>{const id='archive+/= node:two';const url=new URL(restoreLocation(id),'https://homecloud.test');assert.equal(url.pathname,'/restore');assert.equal(url.searchParams.get('archive'),id);});

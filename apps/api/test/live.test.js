@@ -56,7 +56,8 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/storage'&&req.method==='GET')data=[{storage:'backup',type:'nfs',shared:1}];
  else if(req.url==='/api2/json/storage'&&req.method==='POST')data=null;
  else if(req.url==='/api2/json/storage/backup'&&req.method==='PUT')data=null;
- else if(req.url==='/api2/json/nodes/pve/storage')data=[{storage:'backup',type:'nfs',shared:1,active:1,enabled:1,total:100,used:60,avail:40}];
+ else if(req.url==='/api2/json/nodes/pve/storage')data=[{storage:'backup',type:'nfs',shared:1,active:1,enabled:1,total:100,used:60,avail:40,content:'backup'},{storage:'local-lvm',type:'lvmthin',active:1,enabled:1,content:'images,rootdir',avail:100*1024**3},{storage:'local',type:'dir',active:1,enabled:1,content:'vztmpl'}];
+ else if(req.url==='/api2/json/nodes/pve/storage/local/content?content=vztmpl')data=[{content:'vztmpl',volid:'local:vztmpl/debian.tar.zst'}];
  else if(req.url==='/api2/json/nodes/pve/storage/backup/status')data={total:100,used:60,avail:40};
  else if(req.url==='/api2/json/nodes/pve/storage/backup/content')data=[{volid:'backup:backup/test',content:'backup',size:50}];
  else if(req.url==='/api2/json/nodes/pve/storage/backup/rrddata?timeframe=day&cf=AVERAGE')data=[{time:1700000000,total:100,used:60}];
@@ -118,7 +119,7 @@ try{
  await test('node status fills real measurements and discovers guests beyond cluster summaries',async()=>{nodeDetails=true;try{const result=await proxmoxSnapshot();assert.equal(result.nodes[0].cpu,65);assert.equal(result.nodes[0].memoryPercent,75);assert.equal(result.nodes[0].cores,8);assert.ok(result.vms.some(v=>v.id==='102'));assert.equal(result.lxc[0].id,'103');assert.equal(result.nodeServices[0].name,'pveproxy');}finally{nodeDetails=false;}});
  await test('node service actions enforce roles, confirmation and return the actual provider task',async()=>{const endpoint='/proxmox/node/pve/service/sshd/restart';assert.equal((await call(endpoint,'POST',{}, {'x-test-role':'operator'})).status,403);const challenge=await call(endpoint,'POST',{});assert.equal(challenge.status,409);const result=await call(endpoint,'POST',{}, {'X-HomeCloud-Confirm':challenge.body.confirmationPhrase});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:service-task');});
  await test('container creation enforces roles and validation, then returns the provider task',async()=>{
-   const body={name:'test-ct',node:'pve',ostemplate:'local:vztmpl/debian.tar.zst',storage:'local-lvm'};
+   const body={password:'fixture-root-password',name:'test-ct',node:'pve',ostemplate:'local:vztmpl/debian.tar.zst',storage:'local-lvm'};
    assert.equal((await call('/proxmox/ct','POST',body,{'x-test-role':'viewer'})).status,403);
    assert.equal((await call('/proxmox/ct','POST',{...body,disk:-1})).status,400);
    const result=await call('/proxmox/ct','POST',body,{'x-test-role':'operator'});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:create-ct');assert.equal(result.body.result.vmid,'104');

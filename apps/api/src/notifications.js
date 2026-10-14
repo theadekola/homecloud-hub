@@ -37,7 +37,7 @@ export async function sendNotification(channel,text,{env=process.env,fetcher=fet
 export function createNotifier({persistence={get,mutate},env=process.env,send=sendNotification,now=()=>Date.now()}={}){
  let inFlight=null;
  const configured=()=>notificationChannels(env);
- const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>!r.sentAt).length,
+ const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
   failures:queue.filter(r=>!r.sentAt&&r.error).map(r=>({channel:r.channel,error:r.error,nextAttempt:r.nextAttempt})).slice(-20),
   history:queue.slice(-200).map(r=>({id:r.id,channel:r.channel,event:r.event,createdAt:r.createdAt,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null})),
   lastSent:queue.filter(r=>r.sentAt).at(-1)?.sentAt||null};};
@@ -55,9 +55,9 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
      }
     }
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.
-    const ids=new Set(alerts.map(a=>a.id));s.notificationQueue=s.notificationQueue.filter(r=>ids.has(r.alertId));
+    const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId));
    });
-   const pending=(persistence.get().notificationQueue||[]).filter(r=>channels.includes(r.channel)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
+   const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
    for(const item of pending){let error=null;try{await send(item.channel,item.text,{env});}catch{error=`${item.channel} delivery failed. Check its server configuration and service availability.`;}
     persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.attempts++;
      if(error){row.error=error;row.nextAttempt=now()+Math.min(3600000,30000*2**Math.min(row.attempts-1,7));}
@@ -67,7 +67,9 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
   })().finally(()=>{inFlight=null});return inFlight;
  }
  return {deliver,status,async test(channel){if(!configured().includes(channel))throw Object.assign(Error('Notification channel is not configured'),{status:400});
-  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env});return {channel,delivered:true};}
-  catch{throw Object.assign(Error(`${channel} test failed. Check server configuration and service availability.`),{status:502});}}};
+  const record={id:crypto.randomUUID(),channel,event:'test',createdAt:new Date(now()).toISOString(),attempts:1};
+  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
+  catch{record.error=`${channel} test failed. Check server configuration and service availability.`;throw Object.assign(Error(record.error),{status:502});}
+  finally{persistence.mutate(s=>{s.notificationQueue??=[];s.notificationQueue.push(record);const keep=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event!=='test'||keep.has(r.id));});}}};
 }
 export const notifier=createNotifier();

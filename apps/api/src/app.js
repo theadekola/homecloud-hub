@@ -1,3 +1,4 @@
+import {bootstrapGuest} from './guest-bootstrap.js';
 import {targetSSHHost} from './ssh-target.js';
 import {writeShellInput,actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH,sftpOperation,deleteSavedSSH} from './ssh-access.js';
 import net from 'node:net';
@@ -10,7 +11,7 @@ import {datasetInventory,datasetCreateInput,datasetRoot,datasetPermissionsInput}
 import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
-import {agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
+import {agentRequest,agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
 import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
@@ -69,6 +70,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
+ app.get('/api/connections/docker/verify',authorize('owner'),async(req,res)=>{const config=dockerConfig();if(!config.url)return res.json({configured:false,status:'not-configured',message:'No direct Docker endpoint is configured. Paired-node connections do not require one.'});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();res.json({configured:true,status:'reachable',host:{hostname:info.Name,version:info.ServerVersion}});}catch{res.json({configured:true,status:'error',message:'Direct Engine verification failed. Check endpoint reachability, TLS trust and client certificates. No settings were changed.'});}});
+ app.get('/api/docker/hosts/:id/verify',authorize('viewer'),async(req,res)=>{const info=await agentContext.run({host:req.params.id},async()=>{const response=await agentRequest('/info');if(!response.ok)throw httpError('Selected Docker host verification failed',502);return response.json();});if(!info.ServerVersion)throw httpError('Selected host did not report a Docker Engine version',502);res.json({id:req.params.id,host:{hostname:info.Name,version:info.ServerVersion}});});
  app.get('/api/connections/docker',authorize('owner'),(req,res)=>res.json({connection:publicDocker()}));
  const testDocker=async input=>{const saved=dockerStore.read(),config=validateDocker({...input,ca:input.ca||saved?.ca,cert:input.cert||saved?.cert,key:input.key||saved?.key});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();return {config,host:{hostname:info.Name,version:info.ServerVersion}};}catch{throw httpError('Docker connection failed. Check the HTTPS endpoint, client certificate, key, CA and host access.',502)}};
  app.post('/api/connections/docker/test',authorize('owner'),async(req,res)=>{const {host}=await testDocker(req.body);res.json({ok:true,host});});
@@ -117,6 +120,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    await audit(req,label,resource,{result:result??null},status);
    res.json({ok:true,result,message:status==='queued'?'Task accepted. Check task history for completion.':'Operation completed.'});
  });
+ action('post','/node-agents/guest/bootstrap','owner','guest.install-agent-docker',req=>bootstrapGuest(req.body),true);
  action('post','/node-agents/guest/setup','owner','guest.install-docker',req=>installAgentHost(required(req.body.host,'Guest host')),true);
  const snapshot=async provider=>{
    if(provider==='docker'&&selectedAgentHost())return {...await dockerSnapshot(),sampledAt:new Date().toISOString(),mode:'node-agent'};

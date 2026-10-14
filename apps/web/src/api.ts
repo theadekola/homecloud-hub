@@ -19,7 +19,7 @@ export function setTokens(accessToken:string, refreshToken?:string){
 }
 export function clearTokens(){ localStorage.removeItem('homecloud_access_token'); localStorage.removeItem('homecloud_refresh_token'); window.dispatchEvent?.(new Event('homecloud-session-expired')); }
 
-export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string): Promise<T> {
+export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string, rawResponse=false): Promise<T> {
   const headers:any = { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(options.headers).entries()) };
   const host=localStorage.getItem('homecloud_docker_host');if(host&&!Object.hasOwn(headers,'x-homecloud-docker-host')&&(/^\/(?:docker|actions\/docker)(?:\/|\?|$)|^\/(?:storage|network)(?:\?|$)/.test(path)))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
@@ -31,6 +31,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
       headers.Authorization=`Bearer ${getAccessToken()}`;res=await fetch(`${API}/api${path}`,{...options,headers});
     }
   }
+  if(rawResponse&&res.ok)return res as T;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err:any=new Error(body.error || `Request failed: ${res.status}`);

@@ -22,5 +22,5 @@ import {writeShellInput} from '../src/ssh-access.js';
 test('shell input rejects oversized or malformed requests without writing and accepts the limit',()=>{
  const writes=[],session={stream:{write:text=>writes.push(text)}};
  for(const input of ['x'.repeat(8193),42,null])assert.throws(()=>writeShellInput(session,input),e=>e.status===400);
- assert.deepEqual(writes,[]);writeShellInput(session,undefined);writeShellInput(session,'x'.repeat(8192));assert.equal(writes[0].length,8192);
+ assert.throws(()=>writeShellInput({...session,closed:true},'input'),e=>e.status===409);assert.deepEqual(writes,[]);writeShellInput(session,undefined);writeShellInput(session,'x'.repeat(8192));assert.equal(writes[0].length,8192);
 });

@@ -100,18 +100,55 @@ export async function proxmoxLxcAction(node,id,action,payload={}){
   if(action==='delete-snapshot') return pve(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox LXC action: ${action}`);
 }
-export async function proxmoxCreateVm(payload){
-  const node=payload.node; if(!node) throw new Error('node required');
-  const vmid=payload.vmid || await pve('/cluster/nextid');
-  const storage=payload.storage||process.env.PROXMOX_DEFAULT_STORAGE||'local-lvm';
-  const diskGB=Number(payload.disk||40);
-  const body=form({
-    vmid, name:payload.name, cores:Number(payload.cores||2), memory:Number(payload.memory||4096),
-    scsihw:'virtio-scsi-pci', scsi0:`${storage}:${diskGB}`, net0:`virtio,bridge=${payload.bridge||'vmbr0'}`,
-    ostype:payload.ostype||'l26', agent:1, onboot:payload.onboot?1:0
+const vmInputError=message=>Object.assign(new Error(message),{status:400});
+const vmIdentifier=(value,label)=>{if(typeof value!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(value))throw vmInputError(`Invalid ${label}`);return value;};
+const supports=(store,content)=>store?.active===1&&store.enabled!==0&&String(store.content||'').split(',').map(s=>s.trim()).includes(content);
+export async function proxmoxInstallationMedia(node,call=pve){
+  vmIdentifier(node,'node');
+  const stores=await call(`/nodes/${encodeURIComponent(node)}/storage`);
+  if(!Array.isArray(stores))throw new Error('Unexpected storage inventory');
+  const isos=[],errors=[];
+  for(const store of stores.filter(s=>supports(s,'iso'))){
+    try{
+      const files=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(store.storage)}/content?content=iso`);
+      if(!Array.isArray(files))throw new Error('Unexpected ISO inventory');
+      for(const file of files)if(file.content==='iso'&&typeof file.volid==='string'&&file.volid.startsWith(`${store.storage}:iso/`)&&/\.iso$/i.test(file.volid))isos.push({volid:file.volid,storage:store.storage,name:file.volid.split('/').at(-1),size:file.size??null});
+    }catch(error){errors.push(`${store.storage}: ${error.message}`);}
+  }
+  return {node,isos,errors};
+}
+export async function proxmoxCreateVm(payload,call=pve){
+  const node=vmIdentifier(payload.node,'node');
+  const storage=vmIdentifier(payload.storage||process.env.PROXMOX_DEFAULT_STORAGE||'local-lvm','disk storage');
+  const bridge=vmIdentifier(payload.bridge||'vmbr0','network bridge');
+  const diskGB=Number(payload.disk??40),cores=Number(payload.cores??2),memory=Number(payload.memory??4096);
+  for(const [label,value,min,max] of [['Disk GB',diskGB,1,65536],['Cores',cores,1,128],['Memory MB',memory,128,1048576]])if(!Number.isInteger(value)||value<min||value>max)throw vmInputError(`Invalid ${label}`);
+  const iso=payload.iso||'',bootOrder=payload.bootOrder||(iso?'cdrom-first':'disk-first');
+  if(!['cdrom-first','disk-first'].includes(bootOrder)||(!iso&&bootOrder==='cdrom-first'))throw vmInputError('CD-ROM boot requires an installation ISO');
+  const diskBus=payload.diskBus||'scsi';
+  if(!['scsi','sata'].includes(diskBus))throw vmInputError('Invalid disk controller');
+  if(iso&&(typeof iso!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]*:iso\/[^,;\s\x00-\x1f]+\.iso$/i.test(iso)||iso.split('/').includes('..')))throw vmInputError('Invalid ISO volume');
+  const stores=await call(`/nodes/${encodeURIComponent(node)}/storage`);
+  if(!Array.isArray(stores))throw new Error('Unexpected storage inventory');
+  const target=stores.find(s=>s.storage===storage);
+  if(!supports(target,'images'))throw vmInputError('Selected disk storage must be active, enabled and support images on this node');
+  if(typeof target.avail==='number'&&target.avail<diskGB*1024**3)throw vmInputError('Selected disk storage has insufficient free space');
+  if(iso){
+    const isoStore=iso.split(':')[0];
+    if(!supports(stores.find(s=>s.storage===isoStore),'iso'))throw vmInputError('Selected ISO storage is unavailable or does not support ISO content on this node');
+    const files=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(isoStore)}/content?content=iso`);
+    if(!Array.isArray(files)||!files.some(f=>f.content==='iso'&&f.volid===iso))throw vmInputError('Selected ISO is no longer available on this node. Refresh installation media.');
+  }
+  // Always allocate a fresh ID; never accept a caller-supplied existing VM ID.
+  const vmid=await call('/cluster/nextid'),diskDevice=`${diskBus}0`;
+  const body=form({vmid,name:payload.name,cores,memory,
+    scsihw:diskBus==='scsi'?'virtio-scsi-pci':undefined,[diskDevice]:`${storage}:${diskGB}`,
+    ide2:iso?`${iso},media=cdrom`:undefined,
+    boot:`order=${iso?(bootOrder==='cdrom-first'?`ide2;${diskDevice}`:`${diskDevice};ide2`):diskDevice}`,
+    net0:`virtio,bridge=${bridge}`,ostype:payload.ostype||'l26',agent:1,onboot:0,start:0
   });
-  const task=await pve(`/nodes/${encodeURIComponent(node)}/qemu`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
-  return {vmid:String(vmid),task};
+  const task=await call(`/nodes/${encodeURIComponent(node)}/qemu`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+  return {vmid:String(vmid),node,task,installationReady:Boolean(iso)};
 }
 export async function proxmoxBackup(payload){
   const node=payload.node; if(!node)throw new Error('node required');

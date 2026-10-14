@@ -719,3 +719,8 @@
 .docker-manager .vm-toolbar{margin-bottom:6px}
 .docker-manager .vm-pagination{margin-top:0;padding-top:10px}
 @media(max-width:700px){.docker-manager .docker-table{min-width:620px}.docker-manager .docker-table td{padding:6px 8px}.docker-manager .vm-list-card{padding:10px}}
+
+.vm-form .settings-switch{flex-direction:row;align-items:center;gap:10px;min-height:36px}
+.vm-form .settings-switch input[type=checkbox]{width:18px;height:18px;flex:0 0 auto}
+.vm-form h4.cluster-wide{margin:12px 0 0;padding-top:14px;border-top:1px solid #29394c}
+.vm-form input[type=file]{max-width:100%;white-space:normal}

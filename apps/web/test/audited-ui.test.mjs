@@ -140,3 +140,8 @@ test('Share protocol filters switch details and edit form to the visible share',
 test('Storage pages expose only five retained navigation sections',async()=>{
  for(const file of ['Storage','StorageDisks','StorageDatasets','StorageShares','StoragePerformance']){const page=await mounted('pages/'+file+'.tsx',{onTab(){}},async p=>p==='/auth/me'?{user:{role:'viewer'}}:{resources:[],pools:[],summary:{},services:[],series:[],snapshots:[],alerts:[],tasks:[],sources:[]});try{assert.deepEqual([...page.container.querySelectorAll('[role=tab]')].map(b=>b.textContent),['Storage Pools','Disks','Datasets / Volumes','Shares','Performance'])}finally{await page.close()}}
 });
+
+test('Network map normalizes link state and inspects the selected actual interface',async()=>{
+ const page=await mounted('pages/Network.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/network'?{interfaces:[{id:'pve/nic0',name:'nic0',node:'pve',provider:'proxmox',status:'up',address:'192.0.2.1'},{id:'pve/nic1',name:'nic1',node:'pve',provider:'proxmox',active:0}],networks:[],services:[],connectors:[{name:'proxmox',status:'reachable'},{name:'docker',status:'not-configured'}]}:{});
+ try{assert.ok(page.container.querySelector('.network-stats').textContent.includes('1/1'));assert.ok(page.container.querySelector('[aria-label="Inspect nic0 on pve"]').textContent.includes('Up'));assert.ok(page.container.querySelector('[aria-label="Inspect nic1 on pve"]').textContent.includes('Down'));await page.click(page.container.querySelector('[aria-label="Inspect nic0 on pve"]'));assert.ok(page.container.querySelector('.network-inspector').textContent.includes('192.0.2.1'))}finally{await page.close()}
+});

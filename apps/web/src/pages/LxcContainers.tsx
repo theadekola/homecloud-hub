@@ -12,7 +12,7 @@ const percent=(value:any)=>value==null?'Unavailable':`${Math.round(Number(value)
 const sum=(rows:any[],key:string)=>rows.length&&rows.every(row=>typeof row[key]==='number')?rows.reduce((total,row)=>total+row[key],0):null;
 const tone=(status:string)=>status==='running'?'green':status==='stopped'?'red':'gray';
 
-export default function LxcContainers({data,role,clusterUrl,refresh}:{data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
+export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:{navigation?:import('react').ReactNode;data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
  const [params,setParams]=useSearchParams();
  const containers=data?.lxc||[],nodes=data?.nodes||[],storage=data?.storage||[],operator=['operator','admin','owner'].includes(role||'');
  const [selected,setSelected]=useState<string>(containers[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
@@ -41,6 +41,7 @@ export default function LxcContainers({data,role,clusterUrl,refresh}:{data:any;r
    <CtStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <CtStat icon={HardDrive} label="Root Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>
   </div>
+ {navigation}
   <div className="vm-workspace">
    <Card className="vm-list-card">
     <div className="vm-filters"><select aria-label="Filter containers by node" value={node} onChange={e=>setNode(e.target.value)}><option value="all">All Nodes</option>{nodes.map((item:any)=><option key={item.name}>{item.name}</option>)}</select><select aria-label="Filter containers by status" value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All Status</option>{[...new Set(containers.map((ct:any)=>ct.status).filter(Boolean))].map((value:any)=><option key={value}>{value}</option>)}</select><label className="vm-search"><Search size={14}/><input aria-label="Search containers" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search containers…"/></label><div className="vm-layout"><button aria-label="List view" className={layout==='list'?'active':''} onClick={()=>setLayout('list')}><Columns3 size={15}/></button><button aria-label="Grid view" className={layout==='grid'?'active':''} onClick={()=>setLayout('grid')}><Grid2X2 size={15}/></button></div></div>

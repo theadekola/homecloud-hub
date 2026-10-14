@@ -1,3 +1,4 @@
+import {updateShellPresence} from './ssh-idle.js';
 import {streamShellOutput} from './ssh-stream.js';
 import {flag,creationOptions,registerCreation,completeCreationHa} from './guest-create-options.js';
 import {bootstrapGuest} from './guest-bootstrap.js';
@@ -108,7 +109,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/ssh/sftp/:id',authorize('admin'),async(req,res)=>{try{res.json(await sftpOperation(req.params.id,req.user.sub,req.body));}catch(e){res.status(e.status||422).json({error:e.message});}});
  app.get('/api/ssh/session/:id/output',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});streamShellOutput(req,res,s);});
  app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});if(s.releaseOutput)return res.status(409).json({error:'Shell output is already streaming'});const output=s.output;s.output='';res.json({output,closed:s.closed});});
- app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});writeShellInput(s,req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});
+ app.post('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});if(req.body.presence)updateShellPresence(s,req.body.presence);if(typeof req.body.input==='string'&&req.body.input.length)s.touched=Date.now();writeShellInput(s,req.body.input);if(Number.isInteger(req.body.cols)&&Number.isInteger(req.body.rows))s.stream.setWindow(Math.min(100,Math.max(10,req.body.rows)),Math.min(300,Math.max(20,req.body.cols)),0,0);res.json({ok:true});});
+
  app.delete('/api/ssh/session/:id',authorize('admin'),(req,res)=>{closeShell(req.params.id,req.user.sub);res.json({ok:true});});
  const confirmation=(label,body)=>`${label} ${crypto.createHash('sha256').update(JSON.stringify(body||{})).digest('hex').slice(0,8)}`;
  const action=(method,path,role,label,handler,sensitive=false)=>app[method](`/api${path}`,authorize(role),async(req,res)=>{

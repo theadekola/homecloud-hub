@@ -59,3 +59,20 @@ test('node VM and CT terminal views render streamed output immediately and abort
   try{await act(async()=>{controller.enqueue(new TextEncoder().encode('{"output":"immediate echo","closed":false}\n'));await tick()});assert.ok(globalThis.__terminalWrites.includes('immediate echo'));assert.ok(!calls.some(c=>c.p==='/ssh/session/fixture'&&!c.init?.method));}finally{await page.close();assert.equal(aborted,true);delete globalThis.__terminalWrites;delete globalThis.__terminalInput}
  }
 });
+
+test('shell reports suspension and visible resume separately from user activity',async()=>{
+ const calls=[];
+ const page=await mounted('components/SSHAccess.tsx',{target:'node:fixture',sessionId:'fixture'},async(p,init)=>{calls.push({p,init});return {}});
+ const presence=()=>calls.filter(c=>c.init?.body).map(c=>({body:JSON.parse(c.init.body),keepalive:c.init.keepalive})).filter(c=>c.body.presence);
+ try{
+  let hidden=false;
+  Object.defineProperty(page.dom.window.document,'hidden',{get:()=>hidden,configurable:true});
+  calls.length=0;
+  hidden=true;page.dom.window.document.dispatchEvent(new page.dom.window.Event('visibilitychange'));
+  page.dom.window.dispatchEvent(new page.dom.window.Event('keydown'));
+  assert.deepEqual(presence().map(c=>c.body.presence),['hidden']);
+  hidden=false;page.dom.window.document.dispatchEvent(new page.dom.window.Event('visibilitychange'));
+  assert.deepEqual(presence().map(c=>c.body.presence),['hidden','visible']);
+  assert.ok(presence().every(c=>c.keepalive));
+ }finally{await page.close();delete globalThis.__terminalInput;}
+});

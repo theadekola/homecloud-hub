@@ -1577,3 +1577,12 @@
 .shell-console-active .ssh-shell>.error{flex:none;margin:6px 0;max-height:60px;overflow:auto}
 .ssh-shell:fullscreen{display:flex;flex-direction:column;box-sizing:border-box;height:100%}
 .ssh-shell:fullscreen .ssh-terminal{flex:1;height:auto;min-height:0}
+
+/* Keep the app header, session tabs and actions stationary during console use. */
+html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidden;overscroll-behavior:none}
+.shell-scroll-locked .main-shell{height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.shell-scroll-locked .topbar{flex:none}
+.shell-scroll-locked .content{box-sizing:border-box;width:100%;min-height:0;flex:1;overflow:hidden;padding-bottom:0}
+.shell-console-active>.shell-tabs{overflow-y:hidden}
+.shell-console-active>.shell-active-view{overflow:hidden}
+.shell-console-active .ssh-terminal{overflow:hidden}

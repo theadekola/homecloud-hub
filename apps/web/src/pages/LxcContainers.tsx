@@ -18,7 +18,7 @@ export default function LxcContainers({data,role,clusterUrl,refresh}:{data:any;r
  const [selected,setSelected]=useState<string>(containers[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
  const [createNode,setCreateNode]=useState(''),[templates,setTemplates]=useState<any>(null),[templateError,setTemplateError]=useState(''),[templateLoading,setTemplateLoading]=useState(false),[templateRevision,setTemplateRevision]=useState(0);
  const [modal,setModal]=useState<'create'|'snapshot'|'backup'|null>(null),[pending,setPending]=useState(''),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
- useEffect(()=>{if(operator&&params.get('action')==='Create CT'){setModal('create');setParams({}, {replace:true});}},[params.get('action'),operator]);
+ useEffect(()=>{if(operator&&params.get('action')==='Create CT'){setModal('create');const next=new URLSearchParams(params);next.delete('action');next.set('tab','LXC Containers');setParams(next, {replace:true});}},[params.get('action'),operator]);
  const filtered=useMemo(()=>containers.filter((ct:any)=>(node==='all'||ct.node===node)&&(status==='all'||ct.status===status)&&`${ct.id} ${ct.name} ${ct.node}`.toLowerCase().includes(search.toLowerCase())),[containers,node,status,search]);
  useEffect(()=>{if(!filtered.some((r:any)=>r.id===selected))setSelected(filtered[0]?.id||'');},[filtered,selected]);
  useEffect(()=>setPage(1),[node,status,search]);

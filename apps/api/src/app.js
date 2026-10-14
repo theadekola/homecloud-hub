@@ -171,7 +171,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/proxmox/lxc/:node/:id/details',async req=>{
    const base=`/nodes/${encode(req.params.node)}/lxc/${encode(req.params.id)}`,result={node:req.params.node,id:req.params.id,errors:[]};
    await Promise.all([
-     ['status',`${base}/status/current`],['config',`${base}/config`],['snapshots',`${base}/snapshot`],['interfaces',`${base}/interfaces`]
+     ['status',`${base}/status/current`],['config',`${base}/config`],['snapshots',`${base}/snapshot`],['interfaces',`${base}/interfaces`],['history',`${base}/rrddata?timeframe=hour&cf=AVERAGE`]
    ].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
    return result;
  });

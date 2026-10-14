@@ -37,6 +37,7 @@ const upstream=http.createServer(async(req,res)=>{
  else if(req.url==='/api2/json/nodes/pve/qemu/101/agent/network-get-interfaces')data={result:[{name:'eth0','ip-addresses':[{'ip-address':'192.0.2.50','ip-address-type':'ipv4'}]}]};
  else if(req.url==='/api2/json/nodes/pve/lxc/103/status/current')data={status:'running',cpu:0.05,mem:1,maxmem:2,uptime:300};
  else if(req.url==='/api2/json/nodes/pve/lxc/103/config')data={hostname:'actual-lxc',cores:1,memory:512,rootfs:'local-lvm:8',ostype:'debian',unprivileged:1};
+ else if(req.url==='/api2/json/nodes/pve/lxc/103/rrddata?timeframe=hour&cf=AVERAGE')data=[{time:1700000000,cpu:.05,mem:1024,disk:4096,netin:256,netout:128}];
  else if(req.url==='/api2/json/nodes/pve/lxc/103/snapshot'&&req.method==='GET')data=[{name:'ct-baseline',snaptime:1700000000}];
  else if(req.url==='/api2/json/nodes/pve/lxc/103/snapshot'&&req.method==='POST')data='UPID:lxc-snapshot';
  else if(req.url==='/api2/json/nodes/pve/lxc/103/interfaces')data=[{name:'eth0',inet:'192.0.2.60/24'}];
@@ -141,7 +142,7 @@ try{
    const details=await call('/proxmox/vm/pve/101/details');assert.equal(details.status,200);assert.equal(details.body.config.name,'actual-guest');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'baseline');assert.equal(details.body.interfaces.result[0].name,'eth0');assert.equal(details.body.history[0].cpu,.12);assert.equal(details.body.os.result['pretty-name'],'Ubuntu 24.04 LTS');assert.deepEqual(details.body.errors,[]);
  });
  await test('LXC details and snapshots use live Proxmox endpoints',async()=>{
-   const details=await call('/proxmox/lxc/pve/103/details');assert.equal(details.status,200);assert.equal(details.body.config.hostname,'actual-lxc');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'ct-baseline');assert.equal(details.body.interfaces[0].inet,'192.0.2.60/24');assert.deepEqual(details.body.errors,[]);
+   const details=await call('/proxmox/lxc/pve/103/details');assert.equal(details.status,200);assert.equal(details.body.config.hostname,'actual-lxc');assert.equal(details.body.status.status,'running');assert.equal(details.body.snapshots[0].name,'ct-baseline');assert.equal(details.body.interfaces[0].inet,'192.0.2.60/24');assert.equal(details.body.history[0].cpu,.05);assert.equal(details.body.history[0].netin,256);assert.deepEqual(details.body.errors,[]);
    const created=await call('/actions/proxmox/lxc/103/snapshot','POST',{node:'pve',name:'before-upgrade'},{'X-HomeCloud-SSH-Grant':issueGrant('user','POST','/actions/proxmox/lxc/103/snapshot',{node:'pve',name:'before-upgrade'})});assert.equal(created.status,200);assert.equal(created.body.result.task,'UPID:lxc-snapshot');assert.equal(requests.at(-1).body.snapname,'before-upgrade');
  });
  await test('storage inventory and history return measured values; writes require admin and confirmation',async()=>{

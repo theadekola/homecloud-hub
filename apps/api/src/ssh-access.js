@@ -53,10 +53,16 @@ const call=(s,method,...args)=>new Promise((resolve,reject)=>s[method](...args,(
 export async function sftpOperation(id,user,input){
  const session=shellSession(id,user);if(session.mode!=='sftp')throw failure('Not an SFTP session');if(input.action==='keepalive')return {ok:true};const s=session.stream,p=remotePath(input.path||'/');
  if(input.action==='list'){const entries=await call(s,'readdir',p);return {path:p,entries:entries.map(e=>({name:e.filename,directory:e.attrs.isDirectory(),link:e.attrs.isSymbolicLink(),size:e.attrs.size,modified:e.attrs.mtime,mode:e.attrs.mode})).sort((a,b)=>Number(b.directory)-Number(a.directory)||a.name.localeCompare(b.name))};}
+ if(input.action==='stat'){const stat=await call(s,'lstat',p);return {size:stat.size,file:stat.isFile(),link:stat.isSymbolicLink()};}
  if(input.action==='mkdir'){await call(s,'mkdir',p);return {ok:true};}
  if(input.action==='rename'){await call(s,'rename',p,remotePath(input.destination));return {ok:true};}
  if(input.action==='delete'){const stat=await call(s,'lstat',p);await call(s,stat.isDirectory()?'rmdir':'unlink',p);return {ok:true};}
  if(input.action==='read'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0)throw failure('Invalid offset');const handle=await call(s,'open',p,'r');try{const buffer=Buffer.alloc(262144);const bytes=await new Promise((resolve,reject)=>s.read(handle,buffer,0,buffer.length,offset,(e,n)=>e?reject(e):resolve(n)));return {data:buffer.subarray(0,bytes).toString('base64'),done:bytes===0};}finally{await call(s,'close',handle);}}
  if(input.action==='write'){const offset=Number(input.offset||0);if(!Number.isSafeInteger(offset)||offset<0||typeof input.data!=='string'||input.data.length>350000)throw failure('Invalid upload chunk');const buffer=Buffer.from(input.data,'base64');const handle=await call(s,'open',p,offset===0?(input.replace===true?'w':'wx'):'r+');try{await call(s,'write',handle,buffer,0,buffer.length,offset);return {ok:true};}finally{await call(s,'close',handle);}}
  throw failure('Unsupported file operation');
+}
+
+export function writeShellInput(session,input){
+ if(input!==undefined&&(typeof input!=='string'||input.length>8192))throw failure('Shell input must be text of at most 8192 characters');
+ if(typeof input==='string')session.stream.write(input);
 }

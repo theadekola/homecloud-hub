@@ -28,14 +28,15 @@ export function storageSummary(pools){
  const complete=!uncertain&&online.length>0&&measured.length===online.length;
  return {pools:unique.length,online:online.length,measured:measured.length,complete,capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
 }
-export function createStorage(input){
+export function createStorage(input,write=pveWrite){
  const type=required(input.type,'Type'),storage=required(input.storage,'Storage ID');
  if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(storage))throw httpError('Storage ID must start with a letter and contain letters, numbers, underscores or hyphens');
  const fields={dir:['path'],lvm:['vgname'],lvmthin:['vgname','thinpool'],nfs:['server','export'],iscsi:['portal','target'],rbd:['pool'],cephfs:[]}[type];
  if(!Array.isArray(fields))throw httpError('Unsupported storage type');
- const body={type,storage,content:input.content||(['lvm','lvmthin','rbd'].includes(type)?'images,rootdir':type==='iscsi'?'images':'images,rootdir,iso,vztmpl,backup')};
+ const body={type,storage,content:input.content||(type==='cephfs'?'iso,vztmpl,backup,snippets':['lvm','lvmthin','rbd'].includes(type)?'images,rootdir':type==='iscsi'?'images':'images,rootdir,iso,vztmpl,backup')};
+ if(type==='cephfs'&&String(body.content).split(',').some(c=>!['iso','vztmpl','backup','snippets'].includes(c.trim())))throw httpError('CephFS supports ISO, templates, backups and snippets, not VM disks or container roots');
  for(const key of fields)body[key]=required(input[key],key);
  if(type==='dir'&&!String(body.path).startsWith('/'))throw httpError('Directory path must be absolute');
  if(input.nodes)body.nodes=String(input.nodes);
- return pveWrite('/storage','POST',body);
+ return write('/storage','POST',body);
 }

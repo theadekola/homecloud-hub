@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {acceptNetworkReport} from './network-telemetry.js';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {get,mutate} from './store.js';
 const contexts=new AsyncLocalStorage(),pairings=new Map(),nodes=new Map(),jobs=new Map();
@@ -11,12 +12,13 @@ export function pairNode(code,name,kind='proxmox'){const digest=hash(String(code
 export function pairingStatus(code){const pairing=pairings.get(hash(String(code)));if(!pairing||pairing.expires<Date.now())fail('Pairing code expired or invalid',401);return {paired:!!pairing.id,id:pairing.id||null,kind:pairing.kind};}
 export function authenticateAgent(token){const digest=hash(String(token||''));return (get().nodeAgents||[]).find(n=>n.tokenHash===digest)||fail('Agent authentication rejected',401);}
 export function agentNodes(){return (get().nodeAgents||[]).map(({id,name,hostname=name,kind='proxmox'})=>({id,name,hostname,kind,lastSeen:nodes.get(id)?.lastSeen||null,hosts:nodes.get(id)?.hosts||[],version:nodes.get(id)?.version||1,online:Date.now()-(nodes.get(id)?.time||0)<90000}));}
+export function agentNetworkReports(){return agentNodes().map(n=>({id:n.id,hostname:n.hostname,kind:n.kind,online:n.online,version:n.version,network:nodes.get(n.id)?.network||null}));}
 export function agentHosts(){return agentNodes().flatMap(n=>n.hosts.map(h=>({...h,id:`${n.id}:${h.id}`,agent:n.id,node:n.name,kind:n.kind,online:n.online&&h.online})));}
 export function revokeAgent(id){mutate(s=>{s.nodeAgents=(s.nodeAgents||[]).filter(n=>n.id!==id)});nodes.delete(id);for(const [key,j]of jobs)if(j.agent===id){j.reject(new Error('Node agent revoked'));jobs.delete(key)}}
 export function pollAgent(agent,input){
  if(!Array.isArray(input.hosts)||input.hosts.length>500)fail('Invalid host report');
  const hosts=input.hosts.map(h=>{if((agent.kind==='docker'&&h.id!=='node')||!/^(node|qemu\/\d+|lxc\/\d+)$/.test(h.id))fail('Invalid guest identity');return {id:h.id,name:String(h.name||h.id).slice(0,100),online:h.online===true,error:String(h.error||'').slice(0,400),setup:h.setup===true,status:String(h.status||'unavailable').slice(0,40)}});
- nodes.set(agent.id,{version:input.version===2?2:1,time:Date.now(),lastSeen:new Date().toISOString(),hosts});
+ nodes.set(agent.id,{version:input.version===3?3:input.version===2?2:1,time:Date.now(),lastSeen:new Date().toISOString(),hosts,network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
  for(const r of (input.results||[]).slice(0,20)){const j=jobs.get(r.id);if(!j||j.agent!==agent.id)continue;jobs.delete(r.id);if(r.error)j.reject(new Error(String(r.error).slice(0,400)));else if(typeof r.body==='string'&&r.body.length<=2500000&&Number.isInteger(r.status))j.resolve(r);else j.reject(new Error('Invalid agent response'));}
  const pending=[];for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt});if(pending.length===5)break}return {jobs:pending};
 }

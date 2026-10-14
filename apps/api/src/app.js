@@ -2,7 +2,6 @@ import {flag,creationOptions,registerCreation,completeCreationHa} from './guest-
 import {bootstrapGuest} from './guest-bootstrap.js';
 import {targetSSHHost} from './ssh-target.js';
 import {writeShellInput,actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH,sftpOperation,deleteSavedSSH} from './ssh-access.js';
-import net from 'node:net';
 import {providerDiagnostics} from './diagnostics.js';
 import {notifier} from './notifications.js';
 import {storagePerformance} from './storage-performance.js';
@@ -18,7 +17,7 @@ import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
 import {storageInventory,storageDetails,createStorage,storageSummary} from './storage.js';
-import {networkInventory,networkDetails,networkWrite} from './network.js';
+import {networkInventory,networkDetails,networkWrite,networkDnsWrite,networkFirewall} from './network.js';
 import { updates } from './updates.js';
 import express from 'express';
 import cors from 'cors';
@@ -155,8 +154,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
  read('/proxmox/storage',()=>storageInventory());
  read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
- action('put','/network/dns/:node','admin','network.dns.configure',req=>{const body={search:required(req.body.search,'Search domain')};for(const key of ['dns1','dns2','dns3'])if(req.body[key]){if(!net.isIP(req.body[key]))throw httpError('DNS servers must be IP addresses');body[key]=req.body[key];}return pveWrite(`/nodes/${encode(req.params.node)}/dns`,'PUT',body);},true);
- read('/network/firewall/:node',async req=>{const base=`/nodes/${encode(req.params.node)}/firewall`,result={rules:[],options:null,logs:[],errors:[]};await Promise.all([['rules','rules'],['options','options'],['logs','log?limit=50']].map(async([key,path])=>{try{result[key]=await pve(`${base}/${path}`);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));return result;});
+ action('put','/network/dns/:node','admin','network.dns.configure',req=>networkDnsWrite(req.params.node,req.body),true);
+ read('/network/firewall/:node',req=>networkFirewall(req.params.node));
  action('post','/network/firewall/:node/rules','admin','firewall.rule.create',req=>{const b=req.body;if(!['in','out'].includes(b.type)||!['ACCEPT','DROP','REJECT'].includes(b.action))throw httpError('Invalid rule direction or action');const body={type:b.type,action:b.action,enable:0};for(const k of ['source','dest','proto','dport','comment'])if(typeof b[k]==='string'&&b[k].trim())body[k]=b[k].trim();return pveWrite(`/nodes/${encode(req.params.node)}/firewall/rules`,'POST',body);},true);
  action('put','/network/firewall/:node/rules/:pos','admin','firewall.rule.toggle',req=>{const pos=integer(req.params.pos,'Rule position',0,10000);if(![0,1].includes(req.body.enable)||typeof req.body.digest!=='string'||!req.body.digest)throw httpError('A current rule digest and enabled state are required');return pveWrite(`/nodes/${encode(req.params.node)}/firewall/rules/${pos}`,'PUT',{enable:req.body.enable,digest:req.body.digest});},true);
  read('/proxmox/network',()=>networkInventory());
@@ -219,7 +218,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/storage/datasets/permissions',async req=>({permissions:await truenas('filesystem.getacl',[await datasetRoot(req.query.dataset),true])}));
  read('/network',async()=>{
    const s=await monitor.sample();const interfaces=[],errors=[];
-   for(const node of s.proxmox?.nodes||[])if(node.status==='online')try{interfaces.push(...(await pve(`/nodes/${encode(node.name)}/network`)).map(n=>({...n,id:`${node.name}/${n.iface}`,provider:'proxmox',node:node.name,name:n.iface,address:n.address||n.cidr||null})));}catch(e){errors.push(`${node.name}: ${e.message}`);}
+   if(providers.proxmox.configured())try{const inventory=await networkInventory();interfaces.push(...inventory.interfaces.map(n=>({...n,provider:'proxmox'})));errors.push(...inventory.errors);}catch(e){errors.push(`proxmox: ${e.message}`);}
    interfaces.push(...(s.opnsense?.interfaces||[]).map(n=>({...n,provider:'opnsense'})));
    const selected=await selectedDocker(s);errors.push(...selected.errors);
    return {interfaces,dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},networks:selected.inventory?.networks||[],services:s.opnsense?.services||[],errors,connectors:s.services.filter(x=>['proxmox','docker','opnsense'].includes(x.provider)),sampledAt:s.sampledAt};

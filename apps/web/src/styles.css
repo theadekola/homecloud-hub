@@ -155,3 +155,28 @@
 .vm-row-name{display:flex;align-items:center;gap:7px}.vm-row-name svg{color:#7caaff;flex-shrink:0}
 
 .vm-resource-cards{grid-template-columns:repeat(4,minmax(0,1fr))}.vm-resource-cards .vm-network-rate{margin-top:8px}.vm-resource-cards .vm-network-rate span{display:flex;font-size:9px}.vm-network-resource .vm-spark{height:25px;margin-top:4px}.vm-resource-cards strong{font-size:18px}@media(max-width:600px){.vm-resource-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Mobile navigation uses the full viewport; desktop collapse remains independent. */
+.main-shell,.content,.card,.table-wrap,.tabs{min-width:0}
+.nav-backdrop{position:fixed;inset:0;background:#020711aa;border:0;z-index:40;cursor:pointer}
+.nav-close{margin-left:auto;flex-shrink:0}
+@media(max-width:800px){
+  .sidebar,.sidebar.collapsed{width:min(300px,88vw);z-index:41;transform:translateX(-100%);visibility:hidden;height:100dvh;transition:transform .2s,visibility .2s}
+  .sidebar.mobile-open{transform:translateX(0);visibility:visible}
+  .sidebar .brand b,.sidebar .nav-title,.sidebar .nav-item span{display:block}
+  .sidebar .brand{padding:0 14px;gap:9px}.sidebar .brand b{overflow:hidden;text-overflow:ellipsis;font-size:15px}.brand-icon{flex-shrink:0}
+  .nav-item{min-height:44px;font-size:14px}.nav-scroll{flex:1;overscroll-behavior:contain;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  .main-shell,.sidebar.collapsed+.main-shell{margin-left:0;width:100%}
+  .topbar{padding:0 12px;height:60px}.top-actions{gap:8px}.icon-btn{min-width:44px;min-height:44px}
+  .content{padding:14px 12px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+  .header-actions,.pve-heading-actions,.modal-actions{flex-wrap:wrap;max-width:100%}
+  .header-actions select,.header-actions input{min-width:0;max-width:100%}
+  .pve-heading{flex-wrap:wrap}.pve-tabbar{flex-wrap:wrap}.pve-tabbar>div{min-width:0;max-width:100%}
+  .storage-overview-grid,.disk-layout,.dataset-layout,.compose-workspace,.docker-side,.performance-charts,.settings-grid{grid-template-columns:minmax(0,1fr)}
+  .modal-backdrop{padding:12px}.modal{max-height:calc(100dvh - 24px);overflow:auto;width:min(560px,100%)}
+  .form-grid{grid-template-columns:minmax(0,1fr)}.form-grid input,.form-grid select,.form-grid textarea{min-width:0;max-width:100%}
+  input,select,textarea{font-size:16px}.toast{left:12px;right:12px;bottom:16px;overflow-wrap:anywhere}
+  .chat-card{min-height:65dvh}.bubble{max-width:95%}.composer input{min-width:0}
+}
+@media(max-width:400px){.vm-summary,.vm-bottom-cards{grid-template-columns:minmax(0,1fr)}.overview-stats{gap:8px}.overview-stats .card{padding:12px}}
+@media(prefers-reduced-motion:reduce){.sidebar{transition:none}}

@@ -31,7 +31,7 @@ import { auth,requireRole,verifyPassword,issueTokens,rotateRefreshToken,roles } 
 import { writeAudit } from './audit.js';
 import { get,mutate } from './store.js';
 import { monitor as liveMonitor,providers } from './monitor.js';
-import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
+import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxInstallationMedia,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
@@ -224,6 +224,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    if(provider==='docker'&&resourceType==='container')return dockerAction(resourceId,operation,body);
    throw httpError('Unsupported provider/resource');
  },req=>['stop','shutdown','reboot','reset','suspend','delete','delete-snapshot','remove','kill'].includes(req.params.action));
+ read('/proxmox/installation-media/:node',req=>proxmoxInstallationMedia(req.params.node),'operator');
  action('post','/proxmox/vm','operator','proxmox.vm.create',async req=>{
    required(req.body.name,'Name');integer(req.body.cores||2,'Cores',1,128);integer(req.body.memory||4096,'Memory MB',128,1048576);integer(req.body.disk||40,'Disk GB',1,65536);return proxmoxCreateVm(req.body);
  });

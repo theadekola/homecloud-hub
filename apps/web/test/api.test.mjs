@@ -17,6 +17,12 @@ try{
  await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
   const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
  });
+ await test('terminal streaming shares token refresh and returns an unread authenticated response',async()=>{
+  const c=await client();c.setTokens('old','refresh');let refreshes=0;const requests=[];
+  globalThis.fetch=async(url,options)=>{requests.push({url,headers:new Headers(options.headers)});if(url.endsWith('/auth/refresh')){refreshes++;return response(200,{accessToken:'new',refreshToken:'rotated'})}if(new Headers(options.headers).get('Authorization')!=='Bearer new')return response(401);return new Response('{"output":"echo","closed":false}\n',{headers:{'Content-Type':'application/x-ndjson'}})};
+  const stream=await c.api('/ssh/session/test/output',{},undefined,true);assert.equal(refreshes,1);assert.equal(stream.bodyUsed,false);assert.equal(await stream.text(),'{"output":"echo","closed":false}\n');assert.equal(requests.at(-1).headers.get('Authorization'),'Bearer new');assert.ok(!requests.some(r=>r.url.includes('token=')));
+  globalThis.fetch=async()=>response(403,{error:'Insufficient permissions'});await assert.rejects(c.api('/ssh/session/test/output',{},undefined,true),{status:403});
+ });
  await test('temporary refresh failures preserve both session tokens and report availability',async()=>{
   const c=await client();c.setTokens('old','refresh');
   globalThis.fetch=async url=>response(url.endsWith('/auth/refresh')?503:401);

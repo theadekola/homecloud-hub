@@ -1,3 +1,4 @@
+import {readShellOutput,shellInputQueue} from '../shell-stream';
 import {useSSHSession} from '../ssh-session';
 import {sendShellInput,copyTerminalSelection,fullscreenTerminal} from '../ssh-transfer';
 import {useEffect,useRef,useState} from 'react';
@@ -20,7 +21,27 @@ export function SSHLogin({target,host='',action,connection,editing=false,mode='s
 export default function SSHTerminal({target,host,sessionId,onDisconnect,active=true,name}:{target:string;host?:string;sessionId?:string;active?:boolean;name?:string;onDisconnect?:()=>void}){
  const [id,setId]=useState(sessionId||''),[error,setError]=useState(''),ref=useRef<HTMLDivElement>(null),terminalRef=useRef<Terminal|null>(null),fitRef=useRef<FitAddon|null>(null),shellRef=useRef<HTMLDivElement>(null);
  useSSHSession(id);
- useEffect(()=>{if(!id||!ref.current)return;const terminal=new Terminal({fontSize:13,theme:{background:'#07111d'},cursorBlink:true}),fit=new FitAddon();terminalRef.current=terminal;fitRef.current=fit;terminal.loadAddon(fit);terminal.open(ref.current);fit.fit();let stopped=false,timer:any,failures=0;const activeRef=()=>ref.current?.offsetWidth&&document.visibilityState==='visible';const resize=()=>{if(!ref.current?.offsetWidth)return;fit.fit();api(`/ssh/session/${id}`,{method:'POST',body:JSON.stringify({cols:terminal.cols,rows:terminal.rows})}).catch(()=>{})};const observer=new ResizeObserver(resize);observer.observe(ref.current);let chain=Promise.resolve();const input=terminal.onData(text=>{chain=chain.then(()=>sendShellInput(text,chunk=>stopped?Promise.resolve():api(`/ssh/session/${id}`,{method:'POST',body:JSON.stringify({input:chunk})}))).catch(e=>setError(e.message))});const poll=async()=>{try{const r=await api(`/ssh/session/${id}`);if(stopped)return;failures=0;setError('');terminal.write(r.output);if(r.closed){terminal.write('\r\n[SSH session closed]');return}}catch(e:any){if(stopped)return;setError(e.message);if([401,403,404].includes(e.status))return;failures++;}timer=setTimeout(poll,failures?Math.min(30000,1000*2**failures):activeRef()?1500:15000)};poll();return()=>{stopped=true;clearTimeout(timer);observer.disconnect();input.dispose();terminal.dispose();terminalRef.current=null;fitRef.current=null}},[id]);
+ useEffect(()=>{
+  if(!id||!ref.current)return;
+  const terminal=new Terminal({fontSize:13,theme:{background:'#07111d'},cursorBlink:true}),fit=new FitAddon(),controller=new AbortController();
+  terminalRef.current=terminal;fitRef.current=fit;terminal.loadAddon(fit);terminal.open(ref.current);fit.fit();
+  let stopped=false,closed=false,inputFailed=false,timer:ReturnType<typeof setTimeout>|undefined,failures=0,lastSize='';
+  const queue=shellInputQueue(chunk=>api(`/ssh/session/${id}`,{method:'POST',body:JSON.stringify({input:chunk}),signal:controller.signal}),error=>{if(stopped)return;inputFailed=true;terminal.options.disableStdin=true;setError(`${error.message}. Reconnect before typing again; input was not retried.`)});
+  const resize=()=>{if(!ref.current?.offsetWidth||stopped)return;fit.fit();const size=`${terminal.cols}:${terminal.rows}`;if(size===lastSize)return;lastSize=size;api(`/ssh/session/${id}`,{method:'POST',body:JSON.stringify({cols:terminal.cols,rows:terminal.rows}),signal:controller.signal}).catch(()=>{});};
+  const observer=new ResizeObserver(resize);observer.observe(ref.current);
+  const input=terminal.onData(text=>queue.push(text));
+  const stream=async()=>{
+   try{
+    const response=await api<Response>(`/ssh/session/${id}/output`,{signal:controller.signal},undefined,true);
+    if(stopped)return;
+    failures=0;if(!inputFailed)setError('');
+    await readShellOutput(response,frame=>{if(stopped)return;terminal.write(frame.output);if(frame.closed){closed=true;queue.stop();terminal.options.disableStdin=true;terminal.write('\r\n[SSH session closed]');}});
+   }catch(error:any){if(stopped)return;setError(error.message);if([401,403,404].includes(error.status)){queue.stop();terminal.options.disableStdin=true;return;}failures++;}
+   if(!stopped&&!closed)timer=setTimeout(stream,failures?Math.min(30000,1000*2**Math.min(failures,5)):0);
+  };
+  void stream();resize();
+  return()=>{stopped=true;queue.stop();controller.abort();clearTimeout(timer);observer.disconnect();input.dispose();terminal.dispose();terminalRef.current=null;fitRef.current=null;};
+ },[id]);
  useEffect(()=>{if(active&&id){requestAnimationFrame(()=>{fitRef.current?.fit();terminalRef.current?.focus()})}},[active,id]);
  return <div ref={shellRef} className="ssh-shell">{!id?<SSHLogin target={target} host={host} onConnected={r=>setId(r.id)}/>:<><div className="shell-session-toolbar"><div className="shell-session-heading"><TerminalIcon size={21}/><span><b>{name||target}</b><small>{target} � SSH</small></span></div><div className="header-actions"><button className="btn secondary" onClick={async()=>{try{await copyTerminalSelection(terminalRef.current?.getSelection()||'')}catch(e:any){setError(e.message||'Unable to copy selection')}}}><Copy size={14}/> Copy</button><button className="btn secondary" onClick={async()=>{try{terminalRef.current?.paste(await navigator.clipboard.readText())}catch{setError('Clipboard access unavailable')}}}><ClipboardPaste size={14}/> Paste</button><button className="btn secondary" onClick={()=>terminalRef.current?.clear()}><Trash2 size={14}/> Clear</button><button className="icon-btn" aria-label="Fullscreen terminal" onClick={async()=>{try{await fullscreenTerminal(shellRef.current)}catch(e:any){setError(e.message||'Fullscreen unavailable')}}}><Maximize size={16}/></button><button className="btn secondary" onClick={()=>{setId('');onDisconnect?.()}}>Disconnect</button></div></div><div ref={ref} className="ssh-terminal"/></>}{error&&<p className="error">{error}</p>}</div>;
 }

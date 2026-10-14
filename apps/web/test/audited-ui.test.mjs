@@ -3,16 +3,16 @@ import React,{act} from 'react';import {createRoot} from 'react-dom/client';impo
 const rootPath=fileURLToPath(new URL('../',import.meta.url));
 async function component(file){
  const directory=fs.mkdtempSync(path.join(rootPath,'node_modules','audit-ui-'));
- const result=await build({entryPoints:[path.join(rootPath,'src',file)],bundle:true,format:'esm',platform:'node',packages:'external',jsx:'automatic',write:false,plugins:[{name:'fixture-api',setup(b){b.onResolve({filter:/\/api$/},()=>({path:'fixture-api',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const api=(...a)=>globalThis.__auditApi(...a);export const confirmedApi=(...a)=>globalThis.__auditConfirmed(...a);export function setDockerHost(id){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent(new Event('homecloud-connection'));}` }));}}]});
+ const result=await build({entryPoints:[path.join(rootPath,'src',file)],bundle:true,format:'esm',platform:'node',packages:'external',jsx:'automatic',write:false,plugins:[{name:'fixture-api',setup(b){b.onResolve({filter:/\/api$/},()=>({path:'fixture-api',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const clearTokens=()=>{};export const api=(...a)=>globalThis.__auditApi(...a);export const confirmedApi=(...a)=>globalThis.__auditConfirmed(...a);export function setDockerHost(id){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent(new Event('homecloud-connection'));}` }));}}]});
  const modulePath=path.join(directory,'component.mjs');fs.writeFileSync(modulePath,result.outputFiles[0].text);const module=await import(pathToFileURL(modulePath));return {module,cleanup:()=>fs.rmSync(directory,{recursive:true,force:true})};
 }
-async function mounted(file,props,api){
+async function mounted(file,props,api,mobile=true){
  const dom=new JSDOM('<div id="root"></div>',{url:'https://homecloud.test'});const originals={};for(const k of ['window','document','localStorage','Event','CustomEvent','HTMLElement']){originals[k]=globalThis[k];globalThis[k]=dom.window[k];}
- globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.__auditApi=api;globalThis.__auditConfirmed=api;dom.window.confirm=()=>true;
+ dom.window.matchMedia=()=>({matches:mobile,addEventListener(){},removeEventListener(){}});globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.__auditApi=api;globalThis.__auditConfirmed=api;dom.window.confirm=()=>true;
  const built=await component(file),container=dom.window.document.getElementById('root'),root=createRoot(container);const Component=built.module.default;
  const render=async values=>{await act(async()=>{root.render(React.createElement(MemoryRouter,null,React.createElement(Component,values)));await new Promise(r=>setTimeout(r,0));});};
  await render(props);
- return {dom,container,render,click:async button=>{assert.ok(button,'Expected control is rendered');await act(async()=>{button.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true}));await new Promise(r=>setTimeout(r,0));});},close:async()=>{await act(async()=>root.unmount());dom.window.close();built.cleanup();for(const k of Object.keys(originals)){if(originals[k]===undefined)delete globalThis[k];else globalThis[k]=originals[k];}delete globalThis.__auditApi;delete globalThis.__auditConfirmed;}};
+ return {dom,container,render,click:async button=>{assert.ok(button,'Expected control is rendered');await act(async()=>{button.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));});},close:async()=>{await act(async()=>root.unmount());dom.window.close();built.cleanup();for(const k of Object.keys(originals)){if(originals[k]===undefined)delete globalThis[k];else globalThis[k]=originals[k];}delete globalThis.__auditApi;delete globalThis.__auditConfirmed;}};
 }
 const button=(container,label)=>[...container.querySelectorAll('button')].find(b=>b.textContent.trim()===label);
 test('VM detail Snapshot and Backup controls open forms for the selected VM',async()=>{
@@ -45,4 +45,25 @@ test('backup form switches storage and guest suggestions with the selected node'
  const resources=[{id:'a',node:'pve1',name:'backup-a',status:'online',content:'backup'},{id:'b',node:'pve2',name:'backup-b',status:'online',content:'backup'},{id:'c',node:'pve2',name:'offline',status:'offline',content:'backup'}];
  const page=await mounted('pages/ProxmoxBackups.tsx',{role:'operator',hours:'24',onTasks(){},onStorage(){}},async p=>p==='/backups'?{jobs:[],points:[]}:p==='/proxmox/storage'?{resources}:p==='/proxmox'?{nodes:[{name:'pve1'},{name:'pve2'}],vms:[{id:'101',name:'a',node:'pve1'},{id:'102',name:'b',node:'pve2'}],lxc:[]}:{tasks:[]});
  try{await page.click(button(page.container,'Create Backup'));let storage=page.container.querySelector('select[name=storage]');assert.ok(storage.querySelector('option[value=backup-a]'));assert.equal(storage.querySelector('option[value=backup-b]'),null);const node=page.container.querySelector('select[name=node]');await act(async()=>{node.value='pve2';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}));});storage=page.container.querySelector('select[name=storage]');assert.equal(storage.value,'');assert.ok(storage.querySelector('option[value=backup-b]'));assert.equal(storage.querySelector('option[value=backup-a]'),null);assert.equal(storage.querySelector('option[value=offline]'),null);assert.equal(page.container.querySelector('datalist option').value,'102');}finally{await page.close();}
+});
+
+
+test('mobile navigation opens, closes, traps focus and closes after selecting a page',async()=>{
+ const page=await mounted('components/Layout.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer',name:'Mobile user'}}:{});
+ try{
+  const drawer=page.container.querySelector('#primary-navigation');
+  const toggle=page.container.querySelector('.nav-toggle');
+  assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(drawer.hasAttribute('inert'),true);
+  await page.click(toggle);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(drawer.getAttribute('role'),'dialog');assert.equal(document.body.style.overflow,'hidden');assert.equal(page.container.querySelector('.main-shell').hasAttribute('inert'),true);
+  const links=[...drawer.querySelectorAll('a,button')];links.at(-1).focus();
+  await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true})));assert.equal(document.activeElement,links[0]);
+  await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(document.activeElement,toggle);assert.equal(document.body.style.overflow,'');
+  await page.click(toggle);await page.click(page.container.querySelector('.nav-backdrop'));assert.equal(toggle.getAttribute('aria-expanded'),'false');
+  await page.click(toggle);await page.click(drawer.querySelector('a[href="/proxmox"]'));assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(drawer.hasAttribute('inert'),true);
+ }finally{await page.close();}
+});
+
+test('desktop navigation still collapses without opening a mobile drawer',async()=>{
+ const page=await mounted('components/Layout.tsx',{},async()=>({user:{role:'viewer'}}),false);
+ try{const toggle=page.container.querySelector('.nav-toggle');assert.equal(toggle.getAttribute('aria-expanded'),'true');await page.click(toggle);assert.ok(page.container.querySelector('.sidebar.collapsed'));assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(page.container.querySelector('.nav-backdrop'),null);await page.click(toggle);assert.equal(page.container.querySelector('.sidebar.collapsed'),null);}finally{await page.close();}
 });

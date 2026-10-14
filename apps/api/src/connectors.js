@@ -1,3 +1,4 @@
+import {guestNetwork,ctExtra,guestGeneral,allocateGuestId} from './guest-create-options.js';
 import {assertGuestPlacement} from './ssh-target.js';
 import {validateBackupSelection} from './backup-validation.js';
 import {selectedAgentHost,agentRequest} from './node-agents.js';
@@ -124,7 +125,7 @@ export async function proxmoxInstallationMedia(node,call=pve){
 export async function proxmoxCreateVm(payload,call=pve){
   const node=vmIdentifier(payload.node,'node');
   const storage=vmIdentifier(payload.storage||process.env.PROXMOX_DEFAULT_STORAGE||'local-lvm','disk storage');
-  const bridge=vmIdentifier(payload.bridge||'vmbr0','network bridge');
+  const net0=guestNetwork(payload,'vm'),general=await guestGeneral(payload,call);
   const diskGB=Number(payload.disk??40),cores=Number(payload.cores??2),memory=Number(payload.memory??4096);
   for(const [label,value,min,max] of [['Disk GB',diskGB,1,65536],['Cores',cores,1,128],['Memory MB',memory,128,1048576]])if(!Number.isInteger(value)||value<min||value>max)throw vmInputError(`Invalid ${label}`);
   const iso=payload.iso||'',bootOrder=payload.bootOrder||(iso?'cdrom-first':'disk-first');
@@ -144,13 +145,13 @@ export async function proxmoxCreateVm(payload,call=pve){
     const files=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(isoStore)}/content?content=iso`);
     if(!Array.isArray(files)||!files.some(f=>f.content==='iso'&&f.volid===iso))throw vmInputError('Selected ISO is no longer available on this node. Refresh installation media.');
   }
-  // Always allocate a fresh ID; never accept a caller-supplied existing VM ID.
-  const vmid=await call('/cluster/nextid'),diskDevice=`${diskBus}0`;
+  // Validate explicit guestId availability; creation never uses force or replaces guests.
+  const vmid=await allocateGuestId(payload,call),diskDevice=`${diskBus}0`;
   const body=form({vmid,name:payload.name,cores,memory,
     scsihw:diskBus==='scsi'?'virtio-scsi-pci':undefined,[diskDevice]:`${storage}:${diskGB}`,
     ide2:iso?`${iso},media=cdrom`:undefined,
     boot:`order=${iso?(bootOrder==='cdrom-first'?`ide2;${diskDevice}`:`${diskDevice};ide2`):diskDevice}`,
-    net0:`virtio,bridge=${bridge}`,ostype:payload.ostype||'l26',agent:1,onboot:0,start:0
+    net0,...general,ostype:payload.ostype||'l26',agent:1,onboot:0,start:0
   });
   const task=await call(`/nodes/${encodeURIComponent(node)}/qemu`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
   return {vmid:String(vmid),node,task,installationReady:Boolean(iso)};
@@ -174,7 +175,8 @@ export async function proxmoxCtTemplates(node,call=pve){
  return {node,templates,errors};
 }
 export async function proxmoxCreateCt(payload,call=pve){
- const node=vmIdentifier(payload.node,'node'),storage=vmIdentifier(payload.storage,'root storage'),bridge=vmIdentifier(payload.bridge||'vmbr0','network bridge');
+ const node=vmIdentifier(payload.node,'node'),storage=vmIdentifier(payload.storage,'root storage');
+ const net0=guestNetwork(payload,'ct'),extra=ctExtra(payload),general=await guestGeneral(payload,call);
  const disk=Number(payload.disk??8),cores=Number(payload.cores??2),memory=Number(payload.memory??1024);
  for(const [label,value,min,max] of [['Disk GB',disk,1,65536],['Cores',cores,1,128],['Memory MB',memory,128,1048576]])if(!Number.isInteger(value)||value<min||value>max)throw vmInputError(`Invalid ${label}`);
  if(typeof payload.password!=='string'||payload.password.length<12||payload.password.length>128)throw vmInputError('Initial root password must contain 12 to 128 characters');
@@ -186,9 +188,9 @@ export async function proxmoxCreateCt(payload,call=pve){
  if(!supports(templateStore,'vztmpl'))throw vmInputError('Selected template storage is unavailable on this node');
  const files=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(templateStore.storage)}/content?content=vztmpl`);
  if(!Array.isArray(files)||!files.some(f=>f.content==='vztmpl'&&f.volid===template))throw vmInputError('Template is not available on the selected node');
- const vmid=await call('/cluster/nextid');
- const body=form({vmid,hostname:payload.name,ostemplate:template,cores,memory,rootfs:`${storage}:${disk}`,net0:`name=eth0,bridge=${bridge},ip=dhcp`,password:payload.password,unprivileged:1,start:0,onboot:0,'ssh-public-keys':payload.sshKey||undefined});
- return {vmid:String(vmid),task:await call(`/nodes/${encodeURIComponent(node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
+ const vmid=await allocateGuestId(payload,call);
+ const body=form({vmid,hostname:payload.name,ostemplate:template,cores,memory,rootfs:`${storage}:${disk}`,net0,password:payload.password,...extra,...general,start:0,onboot:0,'ssh-public-keys':payload.sshKey||undefined});
+ return {vmid:String(vmid),node,task:await call(`/nodes/${encodeURIComponent(node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
 }
 export function dockerConfigured(){return !!dockerConfig().url}
 export async function docker(path,init={}){

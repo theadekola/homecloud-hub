@@ -9,9 +9,9 @@ export function normalizeDataset(d){
  return {id:`truenas:${d.id||d.name}`,resourceId:d.id||d.name,name:d.name,provider:'truenas',pool:d.name.split('/')[0],type:d.type==='VOLUME'?'ZFS Volume':'Dataset',used,available,size:d.type==='VOLUME'?volsize:quota>0?quota:null,mountpoint:value(d.mountpoint),compression:value(d.compression),deduplication:value(d.deduplication),readonly:value(d.readonly),created:value(d.creation),status:d.locked===true?'Locked':d.mounted?.value==='no'?'Unmounted':d.mounted?.value==='yes'?'Mounted':'Reported',usedByDataset:number(d.usedbydataset),quota:quota>0?quota:null};
 }
 export async function datasetInventory({proxmox=false,truenasEnabled=false,snapshot={},query=pve,tn=truenas,inventory=storageInventory}={}){
- const resources=[],errors=[],pools=[];
+ const resources=[],errors=[],pools=[];let coverage={complete:true};
  if(proxmox)try{
-  const result=await inventory();errors.push(...result.errors);pools.push(...result.resources.map(p=>({...p,provider:'proxmox'})));
+  const result=await inventory();coverage=result.coverage||coverage;errors.push(...result.errors);pools.push(...result.resources.map(p=>({...p,provider:'proxmox'})));
   const seen=new Set();const online=result.resources.filter(p=>p.status==='online');
   for(let i=0;i<online.length;i+=5)await Promise.all(online.slice(i,i+5).map(async p=>{
    try{const rows=await query(`/nodes/${encode(p.node)}/storage/${encode(p.name)}/content`);
@@ -20,9 +20,10 @@ export async function datasetInventory({proxmox=false,truenasEnabled=false,snaps
     }
    }catch(e){errors.push(`${p.node}/${p.name} volumes: ${e.message}`);}
   }));
- }catch(e){errors.push(`Proxmox: ${e.message}`);}
- if(truenasEnabled)try{resources.push(...(await tn('pool.dataset.query',[[],{extra:{flat:true}}])).map(normalizeDataset));pools.push(...(snapshot.pools||[]));}catch(e){errors.push(`TrueNAS: ${e.message}`);}
- return {resources,summary:storageSummary(pools),pools,errors,snapshots:snapshot.snapshots||[],truenasEnabled,sampledAt:new Date().toISOString()};
+ }catch(e){coverage={...coverage,complete:false};errors.push(`Proxmox: ${e.message}`);}
+ if(truenasEnabled&&(!Array.isArray(snapshot.pools)||(snapshot.errors||[]).some(e=>/^pool\.(query|dataset\.query):/.test(e))))coverage={...coverage,complete:false};
+ if(truenasEnabled)try{resources.push(...(await tn('pool.dataset.query',[[],{extra:{flat:true}}])).map(normalizeDataset));pools.push(...(snapshot.pools||[]));}catch(e){coverage={...coverage,complete:false};errors.push(`TrueNAS: ${e.message}`);}
+ return {resources,summary:storageSummary(pools,coverage),pools,errors,snapshots:snapshot.snapshots||[],truenasEnabled,sampledAt:new Date().toISOString()};
 }
 export function datasetCreateInput(input){
  const name=required(input.name,'Dataset path');if(!/^[^/@\s]+(?:\/[^/@\s]+)+$/.test(name)||name.split('/').some(s=>['.','..'].includes(s)))throw httpError('Enter a pool/dataset path');

@@ -1,3 +1,4 @@
+import {inventoryComplete} from '../proxmox-state';
 import {useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {Archive,Box,Columns3,Cpu,ExternalLink,Grid2X2,HardDrive,MemoryStick,Monitor,MoreHorizontal,Play,Power,RefreshCw,RotateCw,Search,Tag,Network,ArrowDown,ArrowUp,Server,Settings2} from 'lucide-react';
@@ -18,11 +19,11 @@ export default function VirtualMachines({data,role,clusterUrl,refresh}:{data:any
  const [selected,setSelected]=useState<string>(vms[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
  const [createNode,setCreateNode]=useState(''),[iso,setIso]=useState(''),[media,setMedia]=useState<any>(null),[mediaError,setMediaError]=useState(''),[mediaLoading,setMediaLoading]=useState(false),[mediaRevision,setMediaRevision]=useState(0),[created,setCreated]=useState<any>(null);
  const [modal,setModal]=useState<'create'|'snapshot'|'backup'|null>(null),[pending,setPending]=useState(''),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
- useEffect(()=>{if(selected!==created?.vmid&&!vms.some((vm:any)=>vm.id===selected))setSelected(vms[0]?.id||'');},[vms,selected,created]);
- useEffect(()=>{if(params.get('action')==='Create VM'){setModal('create');setParams({}, {replace:true});}},[params.get('action')]);
+ useEffect(()=>{if(operator&&params.get('action')==='Create VM'){setModal('create');setParams({}, {replace:true});}},[params.get('action'),operator]);
  const filtered=useMemo(()=>vms.filter((vm:any)=>(node==='all'||vm.node===node)&&(status==='all'||vm.status===status)&&`${vm.id} ${vm.name} ${vm.node}`.toLowerCase().includes(search.toLowerCase())),[vms,node,status,search]);
+ useEffect(()=>{if(!filtered.some((r:any)=>r.id===selected))setSelected(filtered[0]?.id||'');},[filtered,selected]);
  useEffect(()=>setPage(1),[node,status,search]);
- const pages=Math.max(1,Math.ceil(filtered.length/10)),visible=filtered.slice((page-1)*10,page*10),current=vms.find((vm:any)=>vm.id===selected)||vms[0];
+ const pages=Math.max(1,Math.ceil(filtered.length/10)),visible=filtered.slice((page-1)*10,page*10),current=filtered.find((vm:any)=>vm.id===selected);
  useEffect(()=>setPage(p=>Math.max(1,Math.min(p,pages))),[pages]);
  const destination=createNode||nodes[0]?.name||'';
  useEffect(()=>{setIso('');setMedia(null);setMediaError('');if(modal!=='create'||!destination||!operator)return;const controller=new AbortController();setMediaLoading(true);api<any>(`/proxmox/installation-media/${encodeURIComponent(destination)}`,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted)setMedia(result);}).catch(error=>{if(!controller.signal.aborted)setMediaError(error.message);}).finally(()=>{if(!controller.signal.aborted)setMediaLoading(false);});return()=>controller.abort();},[modal,destination,operator,mediaRevision]);
@@ -37,7 +38,7 @@ export default function VirtualMachines({data,role,clusterUrl,refresh}:{data:any
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   {created&&<Card><p role="status">Creation queued for VM {created.vmid} on {created.node}. Check task history for completion, then refresh and start the VM to {created.installationReady?'boot the selected ISO and install the operating system':'boot its disk. No operating system or installation media was supplied'}. The VM is created stopped. The guest agent must be installed inside the guest separately.</p><button className="btn secondary" disabled={!installationConsoleUrl(clusterUrl,{...created,id:created.vmid})} onClick={()=>openConsole({...created,id:created.vmid})}><ExternalLink size={14}/>Open installation console</button><p className="muted">The Proxmox console requires a separate sign-in and console permissions. After installation, eject the ISO or set disk-first boot in Proxmox.</p></Card>}
   <div className="vm-stats">
-   <VmStat icon={Box} label="Total VMs" value={vms.length} detail={`${vms.filter((vm:any)=>vm.status==='running').length} running · ${vms.filter((vm:any)=>vm.status==='stopped').length} stopped`}/>
+   <VmStat icon={Box} label="Total VMs" value={inventoryComplete(data)?vms.length:'Unknown'} detail={`${vms.filter((vm:any)=>vm.status==='running').length} running · ${vms.filter((vm:any)=>vm.status==='stopped').length} stopped`}/>
    <VmStat icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${vms.length} VMs reporting`}/>
    <VmStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <VmStat icon={HardDrive} label="Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>

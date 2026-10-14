@@ -1,3 +1,4 @@
+import {inventoryComplete} from '../proxmox-state';
 import {useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {Archive,Box,Columns3,Cpu,ExternalLink,Grid2X2,HardDrive,MemoryStick,MoreHorizontal,Play,Power,RefreshCw,RotateCw,Search,Tag,Terminal} from 'lucide-react';
@@ -17,11 +18,11 @@ export default function LxcContainers({data,role,clusterUrl,refresh}:{data:any;r
  const [selected,setSelected]=useState<string>(containers[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
  const [createNode,setCreateNode]=useState(''),[templates,setTemplates]=useState<any>(null),[templateError,setTemplateError]=useState(''),[templateLoading,setTemplateLoading]=useState(false),[templateRevision,setTemplateRevision]=useState(0);
  const [modal,setModal]=useState<'create'|'snapshot'|'backup'|null>(null),[pending,setPending]=useState(''),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
- useEffect(()=>{if(!containers.some((ct:any)=>ct.id===selected))setSelected(containers[0]?.id||'');},[containers,selected]);
- useEffect(()=>{if(params.get('action')==='Create CT'){setModal('create');setParams({}, {replace:true});}},[params.get('action')]);
+ useEffect(()=>{if(operator&&params.get('action')==='Create CT'){setModal('create');setParams({}, {replace:true});}},[params.get('action'),operator]);
  const filtered=useMemo(()=>containers.filter((ct:any)=>(node==='all'||ct.node===node)&&(status==='all'||ct.status===status)&&`${ct.id} ${ct.name} ${ct.node}`.toLowerCase().includes(search.toLowerCase())),[containers,node,status,search]);
+ useEffect(()=>{if(!filtered.some((r:any)=>r.id===selected))setSelected(filtered[0]?.id||'');},[filtered,selected]);
  useEffect(()=>setPage(1),[node,status,search]);
- const pages=Math.max(1,Math.ceil(filtered.length/10)),visible=filtered.slice((page-1)*10,page*10),current=containers.find((ct:any)=>ct.id===selected)||containers[0];
+ const pages=Math.max(1,Math.ceil(filtered.length/10)),visible=filtered.slice((page-1)*10,page*10),current=filtered.find((ct:any)=>ct.id===selected);
  useEffect(()=>setPage(p=>Math.max(1,Math.min(p,pages))),[pages]);
  const destination=createNode||nodes[0]?.name||'';
  useEffect(()=>{setTemplates(null);setTemplateError('');if(modal!=='create'||!destination||!operator)return;const controller=new AbortController();setTemplateLoading(true);api<any>(`/proxmox/ct-templates/${encodeURIComponent(destination)}`,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted)setTemplates(result)}).catch(e=>{if(!controller.signal.aborted)setTemplateError(e.message)}).finally(()=>{if(!controller.signal.aborted)setTemplateLoading(false)});return()=>controller.abort();},[modal,destination,operator,templateRevision]);
@@ -35,7 +36,7 @@ export default function LxcContainers({data,role,clusterUrl,refresh}:{data:any;r
   <div className="vm-title"><div><h2>LXC Containers</h2><p>Create, monitor and manage containers reported by the connected Proxmox cluster.</p></div><div><button className="btn secondary" onClick={refresh}><RefreshCw size={14}/>Refresh</button>{operator&&<button className="btn primary" onClick={()=>setModal('create')}>+ Create Container</button>}</div></div>
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   <div className="vm-stats">
-   <CtStat icon={Box} label="Total Containers" value={containers.length} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
+   <CtStat icon={Box} label="Total Containers" value={inventoryComplete(data)?containers.length:'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
    <CtStat icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${containers.length} containers reporting`}/>
    <CtStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <CtStat icon={HardDrive} label="Root Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>

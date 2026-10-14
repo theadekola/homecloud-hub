@@ -22,10 +22,18 @@ export function useApi<T>(path: string, initial: T, refreshMs?:number) {
     const reset=()=>{window.clearInterval(timer);timer=refreshMs===0?undefined:window.setInterval(refresh,refreshMs??interval);};
     window.addEventListener('homecloud-refresh',reset);
     window.addEventListener('homecloud-settings',refresh);
+    const refreshMatching=(event:Event)=>{const detail=(event as CustomEvent).detail;const base=path.split('?')[0];if(detail.prefixes.some((p:string)=>base===p||base.startsWith(p+'/')))detail.requests.push(refresh());};
+    window.addEventListener('homecloud-resource-refresh',refreshMatching);
     const connectionChanged=()=>{++generation.current;pending.current?.abort();pending.current=null;setData(initialValue.current);refresh();};
     window.addEventListener('homecloud-connection',connectionChanged);
-    return()=>{++generation.current;pending.current?.abort();pending.current=null;window.clearInterval(timer);window.removeEventListener('homecloud-refresh',reset);window.removeEventListener('homecloud-settings',refresh);window.removeEventListener('homecloud-connection',connectionChanged);};
+    return()=>{++generation.current;pending.current?.abort();pending.current=null;window.clearInterval(timer);window.removeEventListener('homecloud-refresh',reset);window.removeEventListener('homecloud-settings',refresh);window.removeEventListener('homecloud-resource-refresh',refreshMatching);window.removeEventListener('homecloud-connection',connectionChanged);};
   },[refresh,refreshMs]);
   const current=resourcePath.current===path;
   return {data:current?data:initialValue.current,setData,loading:current?loading:true,error:current?error:'',refresh};
+}
+
+export async function refreshResources(prefixes:string[]){
+ const detail={prefixes,requests:[] as Promise<void>[]};
+ window.dispatchEvent(new CustomEvent('homecloud-resource-refresh',{detail}));
+ await Promise.all(detail.requests);
 }

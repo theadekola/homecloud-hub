@@ -12,7 +12,7 @@ export async function networkDetails(node,period){
  await Promise.all([['dns',`/nodes/${encode(node)}/dns`],['history',`/nodes/${encode(node)}/rrddata?timeframe=${timeframe}&cf=AVERAGE`]].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
  return result;
 }
-export function networkWrite(node,input,edit=false){
+export function networkWrite(node,input,edit=false,write=pveWrite){
  const iface=required(input.iface,'Interface name'),type=required(input.type,'Type');
  if(!/^[A-Za-z][A-Za-z0-9_.:-]{0,14}$/.test(iface))throw httpError('Invalid interface name');
  if(!['bridge','bond','vlan','eth'].includes(type)||(!edit&&type==='eth'))throw httpError('Unsupported interface type');
@@ -23,6 +23,7 @@ export function networkWrite(node,input,edit=false){
  if(input['vlan-id'])body['vlan-id']=integer(input['vlan-id'],'VLAN ID',1,4094);
  if(type==='bond'&&!edit){required(body.slaves,'Bond interfaces');required(body.bond_mode,'Bond mode');}
  if(type==='vlan'&&!edit){required(body['vlan-raw-device'],'Parent device');if(!body['vlan-id'])throw httpError('VLAN ID is required');}
+ if(input.clear!==undefined){if(!edit||!Array.isArray(input.clear)||input.clear.some(key=>!['cidr','cidr6','gateway','gateway6','bridge_ports','comments'].includes(key)||body[key]!==undefined))throw httpError('Invalid network fields to clear');if(input.clear.length)body.delete=[...new Set(input.clear)].join(',');}
  if(!edit)body.iface=iface;
- return pveWrite(`/nodes/${encode(node)}/network${edit?`/${encode(iface)}`:''}`,edit?'PUT':'POST',body);
+ return write(`/nodes/${encode(node)}/network${edit?`/${encode(iface)}`:''}`,edit?'PUT':'POST',body);
 }

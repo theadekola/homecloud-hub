@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""HomeCloud outbound Proxmox Docker bridge. Runs on a paired Proxmox node."""
-import argparse,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue
+"""HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
+import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue
 VERSION=2
 HOSTS=[]
 RESCAN=threading.Event()
@@ -13,6 +13,7 @@ def run(args,timeout=320,input_data=None):
 def guest_run(identity,script,timeout=320):
  if not re.fullmatch(r'node|(?:lxc|qemu)/[0-9]+',identity):raise RuntimeError('Invalid guest identity')
  if len(script.encode())>1000000:raise RuntimeError('Guest request too large')
+ if globals().get('CONFIG',{}).get('kind')=='docker' and identity!='node':raise RuntimeError('Standalone connector cannot access Proxmox guests')
  if identity=='node':return run(['/bin/sh','-c',script],timeout=timeout)
  kind,vmid=identity.split('/')
  if kind=='lxc':return run(['pct','exec',vmid,'--','/bin/sh','-c',script],timeout=timeout)
@@ -61,7 +62,7 @@ def scan():
  while True:
   found=[]
   candidates=[('node',socket.gethostname())]
-  for tool,kind in [('qm','qemu'),('pct','lxc')]:
+  for tool,kind in ([] if globals().get('CONFIG',{}).get('kind')=='docker' else [('qm','qemu'),('pct','lxc')]):
    try:
     for line in run([tool,'list'],30).splitlines()[1:]:
      fields=line.split()
@@ -92,11 +93,15 @@ def post(config,path,body):
 
 def main():
  global CONFIG
- parser=argparse.ArgumentParser();parser.add_argument('--pair');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
+ if args.pair_stdin:
+  args.pair=sys.stdin.readline().strip()
+  if not args.pair:raise SystemExit('Pairing code is required')
  if args.pair:
+  if os.path.exists(args.config):raise SystemExit('Connector already configured. Revoke and remove the old connector before pairing again.')
   if not args.url or not args.url.startswith('https://'):raise SystemExit('HomeCloud HTTPS URL is required')
-  config={'url':args.url.rstrip('/')};config.update(post(config,'pair',{'code':args.pair,'name':socket.gethostname()}))
-  fd=os.open(args.config,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+  config={'url':args.url.rstrip('/')};config.update(post(config,'pair',{'code':args.pair,'name':socket.gethostname(),'kind':args.kind}))
+  fd=os.open(args.config,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
   with os.fdopen(fd,'w') as f:json.dump(config,f)
   os.chmod(args.config,0o600);return
  with open(args.config) as f:config=json.load(f)

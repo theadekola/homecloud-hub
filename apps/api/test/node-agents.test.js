@@ -27,3 +27,19 @@ test('setup is restricted to reported supported guests and versioned agents',asy
  a.pollAgent(identity,{version:2,hosts,results:[{id:work[0].id,status:200,body:Buffer.from(JSON.stringify({message:'verified'})).toString('base64')}]});
  assert.equal((await promise).message,'verified');a.revokeAgent(node.id);
 });
+
+test('Docker host pairing is scoped, single use, named and limited to the local Engine',async()=>{
+ const pairing=a.createPairing({kind:'docker',name:'Media Server'});assert.equal(pairing.kind,'docker');assert.equal(a.pairingStatus(pairing.code).paired,false);
+ assert.throws(()=>a.pairNode(pairing.code,'media','proxmox'),/different connection type/);
+ const node=a.pairNode(pairing.code,'media','docker'),identity=a.authenticateAgent(node.token);assert.equal(identity.kind,'docker');assert.equal(identity.name,'Media Server');assert.equal(identity.hostname,'media');assert.equal(a.pairingStatus(pairing.code).id,node.id);
+ assert.throws(()=>a.pairNode(pairing.code,'media','docker'),/expired or invalid/);
+ assert.throws(()=>a.pollAgent(identity,{hosts:[{id:'qemu/100',online:true}]}),/Invalid guest identity/);
+ a.pollAgent(identity,{version:2,hosts:[{id:'node',name:'media',online:true}],results:[]});
+ const pending=a.agentContext.run({host:node.id+':node'},()=>a.agentRequest('/info'));const job=a.pollAgent(identity,{hosts:[{id:'node',online:true}]}).jobs[0];assert.equal(job.host,'node');
+ a.pollAgent(identity,{hosts:[{id:'node',online:true}],results:[{id:job.id,status:200,body:Buffer.from('{"ServerVersion":"fixture"}').toString('base64')}]});assert.equal((await(await pending).json()).ServerVersion,'fixture');
+ await assert.rejects(()=>a.installAgentHost(node.id+':node'),/guest|Update/);a.revokeAgent(node.id);assert.throws(()=>a.authenticateAgent(node.token));
+});
+test('Pairing expiry and invalid choices are rejected without a reusable credential',()=>{
+ assert.throws(()=>a.createPairing({kind:'shell'}),/Invalid connection type/);assert.throws(()=>a.createPairing({name:'bad\nname'}),/Invalid connection name/);
+ const pairing=a.createPairing({kind:'docker'}),original=Date.now;try{Date.now=()=>original()+600001;assert.throws(()=>a.pairingStatus(pairing.code),/expired/);assert.throws(()=>a.pairNode(pairing.code,'media','docker'),/expired/);}finally{Date.now=original;}
+});

@@ -11,7 +11,7 @@ import {datasetInventory,datasetCreateInput,datasetRoot,datasetPermissionsInput}
 import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
 import {readFileSync} from 'node:fs';
-import {agentRequest,agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
+import {agentRequest,agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairingStatus,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
 import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
@@ -43,7 +43,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
  app.get('/api/node-agent/download',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/homecloud-node-agent.py',import.meta.url))));
  app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
- app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name)));
+ app.get('/api/docker-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-docker-agent.sh',import.meta.url))));
+ app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name,req.body.kind)));
  app.post('/api/node-agent/poll',(req,res)=>{const node=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json(pollAgent(node,req.body));});
  app.post('/api/node-agent/setup-script',(req,res)=>{authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json({script:readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')});});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
@@ -64,7 +65,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
  app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts().filter(h=>h.online||h.status==='connected'),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
- app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{await audit(req,'node-agent.pairing','nodes',{},'success');res.json(createPairing());});
+ app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{const pairing=createPairing(req.body);await audit(req,'node-agent.pairing','nodes',{},'success');res.set('Cache-Control','no-store');res.json(pairing);});
+ app.post('/api/node-agents/pairing/status',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(pairingStatus(req.body.code));});
  app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});
 
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
@@ -77,6 +79,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/connections/docker/test',authorize('owner'),async(req,res)=>{const {host}=await testDocker(req.body);res.json({ok:true,host});});
  app.put('/api/connections/docker',authorize('owner'),async(req,res)=>{const {config,host}=await testDocker(req.body);dockerStore.save(config);await monitor.invalidate();await audit(req,'connection.docker.save',config.url,{},'success');res.json({ok:true,connection:publicDocker(),host});});
  app.delete('/api/connections/docker',authorize('owner'),async(req,res)=>{dockerStore.remove();await monitor.invalidate();await audit(req,'connection.docker.remove','docker',{},'success');res.json({ok:true,connection:publicDocker()});});
+ app.get('/api/connections/proxmox/verify',authorize('owner'),async(req,res)=>{const config=clusterConfig();if(!config.url)return res.json({status:'not-configured',message:'No Proxmox API connection configured.'});try{const resources=await pve('/cluster/resources',{},config);if(!Array.isArray(resources))throw new Error();res.json({status:'reachable',nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))});}catch{res.json({status:'error',message:'Cannot read Proxmox resources. Check token permissions, endpoint and TLS trust.'});}});
  app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
  const testCluster=async input=>{
    const config=validateCluster(input);

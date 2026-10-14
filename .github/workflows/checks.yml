@@ -10,6 +10,9 @@ jobs:
           node-version: 20
       - name: Check Ubuntu shell syntax
         run: |
+          bash -n apps/api/src/agent-assets/install-node-agent.sh
+          bash -n apps/api/src/agent-assets/install-docker-agent.sh
+          python3 apps/api/test/node-agent-python.test.py
           bash -n install.sh
           bash -n deployment/homecloud-updater
           bash -n deployment/setup-updater.sh

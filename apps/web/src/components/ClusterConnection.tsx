@@ -1,23 +1,24 @@
-import { useState } from 'react';
+import { useEffect,useState } from 'react';
 import { Server, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
 import { useApi } from '../hooks';
 import { Card, Modal } from './UI';
 
-export function ClusterConnection({compact=false,label='Cluster Settings',primary=false}:{compact?:boolean;label?:string;primary?:boolean}) {
+export function ClusterConnection({compact=false,label='Cluster Settings',primary=false,autoOpen=false,onSaved}:{compact?:boolean;label?:string;primary?:boolean;autoOpen?:boolean;onSaved?:()=>void}) {
  const {data:session}=useApi<any>('/auth/me',null);
  const owner=session?.user?.role==='owner';
  const [copyMessage,setCopyMessage]=useState('');
  const copyCaCommand=async()=>{try{await navigator.clipboard.writeText('cat /etc/pve/pve-root-ca.pem');setCopyMessage('Command copied.');}catch{setCopyMessage('Select and copy the command below.');}};
  const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]);
  const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ useEffect(()=>{if(autoOpen&&owner)load();},[autoOpen,owner]);
  const submit=async(event:any)=>{
   event.preventDefault();setBusy(true);setError('');setMessage('');setNodes([]);
   const form=event.currentTarget,values=new FormData(form),test=event.nativeEvent.submitter?.value==='test';
   const body={name:values.get('name'),host:values.get('host'),port:Number(values.get('port')),tokenId:values.get('tokenId'),tokenSecret:values.get('tokenSecret'),verifyTls:values.get('verifyTls')==='on',ca:values.get('ca')};
   try{const result:any=await api(`/connections/proxmox${test?'/test':''}`,{method:test?'POST':'PUT',body:JSON.stringify(body)});
    setNodes(result.nodes);setMessage(`${test?'Connection verified':'Cluster saved'}. ${result.nodes.length} node(s) discovered.`);
-   if(!test){form.reset();setOpen(false);window.dispatchEvent(new Event('homecloud-connection'));}
+   if(!test){form.reset();setOpen(false);window.dispatchEvent(new Event('homecloud-connection'));onSaved?.();}
   }catch(e:any){setError(e.message);}finally{setBusy(false);}
  };
  if(!owner)return null;

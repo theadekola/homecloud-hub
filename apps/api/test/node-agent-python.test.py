@@ -32,4 +32,17 @@ class AgentTests(unittest.TestCase):
    self.assertEqual(run.call_args.args[0],['pct','set','131','--features','keyctl=1,nesting=1'])
    self.assertEqual(guest.call_args.args,('lxc/131','fixed fixture setup'));self.assertEqual(guest.call_args.kwargs['timeout'],900)
    self.assertEqual(result['status'],200)
+ def test_standalone_rejects_guest_execution(self):
+  with patch.object(agent,'CONFIG',{'kind':'docker'},create=True),patch.object(agent,'run') as run:
+   with self.assertRaisesRegex(RuntimeError,'Standalone'):agent.guest_run('qemu/100','echo fixture')
+   with self.assertRaisesRegex(RuntimeError,'Standalone'):agent.guest_run('lxc/100','echo fixture')
+   run.assert_not_called()
+ def test_standalone_scan_never_invokes_proxmox_tools(self):
+  class StopScan(Exception):pass
+  class StopEvent:
+   def wait(self,*args):raise StopScan()
+  with patch.object(agent,'CONFIG',{'kind':'docker'},create=True),patch.object(agent,'run') as run,patch.object(agent,'RESCAN',StopEvent()),patch.object(agent,'docker_request',return_value={'status':200,'body':base64.b64encode(b'{"ServerVersion":"fixture"}').decode()}) as docker:
+   with self.assertRaises(StopScan):agent.scan()
+   run.assert_not_called();docker.assert_called_once_with('node','/info',timeout=8)
+   self.assertEqual(agent.HOSTS[0]['id'],'node')
 if __name__=='__main__':unittest.main()

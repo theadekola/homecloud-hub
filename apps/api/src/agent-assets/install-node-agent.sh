@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 [[ $EUID == 0 ]] || { echo 'Run this installer as root on the Proxmox node.'; exit 1; }
+[[ ! -e /etc/homecloud-node-agent.json ]] || { echo 'Connector already configured. Revoke and remove the old connector before pairing again.'; exit 1; }
 command -v qm >/dev/null
 command -v pct >/dev/null
 command -v python3 >/dev/null
 read -rp 'HomeCloud HTTPS URL: ' hub
-[[ "$hub" == https://* ]] || { echo 'HTTPS is required.'; exit 1; }
+python3 -c 'import sys,urllib.parse; u=urllib.parse.urlsplit(sys.argv[1]); assert u.scheme=="https" and u.hostname and not u.username and not u.password and u.path in ("","/") and not u.query and not u.fragment, "Enter a HomeCloud HTTPS origin without credentials or a path"' "$hub"
 read -rsp 'One-time pairing code from HomeCloud: ' pairing
 printf '\n'
 umask 077
 curl --fail --silent --show-error "${hub%/}/api/node-agent/download" -o /usr/local/sbin/homecloud-node-agent.py
-python3 /usr/local/sbin/homecloud-node-agent.py --url "$hub" --pair "$pairing"
+printf '%s\n' "$pairing" | python3 /usr/local/sbin/homecloud-node-agent.py --url "$hub" --pair-stdin
 unset pairing
 cat > /etc/systemd/system/homecloud-node-agent.service <<'UNIT'
 [Unit]

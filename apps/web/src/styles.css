@@ -337,3 +337,14 @@
 @media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
 
 @media(min-width:1251px){.vm-workspace{align-items:stretch}.vm-workspace>.vm-list-card{display:flex;flex-direction:column;margin-bottom:0}.vm-workspace>.vm-detail-stack{display:flex;flex-direction:column;height:100%;gap:12px}.vm-workspace .vm-pagination{margin-top:auto;padding-top:12px}.vm-workspace .vm-resource{flex:1;margin-bottom:0}.vm-workspace .vm-detail{margin-bottom:0}}.vm-detail-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.vm-detail-actions button{min-width:0;white-space:nowrap}@media(max-width:420px){.vm-detail-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Connection onboarding */
+.connection-setup{margin:20px 0;padding:18px;border:1px solid var(--border,#29394c);border-radius:12px}
+.connection-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.connection-choices .btn{display:flex;align-items:flex-start;flex-direction:column;white-space:normal;text-align:left;min-height:92px;gap:8px}
+.connection-choices .btn span{font-size:13px;font-weight:400}
+.connection-entry{padding:18px 0;border-top:1px solid var(--border,#29394c);overflow-wrap:anywhere}
+.connection-entry .header-actions{margin-top:12px;flex-wrap:wrap}
+.connection-setup .node-command{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+.connection-setup details{margin:14px 0}
+@media(max-width:640px){.connection-choices{grid-template-columns:1fr}.connection-setup{padding:12px}.connection-entry .header-actions .btn{flex:1 1 120px}}

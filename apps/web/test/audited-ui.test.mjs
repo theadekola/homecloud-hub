@@ -8,7 +8,7 @@ async function component(file){
  const modulePath=path.join(directory,'component.mjs');fs.writeFileSync(modulePath,result.outputFiles[0].text);const module=await import(pathToFileURL(modulePath));return {module,cleanup:()=>fs.rmSync(directory,{recursive:true,force:true})};
 }
 async function mounted(file,props,api,mobile=true){
- const dom=new JSDOM('<div id="root"></div>',{url:'https://homecloud.test'});const originals={};for(const k of ['window','document','localStorage','Event','CustomEvent','HTMLElement','ResizeObserver']){originals[k]=globalThis[k];globalThis[k]=dom.window[k];}
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://homecloud.test'});const originals={};for(const k of ['window','document','localStorage','Event','CustomEvent','HTMLElement','FormData','ResizeObserver']){originals[k]=globalThis[k];globalThis[k]=dom.window[k];}
  globalThis.ResizeObserver=class {observe(){}disconnect(){}};dom.window.matchMedia=()=>({matches:mobile,addEventListener(){},removeEventListener(){}});globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.__auditApi=api;globalThis.__auditConfirmed=api;dom.window.confirm=()=>true;
  const built=await component(file),container=dom.window.document.getElementById('root'),root=createRoot(container);const Component=built.module.default;
  const render=async values=>{await act(async()=>{root.render(React.createElement(MemoryRouter,null,React.createElement(Location),React.createElement(Component,values)));await new Promise(r=>setTimeout(r,0));});};
@@ -153,4 +153,9 @@ test('Interface dashboard selects visible interface after node filtering',async(
 
 test('Device filters switch visible details and normalize unknown Docker availability',async()=>{
  const page=await mounted('pages/NetworkDevices.tsx',{},async p=>p==='/dashboard'?{nodes:[{name:'pve',status:'online',ip:'192.0.2.1'}],guests:[]}: {hosts:[{id:'host',name:'docker-host'}]});try{const type=page.container.querySelector('[aria-label="Device type"]');await act(async()=>{type.value='Docker Host';type.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.device-details-card').textContent.includes('docker-host'));assert.ok(page.container.querySelector('.device-details-card').textContent.includes('unknown'));assert.ok(!page.container.querySelector('.device-details-card').textContent.includes('192.0.2.1'))}finally{await page.close()}
+});
+
+test('Routing node filters select the visible gateway and edits include configuration precondition',async()=>{
+ const writes=[];const interfaces=['a','b'].map(node=>({id:node+'/vmbr0',node,name:'vmbr0',type:'bridge',gateway:node==='a'?'192.0.2.1':'198.51.100.1',status:'up'}));const page=await mounted('pages/NetworkRouting.tsx',{onMap(){}},async(p,init)=>{if(init?.method==='PUT'){writes.push({p,body:JSON.parse(init.body)});return {}}return p==='/auth/me'?{user:{role:'owner'}}:{interfaces,nodes:[{node:'a'},{node:'b'}]}});
+ try{const node=page.container.querySelector('[aria-label="Route node"]');await act(async()=>{node.value='b';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.route-detail').textContent.includes('198.51.100.1'));await page.click(button(page.container,'Edit'));const form=page.container.querySelector('.modal form');await act(async()=>{form.dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0))});assert.equal(writes[0].p,'/proxmox/network/b/vmbr0');assert.ok(writes[0].body.expectedConfig)}finally{await page.close()}
 });

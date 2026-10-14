@@ -12,7 +12,7 @@ export async function networkDetails(node,period){
  await Promise.all([['dns',`/nodes/${encode(node)}/dns`],['history',`/nodes/${encode(node)}/rrddata?timeframe=${timeframe}&cf=AVERAGE`]].map(async([key,path])=>{try{result[key]=await pve(path);}catch(e){result.errors.push(`${key}: ${e.message}`);}}));
  return result;
 }
-export function networkWrite(node,input,edit=false,write=pveWrite){
+export function networkWrite(node,input,edit=false,write=pveWrite,query=pve){
  const iface=required(input.iface,'Interface name'),type=required(input.type,'Type');
  if(!/^[A-Za-z][A-Za-z0-9_.:-]{0,14}$/.test(iface))throw httpError('Invalid interface name');
  if(!['bridge','bond','vlan','eth'].includes(type)||(!edit&&type==='eth'))throw httpError('Unsupported interface type');
@@ -25,5 +25,11 @@ export function networkWrite(node,input,edit=false,write=pveWrite){
  if(type==='vlan'&&!edit){required(body['vlan-raw-device'],'Parent device');if(!body['vlan-id'])throw httpError('VLAN ID is required');}
  if(input.clear!==undefined){if(!edit||!Array.isArray(input.clear)||input.clear.some(key=>!['cidr','cidr6','gateway','gateway6','bridge_ports','comments'].includes(key)||body[key]!==undefined))throw httpError('Invalid network fields to clear');if(input.clear.length)body.delete=[...new Set(input.clear)].join(',');}
  if(!edit)body.iface=iface;
- return write(`/nodes/${encode(node)}/network${edit?`/${encode(iface)}`:''}`,edit?'PUT':'POST',body);
+ const submit=()=>write(`/nodes/${encode(node)}/network${edit?`/${encode(iface)}`:''}`,edit?'PUT':'POST',body);
+ if(input.expectedConfig!==undefined){
+  const keys=['type','cidr','cidr6','gateway','gateway6','mtu','autostart','bridge_ports','bridge_vlan_aware','slaves','bond_mode','vlan-id','vlan-raw-device','comments'],expected=input.expectedConfig;
+  if(!edit||!expected||typeof expected!=='object'||Array.isArray(expected)||Object.keys(expected).length!==keys.length||keys.some(key=>typeof expected[key]!=='string'||expected[key].length>65536))throw httpError('Invalid expected interface configuration');
+  return (async()=>{const rows=await query(`/nodes/${encode(node)}/network`);if(!Array.isArray(rows))throw httpError('Interface configuration could not be verified',502);const current=rows.find(row=>row.iface===iface);if(!current||keys.some(key=>String(current[key]??'')!==expected[key]))throw httpError('Interface configuration changed. Reload it before saving.',409);return submit();})();
+ }
+ return submit();
 }

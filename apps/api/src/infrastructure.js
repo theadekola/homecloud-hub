@@ -1,3 +1,4 @@
+import {validateBackupSelection} from './backup-validation.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import WebSocket from 'ws';
@@ -17,9 +18,9 @@ export async function backupJobs(){return pve('/cluster/backup');}
 export async function createBackupJob(body){
   const node=required(body.node,'Node'),storage=required(body.storage,'Backup storage');
   const vmid=required(String(body.vmid||''),'VM/container IDs');
-  if(!/^\d+([, ]\d+)*$/.test(vmid))throw httpError('VM IDs must be a comma-separated list of numbers');
+  const selection=await validateBackupSelection({node,storage,vmid},pve);
   const id=`homecloud-${crypto.randomUUID()}`;
-  await pveWrite('/cluster/backup','POST',{id,node,storage,vmid,comment:required(body.name,'Name'),schedule:required(body.schedule,'Proxmox calendar schedule'),enabled:1,mode:'snapshot',compress:'zstd',...(body.retention?{'prune-backups':retention(body.retention)}:{})});
+  await pveWrite('/cluster/backup','POST',{id,node,storage,vmid:selection.vmid,comment:required(body.name,'Name'),schedule:required(body.schedule,'Proxmox calendar schedule'),enabled:1,mode:'snapshot',compress:'zstd',...(body.retention?{'prune-backups':retention(body.retention)}:{})});
   return {id};
 }
 export async function runBackupJob(id){
@@ -44,18 +45,32 @@ export async function backupArchives(){
   }));
   return {points,errors};
 }
-export async function restoreArchive(id,body){
-  const archives=await backupArchives();const point=archives.points.find(p=>p.id===id);
+export async function restoreArchive(id,body,{query=pve,archives=backupArchives,write=pveWrite}={}){
+  const inventory=await archives();const point=inventory.points.find(p=>p.id===id);
   if(!point)throw httpError('Backup archive not found or inaccessible',404);
   const vmid=integer(body.vmid,'New VM/container ID',100);
   const storage=required(body.storage,'Destination storage');
   const node=required(body.node||point.node,'Destination node');
+  const content=point.type==='lxc'?'rootdir':point.type==='qemu'?'images':null;
+  if(!content)throw httpError('Unknown backup type');
+  // Volume IDs for local storage are node-scoped. A matching name alone is not shared-source evidence.
+  if(node!==point.node){
+    const configs=await query('/storage'),source=Array.isArray(configs)&&configs.find(s=>s.storage===point.storage);
+    if(!(source?.shared===1||source?.shared===true))throw httpError('Local backup archives must be restored on their source node');
+    const sourceStores=await query(`/nodes/${encode(node)}/storage`),sourceStore=Array.isArray(sourceStores)&&sourceStores.find(s=>s.storage===point.storage);
+    if(!sourceStore||sourceStore.active!==1||sourceStore.enabled===0||!String(sourceStore.content||'').split(',').includes('backup'))throw httpError('Shared backup storage is unavailable on the destination node');
+    const volumes=await query(`/nodes/${encode(node)}/storage/${encode(point.storage)}/content?content=backup`);
+    if(!Array.isArray(volumes)||!volumes.some(v=>v.volid===point.volid))throw httpError('Selected backup archive is unavailable on the destination node');
+  }
+  const stores=await query(`/nodes/${encode(node)}/storage`),destination=Array.isArray(stores)&&stores.find(s=>s.storage===storage);
+  if(!destination||destination.active!==1||destination.enabled===0||!String(destination.content||'').split(',').includes(content))throw httpError(`Destination storage must be active and support ${content} on the selected node`);
+  if(content==='images'&&['iscsi','iscsidirect'].includes(destination.type))throw httpError('Destination storage cannot allocate a new VM disk');
   // Never overwrite an existing guest. The provider also checks for concurrent allocation.
-  const resources=await pve('/cluster/resources');
+  const resources=await query('/cluster/resources');
   if(resources.some(r=>Number(r.vmid)===vmid))throw httpError('That VM ID already exists; choose an unused ID',409);
-  if(point.type==='lxc')return {node,task:await pveWrite(`/nodes/${encode(node)}/lxc`,'POST',{vmid,ostemplate:point.volid,storage,restore:1,force:0})};
+  if(point.type==='lxc')return {node,task:await write(`/nodes/${encode(node)}/lxc`,'POST',{vmid,ostemplate:point.volid,storage,restore:1,force:0})};
   if(point.type!=='qemu')throw httpError('Unknown backup type');
-  return {node,task:await pveWrite(`/nodes/${encode(node)}/qemu`,'POST',{vmid,archive:point.volid,storage,force:0})};
+  return {node,task:await write(`/nodes/${encode(node)}/qemu`,'POST',{vmid,archive:point.volid,storage,force:0})};
 }
 export function truenasConfigured(){return Boolean(process.env.TRUENAS_URL&&process.env.TRUENAS_API_KEY);}
 export async function truenas(method,params=[]){

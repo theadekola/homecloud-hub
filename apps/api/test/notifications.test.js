@@ -34,3 +34,8 @@ test('SMTP requires verified TLS and treats rejected recipients as failures',asy
  await assert.rejects(sendNotification('email','test',{env:smtp,transport:()=>({sendMail:async()=>({rejected:['to@example.com']})})}));
  assert.deepEqual(notificationChannels({}),[]);
 });
+
+test('explicit channel tests are recorded with safe errors, retained and never automatically retried',async()=>{
+ const state={notificationQueue:[]};let fail=false,count=0;const n=createNotifier({env:{DISCORD_WEBHOOK_URL:env.DISCORD_WEBHOOK_URL},persistence:{get:()=>state,mutate:fn=>fn(state)},send:async()=>{count++;if(fail)throw Error('sensitive webhook token');}});
+ await n.test('discord');assert.equal(n.status().history[0].event,'test');assert.ok(n.status().history[0].sentAt);fail=true;await assert.rejects(n.test('discord'),{status:502});assert.ok(n.status().history[1].error);assert.equal(n.status().pending,0);assert.equal(JSON.stringify(n.status()).includes('sensitive webhook token'),false);await n.deliver([]);assert.equal(count,2);assert.equal(n.status().history.length,2);
+});

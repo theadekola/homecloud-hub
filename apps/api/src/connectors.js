@@ -1,3 +1,5 @@
+import {assertGuestPlacement} from './ssh-target.js';
+import {validateBackupSelection} from './backup-validation.js';
 import {selectedAgentHost,agentRequest} from './node-agents.js';
 import {dockerConfig,dockerTlsConfig} from './docker-config.js';
 import {mergeNodeStorage} from './proxmox-inventory.js';
@@ -83,21 +85,23 @@ export async function proxmoxSnapshot(){
     vms:guests('qemu'),lxc:guests('lxc'),
     storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),content:r.content??null,usage:percent(r.disk,r.maxdisk)}))};
 }
-export async function proxmoxVmAction(node,id,action,payload={}){
+export async function proxmoxVmAction(node,id,action,payload={},call=pve){
+  await assertGuestPlacement(node,id,'qemu',call);
   const statusActions=new Set(['start','stop','shutdown','reboot','reset','suspend','resume']);
-  if(statusActions.has(action)) return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub',vmstate:payload.vmstate?1:0})});
-  if(action==='delete-snapshot') return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
-  if(action==='clone') return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/clone`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({newid:payload.newid,name:payload.name,target:payload.target,full:payload.full===false?0:1,storage:payload.storage})});
-  if(action==='delete') return pve(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(statusActions.has(action)) return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/status/${action}`,{method:'POST'});
+  if(action==='snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub',vmstate:payload.vmstate?1:0})});
+  if(action==='delete-snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
+  if(action==='clone') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/clone`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({newid:payload.newid,name:payload.name,target:payload.target,full:payload.full===false?0:1,storage:payload.storage})});
+  if(action==='delete') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox VM action: ${action}`);
 }
-export async function proxmoxLxcAction(node,id,action,payload={}){
+export async function proxmoxLxcAction(node,id,action,payload={},call=pve){
+  await assertGuestPlacement(node,id,'lxc',call);
   const statusActions=new Set(['start','stop','shutdown','reboot','suspend','resume']);
   const base=`/nodes/${encodeURIComponent(node)}/lxc/${encodeURIComponent(id)}`;
-  if(statusActions.has(action)) return pve(`${base}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return pve(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub'})});
-  if(action==='delete-snapshot') return pve(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
+  if(statusActions.has(action)) return call(`${base}/status/${action}`,{method:'POST'});
+  if(action==='snapshot') return call(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub'})});
+  if(action==='delete-snapshot') return call(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox LXC action: ${action}`);
 }
 const vmInputError=message=>Object.assign(new Error(message),{status:400});
@@ -132,6 +136,7 @@ export async function proxmoxCreateVm(payload,call=pve){
   if(!Array.isArray(stores))throw new Error('Unexpected storage inventory');
   const target=stores.find(s=>s.storage===storage);
   if(!supports(target,'images'))throw vmInputError('Selected disk storage must be active, enabled and support images on this node');
+  if(['iscsi','iscsidirect'].includes(target.type))throw vmInputError('This storage uses existing LUNs and cannot allocate a new VM disk. Select allocating disk storage.');
   if(typeof target.avail==='number'&&target.avail<diskGB*1024**3)throw vmInputError('Selected disk storage has insufficient free space');
   if(iso){
     const isoStore=iso.split(':')[0];
@@ -152,18 +157,39 @@ export async function proxmoxCreateVm(payload,call=pve){
 }
 export async function proxmoxBackup(payload){
   const node=payload.node; if(!node)throw new Error('node required');
-  if(payload.storage){const stores=await pve('/nodes/'+encodeURIComponent(node)+'/storage');const target=Array.isArray(stores)&&stores.find(s=>s.storage===payload.storage);if(!target||target.active!==1||target.enabled===0)throw new Error('Backup storage '+payload.storage+' is not available on node '+node+'. Choose an active backup target for this node.');if(target.content&&!target.content.split(',').includes('backup'))throw new Error('Selected storage does not support backup content.');}
+  await validateBackupSelection(payload,pve);
   return pve(`/nodes/${encodeURIComponent(node)}/vzdump`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({
     vmid:payload.vmid, storage:payload.storage, mode:payload.mode||'snapshot', compress:payload.compress||'zstd', 'notes-template':payload.notes||'HomeCloud Hub'
   })});
 }
 
-export async function proxmoxCreateCt(payload,call=pve){
-  const vmid=await call('/cluster/nextid');
-  const body=form({vmid,hostname:payload.name,ostemplate:payload.ostemplate,cores:Number(payload.cores||2),memory:Number(payload.memory||1024),rootfs:`${payload.storage}:${Number(payload.disk||8)}`,net0:`name=eth0,bridge=${payload.bridge||'vmbr0'},ip=dhcp`,unprivileged:1,start:0,'ssh-public-keys':payload.sshKey||undefined});
-  return {vmid:String(vmid),task:await call(`/nodes/${encodeURIComponent(payload.node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
+export async function proxmoxCtTemplates(node,call=pve){
+ vmIdentifier(node,'node');const stores=await call(`/nodes/${encodeURIComponent(node)}/storage`),templates=[],errors=[];
+ if(!Array.isArray(stores))throw new Error('Unexpected storage inventory');
+ for(const store of stores.filter(s=>supports(s,'vztmpl')))try{
+  const rows=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(store.storage)}/content?content=vztmpl`);
+  if(!Array.isArray(rows))throw new Error('Unexpected template inventory');
+  templates.push(...rows.filter(r=>r.content==='vztmpl'&&typeof r.volid==='string'&&r.volid.startsWith(`${store.storage}:vztmpl/`)).map(r=>({volid:r.volid,name:r.volid.split('/').at(-1),storage:store.storage})));
+ }catch(e){errors.push(`${store.storage}: ${e.message}`)}
+ return {node,templates,errors};
 }
-
+export async function proxmoxCreateCt(payload,call=pve){
+ const node=vmIdentifier(payload.node,'node'),storage=vmIdentifier(payload.storage,'root storage'),bridge=vmIdentifier(payload.bridge||'vmbr0','network bridge');
+ const disk=Number(payload.disk??8),cores=Number(payload.cores??2),memory=Number(payload.memory??1024);
+ for(const [label,value,min,max] of [['Disk GB',disk,1,65536],['Cores',cores,1,128],['Memory MB',memory,128,1048576]])if(!Number.isInteger(value)||value<min||value>max)throw vmInputError(`Invalid ${label}`);
+ if(typeof payload.password!=='string'||payload.password.length<12||payload.password.length>128)throw vmInputError('Initial root password must contain 12 to 128 characters');
+ const template=payload.ostemplate;
+ if(typeof template!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]*:vztmpl\/[^,;\s\x00-\x1f]+$/.test(template)||template.split('/').includes('..'))throw vmInputError('Invalid template volume');
+ const stores=await call(`/nodes/${encodeURIComponent(node)}/storage`),target=Array.isArray(stores)&&stores.find(s=>s.storage===storage),templateStore=Array.isArray(stores)&&stores.find(s=>s.storage===template.split(':')[0]);
+ if(!supports(target,'rootdir'))throw vmInputError('Selected root storage is not available on node '+node+' or does not support rootdir');
+ if(typeof target.avail==='number'&&target.avail<disk*1024**3)throw vmInputError('Selected root storage has insufficient free space');
+ if(!supports(templateStore,'vztmpl'))throw vmInputError('Selected template storage is unavailable on this node');
+ const files=await call(`/nodes/${encodeURIComponent(node)}/storage/${encodeURIComponent(templateStore.storage)}/content?content=vztmpl`);
+ if(!Array.isArray(files)||!files.some(f=>f.content==='vztmpl'&&f.volid===template))throw vmInputError('Template is not available on the selected node');
+ const vmid=await call('/cluster/nextid');
+ const body=form({vmid,hostname:payload.name,ostemplate:template,cores,memory,rootfs:`${storage}:${disk}`,net0:`name=eth0,bridge=${bridge},ip=dhcp`,password:payload.password,unprivileged:1,start:0,onboot:0,'ssh-public-keys':payload.sshKey||undefined});
+ return {vmid:String(vmid),task:await call(`/nodes/${encodeURIComponent(node)}/lxc`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})};
+}
 export function dockerConfigured(){return !!dockerConfig().url}
 export async function docker(path,init={}){
   const config=dockerConfig(),dockerUrl=config.url;

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
-import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue
-VERSION=2
+import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
+VERSION=3
 HOSTS=[]
 RESCAN=threading.Event()
 LOCK=threading.Lock()
@@ -87,6 +87,46 @@ def scan():
    with LOCK:HOSTS=list(found)
   RESCAN.wait(60);RESCAN.clear()
 
+# Local read-only network collection is separate from guest Docker discovery.
+NETWORK=None
+NETWORK_SESSION=str(uuid.uuid4())
+def collect_network(root='/sys/class/net',boot_path='/proc/sys/kernel/random/boot_id'):
+ boot=NETWORK_SESSION
+ try:boot=pathlib.Path(boot_path).read_text().strip()
+ except OSError:pass
+ entries=json.loads(run(['ip','-j','address','show'],timeout=3))
+ if not isinstance(entries,list) or len(entries)>512:raise RuntimeError('Invalid interface inventory')
+ rows=[]
+ for entry in entries:
+  name=entry.get('ifname','')
+  if name in ('.','..') or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,15}',name):continue
+  base=pathlib.Path(root)/name
+  def read_int(path):
+   try:return int((base/path).read_text().strip())
+   except (OSError,ValueError):return None
+  addresses=[]
+  for address in entry.get('addr_info',[]):
+   try:
+    ip=ipaddress.ip_address(address['local']);prefix=address['prefixlen']
+    if isinstance(prefix,int) and 0<=prefix<=(32 if ip.version==4 else 128):addresses.append(str(ip)+'/'+str(prefix))
+   except (KeyError,ValueError,TypeError):pass
+  speed=None;reason='unavailable'
+  if not (base/'device').exists():reason='virtual'
+  else:
+   speed=read_int('speed')
+   if speed is None or speed<=0:
+    speed=None;reason='link-down' if entry.get('operstate') in ('DOWN','LOWERLAYERDOWN') else 'unsupported'
+  rx=read_int('statistics/rx_bytes');tx=read_int('statistics/tx_bytes')
+  rows.append({'name':name,'ifindex':entry.get('ifindex'),'mac':entry.get('address'),'addresses':addresses[:64],'speed':speed,'speedReason':reason,'rxBytes':str(rx) if rx is not None and rx>=0 else None,'txBytes':str(tx) if tx is not None and tx>=0 else None})
+ return {'status':'ok','bootId':boot,'uptime':time.monotonic(),'interfaces':rows}
+def network_scan():
+ global NETWORK
+ while True:
+  try:report=collect_network()
+  except Exception:report={'status':'error'}
+  with LOCK:NETWORK=report
+  time.sleep(5)
+
 def post(config,path,body):
  request=urllib.request.Request(config['url']+'/api/node-agent/'+path,data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+config.get('token','')})
  with urllib.request.urlopen(request,timeout=30) as response:return json.load(response)
@@ -106,7 +146,7 @@ def main():
   os.chmod(args.config,0o600);return
  with open(args.config) as f:config=json.load(f)
  CONFIG=config
- threading.Thread(target=scan,daemon=True).start();results=[];pending=queue.Queue();completed=queue.Queue()
+ threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start();results=[];pending=queue.Queue();completed=queue.Queue()
  def worker():
   while True:
    job=pending.get()
@@ -118,8 +158,8 @@ def main():
  threading.Thread(target=worker,daemon=True).start()
  while True:
   try:
-   with LOCK:hosts=list(HOSTS)
-   response=post(config,'poll',{'version':VERSION,'hosts':hosts,'results':results});results=[]
+   with LOCK:hosts=list(HOSTS);network=NETWORK
+   response=post(config,'poll',{'version':VERSION,'hosts':hosts,'results':results,**({'network':network} if network else {})});results=[]
    for job in response['jobs']:pending.put(job)
    while not completed.empty():results.append(completed.get())
   except Exception as e:print('Node agent connection unavailable: '+str(e),flush=True)

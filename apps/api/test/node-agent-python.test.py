@@ -1,4 +1,4 @@
-import base64,importlib.util,json,pathlib,unittest
+import base64,importlib.util,json,pathlib,unittest,tempfile
 from unittest.mock import patch
 module_path=pathlib.Path(__file__).parents[1]/'src'/'agent-assets'/'homecloud-node-agent.py'
 spec=importlib.util.spec_from_file_location('agent',module_path);agent=importlib.util.module_from_spec(spec);spec.loader.exec_module(agent)
@@ -45,4 +45,18 @@ class AgentTests(unittest.TestCase):
    with self.assertRaises(StopScan):agent.scan()
    run.assert_not_called();docker.assert_called_once_with('node','/info',timeout=8)
    self.assertEqual(agent.HOSTS[0]['id'],'node')
+ def test_network_collection_is_local_read_only_and_keeps_large_counters(self):
+  with tempfile.TemporaryDirectory() as folder:
+   root=pathlib.Path(folder);nic=root/'nic0';(nic/'device').mkdir(parents=True);(nic/'statistics').mkdir();(nic/'speed').write_text('1000');(nic/'statistics'/'rx_bytes').write_text('9007199254740993');(nic/'statistics'/'tx_bytes').write_text('0')
+   bridge=root/'vmbr0';(bridge/'statistics').mkdir(parents=True);(bridge/'statistics'/'rx_bytes').write_text('5');(bridge/'statistics'/'tx_bytes').write_text('8');boot=root/'boot';boot.write_text('fixture-boot')
+   entries=[{'ifname':'nic0','ifindex':2,'address':'02:00:00:00:00:01','operstate':'UP','addr_info':[{'local':'192.0.2.1','prefixlen':24},{'local':'2001:db8::1','prefixlen':64}]},{'ifname':'vmbr0','ifindex':3,'addr_info':[]},{'ifname':'../outside','ifindex':4,'addr_info':[]}]
+   with patch.object(agent,'run',return_value=json.dumps(entries)) as run,patch.object(agent,'guest_run') as guest:
+    report=agent.collect_network(str(root),str(boot));run.assert_called_once_with(['ip','-j','address','show'],timeout=3);guest.assert_not_called()
+   self.assertEqual(report['bootId'],'fixture-boot');self.assertEqual(len(report['interfaces']),2);self.assertEqual(report['interfaces'][0]['rxBytes'],'9007199254740993');self.assertEqual(report['interfaces'][0]['txBytes'],'0');self.assertEqual(report['interfaces'][0]['speed'],1000);self.assertEqual(report['interfaces'][0]['addresses'],['192.0.2.1/24','2001:db8::1/64']);self.assertEqual(report['interfaces'][1]['speedReason'],'virtual')
+ def test_network_missing_counters_and_down_link_are_not_zero_measurements(self):
+  with tempfile.TemporaryDirectory() as folder:
+   root=pathlib.Path(folder);(root/'nic0'/'device').mkdir(parents=True);(root/'nic0'/'speed').write_text('-1')
+   with patch.object(agent,'run',return_value=json.dumps([{'ifname':'nic0','ifindex':2,'operstate':'DOWN','addr_info':[]}])):
+    row=agent.collect_network(str(root),str(root/'absent-boot'))['interfaces'][0]
+   self.assertIsNone(row['speed']);self.assertIsNone(row['rxBytes']);self.assertEqual(row['speedReason'],'link-down')
 if __name__=='__main__':unittest.main()

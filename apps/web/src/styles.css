@@ -1588,3 +1588,17 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .shell-console-active .ssh-terminal{overflow:hidden}
 
 .ssh-terminal .xterm-screen{-webkit-touch-callout:none}
+/* FitAddon measures the outer box and subtracts xterm's own padding. */
+.ssh-terminal{position:relative;padding:0;box-sizing:border-box}
+.ssh-terminal .xterm{box-sizing:border-box;padding:10px}
+.terminal-selection{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.terminal-selection[hidden],.terminal-selection [hidden]{display:none}
+.terminal-selection-menu{position:absolute;left:8px;right:8px;margin:auto;width:max-content;max-width:calc(100% - 16px);display:flex;pointer-events:auto;background:#303033f5;border:1px solid #626269;border-radius:22px;box-shadow:0 4px 18px #0008;overflow:hidden}
+.terminal-selection-menu button{border:0;border-right:1px solid #626269;background:transparent;color:#fff;padding:10px 15px;font-size:13px;min-height:40px;cursor:pointer}
+.terminal-selection-menu button:last-child{border:0}
+.terminal-selection-handle{position:absolute;transform:translate(-50%,-50%);width:36px;height:36px;border:0;background:transparent;pointer-events:auto;touch-action:none;padding:0}
+.terminal-selection-handle:after{content:'';position:absolute;width:17px;height:17px;left:9px;background:#c7c9bd;border:2px solid white;border-radius:50%;box-sizing:border-box}
+.terminal-selection-handle.start{transform:translate(-50%,-100%)}
+.terminal-selection-handle.start:after{bottom:0}
+.terminal-selection-handle.end{transform:translate(-50%,0)}
+.terminal-selection-handle.end:after{top:0}

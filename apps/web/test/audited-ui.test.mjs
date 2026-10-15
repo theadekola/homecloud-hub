@@ -241,3 +241,16 @@ test('backup report exports include only filtered tasks and coverage metadata',a
 test('backup report failures use unknown statistics and recover through retry',async()=>{
  let fail=true;const page=await mounted('pages/BackupReports.tsx',{hours:'24',setHours(){}},async p=>{if(p.startsWith('/proxmox/tasks')&&fail)throw Error('Failed to fetch');return reportApi(p)});try{assert.ok(page.container.querySelector('[role=alert]').textContent.includes('Unable to load backup reports'));assert.equal(button(page.container,'Export Report').disabled,true);assert.ok([...page.container.querySelectorAll('.report-stats strong')].every(c=>c.textContent==='Unknown'));fail=false;await page.click(button(page.container,'Retry'));assert.equal(page.container.querySelector('[role=alert]'),null);assert.equal(button(page.container,'Export Report').disabled,false);}finally{await page.close();}
 });
+
+test('backup creation displays guest-discovery failures inside the form',async()=>{
+ const page=await mounted('pages/ProxmoxBackups.tsx',{role:'owner',hours:'24',onTasks(){},onStorage(){}},async p=>{if(p==='/proxmox')throw Error('Guest inventory denied');return p==='/proxmox/storage'?{resources:[]} :p.startsWith('/proxmox/tasks')?{tasks:[],errors:[]}:{jobs:[],points:[],errors:[]}});
+ try{await page.click(button(page.container,'Create Backup'));assert.ok(page.container.querySelector('.modal button.btn.primary').disabled);assert.ok(page.container.querySelector('.modal').textContent.includes('Guest inventory denied'));}finally{await page.close()}
+});
+test('backup overview uses exitstatus consistently with reports',async()=>{
+ const page=await mounted('pages/ProxmoxBackups.tsx',{role:'owner',hours:'24',onTasks(){},onStorage(){}},async p=>p.startsWith('/proxmox/tasks')?{tasks:[{upid:'fixture',type:'vzdump',status:'stopped',exitstatus:'OK',starttime:1900000000,endtime:1900000060}],errors:[]}:p==='/proxmox/storage'?{resources:[]}:p==='/proxmox'?{nodes:[],vms:[],lxc:[]}:{jobs:[],points:[],errors:[]});
+ try{const stats=page.container.querySelectorAll('.backup-stats>.card');assert.equal(stats[2].querySelector('strong').textContent,'1');assert.equal(stats[3].querySelector('strong').textContent,'0');}finally{await page.close()}
+});
+test('restore counts verified shared archives once while keeping local archives distinct',async()=>{
+ let shared=true;const data=()=>({points:['n1','n2'].map(node=>({id:node,node,storage:'backup',volid:'backup:backup/archive',shared,type:'qemu',size:1024**3,created:new Date().toISOString()})),snapshots:[],errors:[]});const page=await mounted('pages/Restore.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:data());
+ try{assert.equal(page.container.querySelector('.restore-stats strong').textContent,'1');assert.equal(page.container.querySelectorAll('tbody tr').length,1);shared=false;await page.click(button(page.container,'Refresh'));assert.equal(page.container.querySelector('.restore-stats strong').textContent,'2');assert.equal(page.container.querySelectorAll('tbody tr').length,2);}finally{await page.close()}
+});

@@ -1,14 +1,14 @@
 import {attachTerminalTouchSelection} from '../terminal-touch';
 import {readShellOutput,shellInputQueue} from '../shell-stream';
 import {useShellPresence,useSSHSession} from '../ssh-session';
-import {sendShellInput,copyTerminalSelection,fullscreenTerminal} from '../ssh-transfer';
+import {fullscreenTerminal} from '../ssh-transfer';
 import {useEffect,useRef,useState} from 'react';
 import {Terminal} from '@xterm/xterm';
 import {FitAddon} from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import {api} from '../api';
 import {Modal} from './UI';
-import {Eye,EyeOff,Copy,ClipboardPaste,Trash2,Maximize,Terminal as TerminalIcon} from 'lucide-react';
+import {Eye,EyeOff,Maximize,Terminal as TerminalIcon} from 'lucide-react';
 export function SSHApproval(){
  const [request,setRequest]=useState<any>(null),complete=useRef<(token?:string,serial?:number)=>void>(()=>{});
  useEffect(()=>{
@@ -57,5 +57,5 @@ export default function SSHTerminal({target,host,sessionId,onDisconnect,active=t
   return()=>{stopped=true;releaseTouchSelection();queue.stop();controller.abort();clearTimeout(timer);observer.disconnect();if(resizeFrame)cancelAnimationFrame(resizeFrame);input.dispose();terminal.dispose();terminalRef.current=null;fitRef.current=null;};
  },[id]);
  useEffect(()=>{if(active&&id){requestAnimationFrame(()=>{fitRef.current?.fit();terminalRef.current?.focus()})}},[active,id]);
- return <div ref={shellRef} className="ssh-shell">{!id?<SSHLogin target={target} host={host} onConnected={r=>setId(r.id)}/>:<><div className="shell-session-toolbar"><div className="shell-session-heading"><TerminalIcon size={21}/><span><b>{name||target}</b><small>{target} · SSH</small></span></div><div className="header-actions"><button className="btn secondary" onClick={async()=>{try{await copyTerminalSelection(terminalRef.current?.getSelection()||'')}catch(e:any){setError(e.message||'Unable to copy selection')}}}><Copy size={14}/> Copy</button><button className="btn secondary" onClick={async()=>{try{terminalRef.current?.paste(await navigator.clipboard.readText())}catch{setError('Clipboard access unavailable')}}}><ClipboardPaste size={14}/> Paste</button><button className="btn secondary" onClick={()=>terminalRef.current?.clear()}><Trash2 size={14}/> Clear</button><button className="icon-btn" aria-label="Fullscreen terminal" onClick={async()=>{try{await fullscreenTerminal(shellRef.current)}catch(e:any){setError(e.message||'Fullscreen unavailable')}}}><Maximize size={16}/></button><button className="btn secondary" onClick={()=>{setId('');onDisconnect?.()}}>Disconnect</button></div></div><div ref={ref} className="ssh-terminal"/></>}{error&&<p className="error">{error}</p>}</div>;
+ return <div ref={shellRef} className="ssh-shell">{!id?<SSHLogin target={target} host={host} onConnected={r=>setId(r.id)}/>:<><div className="shell-session-toolbar"><div className="shell-session-heading"><TerminalIcon size={21}/><span><b>{name||target}</b><small>{target} · SSH</small></span></div><div className="header-actions"><button className="icon-btn" aria-label="Fullscreen terminal" onClick={async()=>{try{await fullscreenTerminal(shellRef.current)}catch(e:any){setError(e.message||'Fullscreen unavailable')}}}><Maximize size={16}/></button><button className="btn secondary" onClick={()=>{setId('');onDisconnect?.()}}>Disconnect</button></div></div><div ref={ref} className="ssh-terminal"/></>}{error&&<p className="error">{error}</p>}</div>;
 }

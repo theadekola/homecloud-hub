@@ -1,2 +1,2 @@
-export function canAccessPage(path:string,role?:string){return ['/users','/tools/shell','/tools/sftp'].includes(path)?['admin','owner'].includes(role||''):path==='/audit'?['auditor','operator','admin','owner'].includes(role||''):true;}
+export function canAccessPage(path:string,role?:string){return ['/tools/shell','/tools/sftp'].includes(path)?['admin','owner'].includes(role||''):['/users','/audit'].includes(path)?['auditor','operator','admin','owner'].includes(role||''):true;}
 export function canToggleAccount(account:any,user:any){return ['admin','owner'].includes(user?.role)&&account.id!==(user?.sub||user?.id)&&account.role!=='owner'&&!(user.role==='admin'&&account.role==='admin');}

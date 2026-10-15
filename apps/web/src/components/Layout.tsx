@@ -3,7 +3,7 @@ import {applyAppearance} from '../appearance';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Boxes, Container, Database, Network, HardDriveDownload,
-  CalendarClock, History, RotateCcw, Activity, Bell, Sparkles, Users, ScrollText, Settings,
+  CalendarClock, History, RotateCcw, Activity, Bell, Sparkles, Users, Settings,
   Terminal, FolderOpen, Menu, X, Cloud, ChevronDown, LogOut
 } from 'lucide-react';
 import { useState,useEffect,useRef } from 'react';
@@ -17,7 +17,7 @@ const sections = [
   { title: 'DATA PROTECTION', items: [['Backups','/backups',HardDriveDownload]] },
   { title: 'MONITORING', items: [['Monitoring','/monitoring',Activity],['Alerts','/alerts',Bell],['AI Assistant','/ai',Sparkles]] },
   { title: 'TOOLS', items: [['Shell','/tools/shell',Terminal],['SFTP Files','/tools/sftp',FolderOpen]] },
-  { title: 'MANAGEMENT', items: [['Users','/users',Users],['Audit Logs','/audit',ScrollText],['Settings','/settings',Settings]] },
+  { title: 'MANAGEMENT', items: [['Users','/users',Users],['Settings','/settings',Settings]] },
 ];
 
 export default function Layout() {

@@ -39,7 +39,7 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
  const configured=()=>notificationChannels(env);
  const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
   failures:queue.filter(r=>!r.sentAt&&r.error).map(r=>({channel:r.channel,error:r.error,nextAttempt:r.nextAttempt})).slice(-20),
-  history:queue.slice(-200).map(r=>({id:r.id,channel:r.channel,event:r.event,createdAt:r.createdAt,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null})),
+  history:queue.slice(-200).map(r=>{const current=(persistence.get().alerts||[]).find(a=>a.id===r.alertId),alert=r.alert||current;return {id:r.id,channel:r.channel,event:r.event,alertId:r.alertId||null,createdAt:r.createdAt||null,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null,alert:alert?{title:alert.title||null,severity:alert.severity||null,source:alert.source||null,details:alert.details||null}:null,metadataSource:r.alert?'delivery-snapshot':current?'current-alert':null}}),
   lastSent:queue.filter(r=>r.sentAt).at(-1)?.sentAt||null};};
  async function deliver(alerts){
   if(inFlight)return inFlight;
@@ -51,7 +51,7 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
      if(!date||now()-Date.parse(date)>7*86400000)continue;
      for(const channel of channels){const key=`${alert.id}:${event}:${channel}`;
       if(!s.notificationQueue.some(r=>r.key===key)&&s.notificationQueue.filter(r=>!r.sentAt).length<1000)
-       s.notificationQueue.push({id:crypto.randomUUID(),key,channel,alertId:alert.id,event,text:textFor(alert,event),attempts:0,nextAttempt:now()});
+       s.notificationQueue.push({id:crypto.randomUUID(),key,channel,alertId:alert.id,event,createdAt:new Date(now()).toISOString(),alert:{title:alert.title,severity:alert.severity,source:alert.source,details:alert.details},text:textFor(alert,event),attempts:0,nextAttempt:now()});
      }
     }
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.

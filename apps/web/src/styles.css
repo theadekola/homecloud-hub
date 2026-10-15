@@ -1586,3 +1586,5 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .shell-console-active>.shell-tabs{overflow-y:hidden}
 .shell-console-active>.shell-active-view{overflow:hidden}
 .shell-console-active .ssh-terminal{overflow:hidden}
+
+.ssh-terminal .xterm-screen{-webkit-touch-callout:none}

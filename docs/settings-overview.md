@@ -91,3 +91,12 @@ optimization, index rebuilding and factory reset are not implemented as remote
 operations. System Backup exports only supported general settings; restore stages
 a validated settings file and still requires Save Changes. No credentials or full
 application data are included.
+
+
+## Security settings
+
+The Security tab follows the reference layout with Authentication, Access Control, Network Security, Active Sessions, Audit Logs, Security Status, Threat Protection and Danger Zone cards. It uses the shared Edit → Save Changes / Cancel workflow. Security policies are read-only deployment/runtime facts; editing does not enable unsupported authentication or network controls, and saving a supported settings draft never changes these policies.
+
+The authenticated, read-only `/api/security` endpoint reports token lifetime configuration, role names, password creation requirements and the same authentication rate-limit constants enforced by Express. It does not return token values, signing keys, credentials or account lists. Authentication endpoints share 20 requests per 15 minutes per IP; this is not a per-account lockout. Password creation requires at least 12 characters and at most 72 UTF-8 bytes without composition rules.
+
+Audit records load only when a permitted user requests them. The card previews five records from the existing latest-record API and provides the full audit-page link. Viewer accounts cannot request this preview; the backend continues enforcing auditor access. Failures are shown inline with a retryable load button. Current browser details come from the authenticated account and URL. Other devices, source IPs, last activity, session revocation, API keys, 2FA, firewall/Fail2Ban, intrusion detection and host security update management are not fabricated. HTTPS describes only the current URL scheme, not certificate validity or backend transport. Sign-out confirms its scope and clears this browser's tokens; it does not claim global revocation.

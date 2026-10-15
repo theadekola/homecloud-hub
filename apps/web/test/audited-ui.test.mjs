@@ -111,9 +111,9 @@ test('Compose filters replace hidden selection and power action targets the visi
  try{const select=page.container.querySelector('[aria-label="Stack status"]');await act(async()=>{select.value='Stopped';select.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.compose-details').textContent.includes('stopped-app'));assert.ok(!page.container.querySelector('.compose-details').textContent.includes('running-app'));await page.click(button(page.container,'Start'));assert.deepEqual(writes,['/docker/stack/b/start'])}finally{await page.close()}
 });
 
-test('Docker keeps only four resource tabs below each page summary',async()=>{
+test('Docker exposes all six resource tabs and preserves summary navigation',async()=>{
  const page=await mounted('pages/Docker.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/docker'?{host:{hostname:'fixture'},containers:[],images:[],volumes:[],networks:[],stacks:[]}:p==='/docker/hosts'?{hosts:[],directEnabled:true}:p==='/docker/volumes/usage'?{volumes:[]}:{nodes:[]});
- try{for(const [tab,selector] of [['Containers','.docker-stats'],['Images','.image-summary'],['Volumes','.volume-summary'],['Compose Stacks','.volume-summary']]){await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent===tab));assert.deepEqual([...page.container.querySelectorAll('[role=tab]')].map(b=>b.textContent),['Containers','Images','Volumes','Compose Stacks']);assert.ok(page.container.querySelector(selector).compareDocumentPosition(page.container.querySelector('[role=tablist]'))&4)}}finally{await page.close()}
+ try{for(const [tab,selector] of [['Containers','.docker-stats'],['Images','.image-summary'],['Volumes','.volume-summary'],['Compose Stacks','.volume-summary']]){await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent===tab));assert.deepEqual([...page.container.querySelectorAll('[role=tab]')].map(b=>b.textContent),['Containers','Images','Volumes','Networks','Compose Stacks','Events']);assert.ok(page.container.querySelector(selector).compareDocumentPosition(page.container.querySelector('[role=tablist]'))&4)}}finally{await page.close()}
 });
 
 test('Storage Pools skips offline history and filtering selects an online visible pool',async()=>{
@@ -137,8 +137,8 @@ test('Share protocol filters switch details and edit form to the visible share',
  try{const filter=page.container.querySelector('[aria-label="Share protocol"]');await act(async()=>{filter.value='NFS';filter.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.share-detail-card').textContent.includes('backup'));await page.click(button(page.container,'Edit Share'));assert.equal(page.container.querySelector('.modal input[name=path]').value,'/mnt/backup');assert.equal(page.container.querySelector('.modal input[name=networks]').value,'192.0.2.0/24')}finally{await page.close()}
 });
 
-test('Storage pages expose only five retained navigation sections',async()=>{
- for(const file of ['Storage','StorageDisks','StorageDatasets','StorageShares','StoragePerformance']){const page=await mounted('pages/'+file+'.tsx',{onTab(){}},async p=>p==='/auth/me'?{user:{role:'viewer'}}:{resources:[],pools:[],summary:{},services:[],series:[],snapshots:[],alerts:[],tasks:[],sources:[]});try{assert.deepEqual([...page.container.querySelectorAll('[role=tab]')].map(b=>b.textContent),['Storage Pools','Disks','Datasets / Volumes','Shares','Performance'])}finally{await page.close()}}
+test('Storage pages expose all six navigation sections including snapshots',async()=>{
+ for(const file of ['Storage','StorageDisks','StorageDatasets','StorageSnapshots','StorageShares','StoragePerformance']){const page=await mounted('pages/'+file+'.tsx',{onTab(){}},async p=>p==='/auth/me'?{user:{role:'viewer'}}:{resources:[],pools:[],summary:{},services:[],series:[],snapshots:[],alerts:[],tasks:[],sources:[]});try{assert.deepEqual([...page.container.querySelectorAll('[role=tab]')].map(b=>b.textContent),['Storage Pools','Disks','Datasets / Volumes','Snapshots','Shares','Performance'])}finally{await page.close()}}
 });
 
 test('Network map normalizes link state and inspects the selected actual interface',async()=>{

@@ -30,7 +30,7 @@ export default function ClusterNodes({navigation,data,metrics,tasks,network,hour
  const earliest=nodes.length&&nodes.every((n:any)=>n.status==='online'&&n.uptime!=null)?Math.min(...nodes.map((n:any)=>n.uptime)):null;
  const admin=['admin','owner'].includes(role||'');
  const perform=async(path:string)=>{setBusy(true);setError('');setMessage('');try{const response:any=await confirmedApi(path,{method:'POST',body:'{}'});setMessage(response.result?.message||response.message);await refresh();await detail.refresh();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
- const openConsole=()=>window.open(data.cluster.url,'_blank','noopener,noreferrer');
+ const openConsole=()=>{if(!node||!data?.cluster?.url)return;const url=new URL(data.cluster.url);url.hash=`v1:0:=node%2F${encodeURIComponent(node.name)}:4:=config`;window.open(url.toString(),'_blank','noopener,noreferrer');};
  const inspect=async(t:any,logs=false)=>{setError('');try{setTaskResult(await api(`/tasks/${encodeURIComponent(t.node)}/${encodeURIComponent(t.upid)}${logs?'/log':''}`));}catch(e:any){setError(e.message);}};
  const traces=(name:string,key:string)=>metrics.filter(m=>new Date(m.time).getTime()>Date.now()-Number(hours)*3600000).map(m=>({time:m.time,value:key==='storage'?usage((m.storage||[]).filter((s:any)=>s.node===name)):m.nodes?.find((n:any)=>n.name===name)?.[key]??null}));
  const servicePills=(name:string)=><div className="node-service-pills">{services.filter((s:any)=>s.node===name).slice(0,3).map((s:any)=><button key={s.id} onClick={()=>{chooseNode(name,'Services');}}><i className={s.status==='running'?'online':''}/>{s.name}</button>)}</div>;

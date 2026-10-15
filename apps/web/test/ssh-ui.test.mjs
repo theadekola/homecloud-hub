@@ -107,3 +107,33 @@ test('Alerts overview counts active conditions instead of stored history and exp
  try{await act(async()=>{await tick()});const aside=page.container.querySelector('aside');assert.ok(aside.textContent.includes('Active Alerts Overview'));assert.ok(aside.textContent.includes('Active host'));assert.ok(!aside.textContent.includes('Historical host'));assert.ok(!aside.textContent.includes('critical'));assert.equal(page.container.querySelector('.table-wrap[role=region]').tabIndex,0);assert.equal(page.container.querySelectorAll('tbody tr').length,1);await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Alert Rules'));assert.ok(page.container.querySelector('.alert-rules'));
  }finally{await page.close()}
 });
+
+test('SFTP failed navigation leaves current folder and history unchanged',async()=>{
+ const page=await mounted('components/SFTPBrowser.tsx',{sessionId:'fixture',name:'Fixture',active:true,onDisconnect(){}},async(p,o)=>{const b=JSON.parse(o.body);if(b.action==='list'&&b.path==='/denied')throw Error('Permission denied');return {path:'/',entries:[{name:'denied',directory:true,mode:0o040000,modified:1}]}});
+ try{await page.click([...page.container.querySelectorAll('.sftp-entry')].find(b=>b.textContent.includes('denied')));assert.equal(page.container.querySelector('[aria-label="Remote directory"]').value,'/');assert.equal(page.container.querySelector('[aria-label=Back]').disabled,true);assert.match(page.container.querySelector('[role=alert]').textContent,/Permission denied/);}finally{await page.close()}
+});
+test('Network Manage Device selects the requested Docker host before navigation',async()=>{
+ const page=await mounted('pages/NetworkDevices.tsx',{},async p=>p==='/docker/hosts'?{hosts:[{id:'agent:node',name:'Host A',node:'pve',online:true}]}:{nodes:[],guests:[],services:[]});
+ try{localStorage.setItem('homecloud_docker_host','other:node');const link=[...page.container.querySelectorAll('a')].find(a=>a.textContent.includes('Manage Device'));await page.click(link);assert.equal(localStorage.getItem('homecloud_docker_host'),'agent:node');}finally{await page.close()}
+});
+test('Network honours DNS tab deep links and tab clicks',async()=>{
+ const page=await mounted('pages/Network.tsx',{},async()=>({resolvers:[],interfaces:[],networks:[],services:[],connectors:[],nodes:[]}),true,false,['/network?tab=DNS']);
+ try{assert.ok(page.container.querySelector('.network-dns'));await page.click([...page.container.querySelectorAll('.tabs button')].find(b=>b.textContent==='Network Map'));assert.ok(page.container.querySelector('.network-map'));}finally{await page.close()}
+});
+test('shared dialogs trap keyboard focus, close with Escape and restore focus',async()=>{
+ let closed=0;const page=await mounted('components/UI.tsx',{open:false,title:'Fixture',onClose(){closed++},children:React.createElement('button',null,'Last control')},async()=>({}),true,false,['/'],'Modal');
+ try{const trigger=document.createElement('button');document.body.append(trigger);trigger.focus();await page.render({open:true,title:'Fixture',onClose(){closed++},children:React.createElement('button',null,'Last control')});const modal=page.container.querySelector('[role=dialog]'),first=modal.querySelector('button'),last=[...modal.querySelectorAll('button')].at(-1);assert.equal(document.activeElement,first);last.focus();await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true})));assert.equal(document.activeElement,first);await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true})));assert.equal(document.activeElement,last);await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));assert.equal(closed,1);await page.render({open:false,title:'Fixture',onClose(){}});assert.equal(document.activeElement,trigger);trigger.remove();}finally{await page.close()}
+});
+
+test('Docker Networks and Events tabs render their actual management components',async()=>{
+ const page=await mounted('pages/Docker.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/docker/hosts'?{hosts:[]}:p==='/node-agents'?{nodes:[]}:p.startsWith('/docker/events')?{events:[]}:{host:{hostname:'Fixture'},containers:[],images:[],volumes:[],networks:[],stacks:[]});
+ try{await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent==='Networks'));assert.ok(page.container.textContent.includes('Create Network'));await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent==='Events'));assert.ok(page.container.querySelector('.docker-events'));}finally{await page.close()}
+});
+test('Storage Snapshots tab renders snapshot management and supports returning to pools',async()=>{
+ const page=await mounted('pages/Storage.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/storage/snapshots'?{resources:[],targets:[],schedules:[]}:{pools:[],summary:{},tasks:[]});
+ try{await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent==='Snapshots'));assert.ok(page.container.querySelector('.storage-snapshots'));await page.click([...page.container.querySelectorAll('[role=tab]')].find(b=>b.textContent==='Storage Pools'));assert.ok(page.container.querySelector('.storage-pool-table'));}finally{await page.close()}
+});
+test('saved SSH authentication failures remain visible inside the login dialog',async()=>{
+ const page=await mounted('pages/Shell.tsx',{},async p=>{if(p==='/proxmox')return {nodes:[{name:'pve',ip:'192.0.2.10',status:'online'}],vms:[],lxc:[]};if(p==='/ssh/connections')return {};if(p==='/ssh/connect')throw Object.assign(Error('Check username and password'),{status:422});if(p==='/ssh/fingerprint')return {fingerprint:'SHA256:fixture'};return {};});
+ try{await page.click(page.container.querySelector('[aria-label="Connect to pve"]'));assert.match(page.container.querySelector('.modal [role=alert]').textContent,/Saved SSH connection failed.*username and password/);}finally{await page.close()}
+});

@@ -11,6 +11,8 @@ export function integer(value,name,min=1,max=999999999){const n=Number(value);if
 export function retention(value){
   if(typeof value!=='string'||!/^keep-(last|hourly|daily|weekly|monthly|yearly)=\d+(,keep-(last|hourly|daily|weekly|monthly|yearly)=\d+)*$/.test(value))throw httpError('Use a retention rule such as keep-last=7,keep-weekly=4');
   if(!value.split(',').some(pair=>Number(pair.split('=')[1])>0))throw httpError('Retention must keep at least one backup');
+  const keys=value.split(',').map(pair=>pair.split('=')[0]);
+  if(new Set(keys).size!==keys.length)throw httpError('Each retention interval can appear only once');
   return value;
 }
 export const pveWrite=(path,method,body)=>pve(path,{method,headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(Object.entries(body).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]))});
@@ -23,23 +25,24 @@ export async function createBackupJob(body){
   await pveWrite('/cluster/backup','POST',{id,node,storage,vmid:selection.vmid,comment:required(body.name,'Name'),schedule:required(body.schedule,'Proxmox calendar schedule'),enabled:1,mode:'snapshot',compress:'zstd',...(body.retention?{'prune-backups':retention(body.retention)}:{})});
   return {id};
 }
-export async function runBackupJob(id){
-  const job=await pve(`/cluster/backup/${encode(id)}`);
+export async function runBackupJob(id,{query=pve,write=pveWrite}={}){
+  const job=await query(`/cluster/backup/${encode(id)}`);
   if(!job.node)throw httpError('Choose a node-specific job to run from HomeCloud Hub; cluster-wide jobs run through the Proxmox scheduler');
   const options={};
-  for(const key of ['vmid','all','exclude','pool','storage','mode','compress','bwlimit','ionice','mailto','mailnotification'])if(job[key]!=null)options[key]=job[key];
+  for(const key of ['vmid','all','exclude','pool','storage','mode','compress','bwlimit','ionice','mailto','mailnotification','prune-backups','protected','notes-template','notification-mode','notification-target','fleecing','performance','pbs-change-detection-mode'])if(job[key]!=null)options[key]=job[key];
   if(!options.vmid&&!options.all&&!options.pool)throw httpError('Job has no guest selection');
-  return {node:job.node,task:await pveWrite(`/nodes/${encode(job.node)}/vzdump`,'POST',options)};
+  return {node:job.node,task:await write(`/nodes/${encode(job.node)}/vzdump`,'POST',options)};
 }
 export async function toggleBackupJob(id){const job=await pve(`/cluster/backup/${encode(id)}`);await pveWrite(`/cluster/backup/${encode(id)}`,'PUT',{enabled:job.enabled===0||job.enabled===false?1:0});}
-export async function backupArchives(){
-  const nodes=await pve('/nodes');const points=[],errors=[];
+export async function backupArchives(query=pve){
+  const nodes=await query('/nodes');const points=[],errors=[];let configs=[];
+  try{configs=await query('/storage');if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
   await Promise.all(nodes.filter(n=>n.status==='online').map(async n=>{
     let stores;
-    try{stores=await pve(`/nodes/${encode(n.node)}/storage?content=backup`)}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
+    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`)}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
     await Promise.all(stores.filter(s=>s.active).map(async store=>{
-      try{const files=await pve(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
-        for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});
+      try{const files=await query(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
+        for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,shared:(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===1||(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===true,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});
       }catch(e){errors.push(`${n.node}/${store.storage}: ${e.message}`);}
     }));
   }));

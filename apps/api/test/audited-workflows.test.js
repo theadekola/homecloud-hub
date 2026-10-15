@@ -67,3 +67,14 @@ test('CT template discovery is node-scoped, read-only and excludes unavailable s
  const calls=[];const result=await proxmoxCtTemplates('pve1',async(p,init)=>{calls.push({p,init});if(p.endsWith('/storage'))return [...stores,{storage:'offline',active:0,content:'vztmpl'}];return [{content:'vztmpl',volid:'local:vztmpl/debian.tar.zst'},{content:'backup',volid:'local:backup/other'}];});
  assert.deepEqual(result.templates,[{volid:'local:vztmpl/debian.tar.zst',name:'debian.tar.zst',storage:'local'}]);assert.equal(calls.length,2);assert.ok(calls.every(c=>!c.init&&c.p.startsWith('/nodes/pve1/')));
 });
+
+import {runBackupJob,backupArchives,retention} from '../src/infrastructure.js';
+test('Run Now preserves saved backup behaviour and omits scheduler metadata',async()=>{
+ const options={vmid:'101',storage:'backup',mode:'snapshot',compress:'zstd','prune-backups':'keep-last=7',protected:1,'notes-template':'{{guestname}}','notification-mode':'notification-system','notification-target':'admins',fleecing:'enabled=1,storage=disk',performance:'max-workers=2','pbs-change-detection-mode':'metadata',all:0};const calls=[];
+ const result=await runBackupJob('job',{query:async()=>({...options,node:'pve1',id:'job',schedule:'daily',enabled:1,comment:'Metadata'}),write:async(p,m,b)=>{calls.push({p,m,b});return 'UPID:fixture'}});assert.equal(result.task,'UPID:fixture');assert.deepEqual(calls,[{p:'/nodes/pve1/vzdump',m:'POST',b:options}]);
+});
+test('archive discovery reports verified sharing while preserving source identities',async()=>{
+ const query=async p=>p==='/nodes'?[{node:'pve1',status:'online'},{node:'pve2',status:'online'}]:p==='/storage'?[{storage:'backup',shared:1}]:p.endsWith('/storage?content=backup')?[{storage:'backup',active:1}]:[{volid:'backup:backup/fixture.vma.zst',subtype:'qemu',ctime:1700000000,size:100}];const result=await backupArchives(query);assert.equal(result.points.length,2);assert.ok(result.points.every(p=>p.shared));assert.notEqual(result.points[0].id,result.points[1].id);
+ const unknown=await backupArchives(async p=>{if(p==='/storage')throw Error('denied');return query(p)});assert.ok(unknown.points.every(p=>!p.shared));assert.match(unknown.errors[0],/sharing configuration/);
+});
+test('retention rejects conflicting and repeated intervals before a provider call',()=>{for(const rule of ['keep-last=1,keep-last=7','keep-last=7,keep-last=7'])assert.throws(()=>retention(rule),/only once/);assert.equal(retention('keep-last=7,keep-weekly=4'),'keep-last=7,keep-weekly=4');});

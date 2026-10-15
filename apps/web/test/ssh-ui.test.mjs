@@ -31,7 +31,7 @@ test('terminal preserves long paste order, reports unsupported controls and surv
   const text='a'.repeat(8191)+'😀'+'b'.repeat(9000);
   await act(async()=>{globalThis.__terminalInput(text);globalThis.__terminalInput('last');await tick();});
   const chunks=calls.filter(c=>c.init?.body).map(c=>JSON.parse(c.init.body).input).filter(x=>x!==undefined);assert.equal(chunks.join(''),text+'last');assert.ok(chunks.every(x=>x.length<=8192));
-  const buttons=[...page.container.querySelectorAll('button')];await page.click(buttons.find(b=>b.textContent.trim()==='Copy'));assert.ok(page.container.textContent.includes('Copy is unavailable'));await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.ok(page.container.textContent.includes('Fullscreen is unavailable'));
+  const buttons=[...page.container.querySelectorAll('.shell-session-toolbar button')];assert.ok(!buttons.some(b=>['Copy','Paste','Clear'].includes(b.textContent.trim())));await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.ok(page.container.textContent.includes('Fullscreen is unavailable'));
  }finally{await page.close();await tick();delete globalThis.__terminalInput;}
  assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);
 });

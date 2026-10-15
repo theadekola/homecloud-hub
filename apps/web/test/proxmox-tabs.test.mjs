@@ -111,3 +111,7 @@ test('creation pop-ups submit the displayed guest and networking options',async(
 test('operators retain unprivileged defaults and cannot choose HA or privileged CTs',async()=>{
  const page=await mounted('components/GuestCreateFields.tsx',{kind:'ct',node:'n1',role:'operator'},async()=>({pools:[],bridges:[],errors:[]}));try{assert.equal(page.container.querySelector('[name=addHa]').disabled,true);assert.equal(page.container.querySelector('[name=unprivileged]').value,'1');const checkbox=[...page.container.querySelectorAll('input[type=checkbox]')].find(e=>e.parentElement.textContent.includes('Unprivileged'));assert.equal(checkbox.checked,true);assert.equal(checkbox.disabled,true);}finally{await page.close();}
 });
+
+test('Backup Jobs has six cards and orders enabled upcoming schedules',async()=>{
+ const jobs=[{id:'late','next-run':200,enabled:1},{id:'disabled','next-run':50,enabled:0},{id:'early','next-run':100,enabled:1}];const page=await mounted('pages/ProxmoxBackups.tsx',{role:'viewer',hours:'24',onTasks(){},onStorage(){}},async p=>p==='/backups'?{points:[],jobs,errors:[]}:p==='/proxmox/storage'?{resources:[],errors:[]}:p==='/proxmox'?{nodes:[],vms:[],lxc:[]}:{tasks:[],errors:[]});try{assert.equal(page.container.querySelectorAll('.backup-stats>.card').length,6);const upcoming=[...page.container.querySelectorAll('.backup-side>.card')].find(c=>c.querySelector('h3')?.textContent==='Upcoming Backups');assert.deepEqual([...upcoming.querySelectorAll('.backup-target b')].map(b=>b.textContent),['early','late']);}finally{await page.close();}
+});

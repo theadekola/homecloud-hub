@@ -77,4 +77,8 @@ try{
   const c=await client();let calls=0;globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
   await assert.rejects(c.confirmedApi('/docker/volume/data',{method:'DELETE'}),/cancelled/);assert.equal(calls,1);
  });
+ await test('temporary account-service failures retain both access and refresh tokens',async()=>{
+  const c=await client();c.setTokens('old','refresh');globalThis.fetch=async url=>url.endsWith('/auth/refresh')?response(503,{error:'Account service temporarily unavailable'}):response(401);
+  await assert.rejects(c.api('/auth/me'),{status:503});assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('homecloud_refresh_token'),'refresh');
+ });
 }finally{Object.assign(globalThis,original);}

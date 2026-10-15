@@ -6,7 +6,7 @@ export default function PairConnector({kind,onPaired}:{kind:'proxmox'|'docker';o
  const navigate=useNavigate(),secure=window.location.protocol==='https:',origin=window.location.origin;
  const [name,setName]=useState(''),[pairing,setPairing]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const standalone=kind==='docker';
- const command=`curl --fail --show-error --proto '=https' '${origin}/api/${standalone?'docker-agent':'node-agent'}/install' -o /tmp/homecloud-connector-install.sh &&\n${standalone?'sudo ':''}bash /tmp/homecloud-connector-install.sh`;
+ const command=`curl --fail --show-error --proto '=https' '${origin}/api/${standalone?'docker-agent':'node-agent'}/install' -o /tmp/homecloud-connector-install.sh &&\n${standalone?"if [ \"$(id -u)\" -eq 0 ]; then bash /tmp/homecloud-connector-install.sh; else sudo bash /tmp/homecloud-connector-install.sh; fi":'bash /tmp/homecloud-connector-install.sh'}`;
  const generate=async(e:any)=>{e.preventDefault();setBusy(true);setError('');setMessage('');setPairing(null);try{setPairing(await api('/node-agents/pairing',{method:'POST',body:JSON.stringify({kind,name})}));}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  const copy=async(value:string)=>{try{await navigator.clipboard.writeText(value);setMessage('Copied.')}catch{setMessage('Select the text and copy it manually.')}};
  const verify=async()=>{setBusy(true);setError('');setMessage('');try{

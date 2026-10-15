@@ -59,4 +59,38 @@ class AgentTests(unittest.TestCase):
    with patch.object(agent,'run',return_value=json.dumps([{'ifname':'nic0','ifindex':2,'operstate':'DOWN','addr_info':[]}])):
     row=agent.collect_network(str(root),str(root/'absent-boot'))['interfaces'][0]
    self.assertIsNone(row['speed']);self.assertIsNone(row['rxBytes']);self.assertEqual(row['speedReason'],'link-down')
+ def test_poll_sends_completed_results_before_request_and_preserves_them_on_failure(self):
+  completed=agent.queue.Queue();completed.put({'id':'done','status':200,'body':'e30='});reads=agent.queue.Queue();writes=agent.queue.Queue();ready=agent.threading.Event()
+  with patch.object(agent,'post',return_value={'jobs':[]}) as post,patch.object(agent.time,'sleep'),patch.object(ready,'wait'):
+   agent.poll_once({},reads,writes,completed,ready)
+   self.assertEqual(post.call_args.args[2]['results'][0]['id'],'done')
+  completed.put({'id':'retry','status':200,'body':'e30='})
+  with patch.object(agent,'post',side_effect=RuntimeError('offline')):
+   with self.assertRaises(RuntimeError):agent.poll_once({},reads,writes,completed,ready)
+  self.assertEqual(completed.get_nowait()['id'],'retry')
+ def test_expired_work_does_not_execute_and_read_deadline_reaches_curl(self):
+  job={'id':'read','operation':'docker','host':'node','path':'/info','method':'GET','body':'','expiresAt':agent.time.time()*1000-1}
+  with patch.object(agent,'docker_request') as read:
+   self.assertIn('expired',agent.execute_job(job)['error']);read.assert_not_called()
+   job['expiresAt']=agent.time.time()*1000+5000;read.return_value={'status':200,'body':'e30='};self.assertEqual(agent.execute_job(job)['status'],200);self.assertLessEqual(read.call_args.kwargs['timeout'],5)
+  self.assertFalse(agent.read_job({**job,'method':'POST'}));self.assertFalse(agent.read_job({**job,'path':'/events?since=1'}));self.assertFalse(agent.read_job({**job,'operation':'setup'}))
+ def test_installation_does_not_block_reads_and_writes_remain_serial(self):
+  import threading
+  started,release,read_done,second=threading.Event(),threading.Event(),threading.Event(),threading.Event()
+  def execute(job):
+   if job['id']=='install':started.set();release.wait(2)
+   elif job['id']=='read':read_done.set()
+   else:second.set()
+   return {'id':job['id'],'status':200,'body':'e30='}
+  with patch.object(agent,'execute_job',side_effect=execute):
+   reads,writes,completed,ready=agent.start_workers()
+   writes.put({'id':'install'});self.assertTrue(started.wait(1));writes.put({'id':'write'});reads.put({'id':'read'})
+   try:self.assertTrue(read_done.wait(1));self.assertFalse(second.is_set())
+   finally:release.set();writes.join();reads.join()
+   self.assertTrue(second.is_set())
+ def test_busy_queue_rejects_work_without_executing_and_poll_rate_is_bounded(self):
+  reads,writes,completed,ready=agent.queue.Queue(maxsize=1),agent.queue.Queue(),agent.queue.Queue(),agent.threading.Event();reads.put({'id':'existing'})
+  with patch.object(agent,'post',return_value={'jobs':[{'id':'new','operation':'docker','method':'GET','path':'/info'}]}),patch.object(agent.time,'sleep') as sleep:
+   agent.poll_once({},reads,writes,completed,ready)
+   self.assertIn('busy',completed.get_nowait()['error']);self.assertEqual(reads.get_nowait()['id'],'existing');self.assertGreater(sleep.call_args.args[0],.5)
 if __name__=='__main__':unittest.main()

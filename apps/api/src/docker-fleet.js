@@ -11,14 +11,26 @@ export function createDockerFleet({hosts=agentHosts,read=dockerSnapshot,nodes=()
    else cache.delete(id);
   }
   const selected=reported.filter(h=>h.online||h.status==='connected'||cache.has(h.id)),results=[];
-  for(let i=0;i<selected.length;i+=2)await Promise.all(selected.slice(i,i+2).map(async h=>{
+  const readHost=async h=>{
    const row={id:h.id,node:h.node,name:h.name,status:'error',sampledAt:new Date(now()).toISOString()};
    if(!h.online){results.push({...row,error:'Docker host or its node agent is offline',lastSeen:cache.get(h.id)?.sampledAt||null});return;}
    const started=now();
    try{const data=await agentContext.run({host:h.id},()=>read({timeoutMs:30000}));
     const measured={...row,status:data.errors?.length?'partial':'reachable',error:data.errors?.length?data.errors.join('; '):undefined,response:now()-started,inventory:data};cache.set(h.id,measured);results.push(measured);
    }catch{results.push({...row,response:now()-started,error:'Docker inventory unavailable; inspect the selected host and node agent',lastSeen:cache.get(h.id)?.sampledAt||null});}
-  }));
+  };
+  // Rolling, bounded work: a slow host does not hold the next host behind its
+  // batch, and one paired node cannot consume every slot.
+  await new Promise(resolve=>{
+   const pending=[...selected],perNode=new Map();let active=0;
+   const pump=()=>{
+    while(active<4){const index=pending.findIndex(h=>(perNode.get(h.agent||h.node||h.id)||0)<2);if(index<0)break;
+     const [host]=pending.splice(index,1),key=host.agent||host.node||host.id;active++;perNode.set(key,(perNode.get(key)||0)+1);
+     Promise.resolve().then(()=>readHost(host)).finally(()=>{active--;perNode.set(key,perNode.get(key)-1);pump();});
+    }
+    if(!pending.length&&!active)resolve();
+   };pump();
+  });
   return {hosts:results.sort((a,b)=>a.id.localeCompare(b.id))};
  };
 }

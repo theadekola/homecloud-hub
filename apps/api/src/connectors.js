@@ -1,3 +1,5 @@
+import {createGuestFilesystemReader} from './guest-filesystem-cache.js';
+import {createHash} from 'node:crypto';
 import {guestNetwork,ctExtra,guestGeneral,allocateGuestId} from './guest-create-options.js';
 import {assertGuestPlacement} from './ssh-target.js';
 import {validateBackupSelection} from './backup-validation.js';
@@ -45,6 +47,7 @@ export async function pve(path, init={}, config=clusterConfig()){
 const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]));
 
 export function proxmoxConfigured(){const c=clusterConfig();return !!(c.url&&c.tokenId&&c.tokenSecret)}
+const readGuestFilesystems=createGuestFilesystemReader(guestFilesystemUsage);
 export async function proxmoxSnapshot(){
   const resources=await pve('/cluster/resources');
   const errors=[],nodeServices=[];
@@ -74,9 +77,9 @@ export async function proxmoxSnapshot(){
     }));
   }));
   const percent=(used,total)=>typeof used==='number'&&typeof total==='number'&&total>0?Math.round(used/total*100):null;
-  const vmFilesystems=new Map();
   const running=resources.filter(r=>r.type==='qemu'&&r.status==='running');
-  for(let offset=0;offset<running.length;offset+=4)await Promise.all(running.slice(offset,offset+4).map(async r=>{try{const response=await pve(`/nodes/${encodeURIComponent(r.node)}/qemu/${encodeURIComponent(r.vmid)}/agent/get-fsinfo`);vmFilesystems.set(String(r.vmid),guestFilesystemUsage(response));}catch{}}));
+  const identity=createHash('sha256').update(JSON.stringify(clusterConfig())).digest('hex');
+  const vmFilesystems=await readGuestFilesystems(running,pve,identity);
   const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.used??null):(r.disk??null),diskTotal:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.total??null):(r.maxdisk??null),diskFree:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.free??null):null,diskCapacity:r.maxdisk??null,diskPercent:type==='qemu'?percent(vmFilesystems.get(String(r.vmid))?.used,vmFilesystems.get(String(r.vmid))?.total):percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
   let clusterStatus=[];
   try{clusterStatus=await pve('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}

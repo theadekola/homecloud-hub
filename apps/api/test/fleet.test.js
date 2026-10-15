@@ -56,3 +56,9 @@ test('cached measurements remain available while a provider refresh is blocked',
  release();await refreshing;
  assert.notEqual(await monitor.sample(),first);
 });
+
+test('fleet errors identify timeouts and Engine authorization without leaking provider response bodies',async()=>{
+ let message='Node agent request timed out';const fleet=createDockerFleet({hosts:()=>[{id:'a',online:true}],read:async()=>{throw Error(message)}});
+ assert.match((await fleet()).hosts[0].error,/timed out/);message='Docker HTTP 403: secret-provider-body';const denied=(await fleet()).hosts[0].error;assert.match(denied,/Docker HTTP 403/);assert.doesNotMatch(denied,/secret-provider-body/);
+ message='arbitrary secret';assert.doesNotMatch((await fleet()).hosts[0].error,/arbitrary secret/);
+});

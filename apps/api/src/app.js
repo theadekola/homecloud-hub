@@ -1,3 +1,4 @@
+import {connectionHealth} from './connection-health.js';
 import {createReadCache} from './read-cache.js';
 import {resolveActionApproval} from './action-approval.js';
 import {updateShellPresence} from './ssh-idle.js';
@@ -82,6 +83,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
+ app.get('/api/connections/health',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');if(req.query.refresh==='1')void monitor.sample(true).catch(()=>{});const snapshot=await monitor.sample();res.json(connectionHealth({snapshot,cluster:publicCluster(clusterConfig()),direct:publicDocker(),nodes:agentNodes(),refreshing:!!monitor.isRefreshing?.()}));});
  app.get('/api/connections/docker/verify',authorize('owner'),async(req,res)=>{const config=dockerConfig();if(!config.url)return res.json({configured:false,status:'not-configured',message:'No direct Docker endpoint is configured. Paired-node connections do not require one.'});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();res.json({configured:true,status:'reachable',host:{hostname:info.Name,version:info.ServerVersion}});}catch{res.json({configured:true,status:'error',message:'Direct Engine verification failed. Check endpoint reachability, TLS trust and client certificates. No settings were changed.'});}});
  app.get('/api/docker/hosts/:id/verify',authorize('viewer'),async(req,res)=>{const info=await agentContext.run({host:req.params.id},async()=>{const response=await agentRequest('/info');if(!response.ok)throw httpError('Selected Docker host verification failed',502);return response.json();});if(!info.ServerVersion)throw httpError('Selected host did not report a Docker Engine version',502);res.json({id:req.params.id,host:{hostname:info.Name,version:info.ServerVersion}});});
  app.get('/api/connections/docker',authorize('owner'),(req,res)=>res.json({connection:publicDocker()}));

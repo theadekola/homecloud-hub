@@ -55,3 +55,6 @@ export async function refreshResources(prefixes:string[]){
  window.dispatchEvent(new CustomEvent('homecloud-resource-refresh',{detail}));
  await Promise.all(detail.requests);
 }
+
+// Clears only in-memory API reads, preserving credentials and browser preferences.
+export function clearApiCache(){clear();}

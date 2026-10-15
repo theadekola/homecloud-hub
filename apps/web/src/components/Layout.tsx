@@ -22,7 +22,9 @@ const sections = [
 
 export default function Layout() {
   useEffect(()=>{applyAppearance();},[]);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(()=>localStorage.getItem('homecloud_sidebar')==='collapsed');
+  useEffect(()=>{const changed=()=>setCollapsed(localStorage.getItem('homecloud_sidebar')==='collapsed');window.addEventListener('homecloud-sidebar',changed);return()=>window.removeEventListener('homecloud-sidebar',changed);},[]);
+  useEffect(()=>{localStorage.setItem('homecloud_sidebar',collapsed?'collapsed':'expanded');},[collapsed]);
   const [mobile, setMobile] = useState(()=>window.matchMedia('(max-width: 800px)').matches);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef=useRef<HTMLElement>(null);

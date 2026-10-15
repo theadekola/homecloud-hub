@@ -28,3 +28,7 @@ test('partial startup polling completes without forcing another backend scan',as
  const requests=[];const page=await harness(async(p,o)=>{requests.push(o);return requests.length===1?{value:'Partial',refreshing:true}:{value:'Complete',refreshing:false}});
  try{await page.render([['a','/dashboard']]);await act(async()=>{await new Promise(r=>setTimeout(r,1100))});assert.equal(requests.length,2);assert.equal(requests[1].headers,undefined);assert.equal(page.container.querySelector('span').textContent,'Complete');await act(async()=>{await new Promise(r=>setTimeout(r,1100))});assert.equal(requests.length,2);}finally{await page.close()}
 });
+
+test('clearing the browser read cache revalidates mounted views without clearing credentials or host selection',async()=>{
+ let calls=0;const page=await harness(async()=>({value:`Read ${++calls}`}));try{await page.render([['a','/settings']]);const token=localStorage.getItem('homecloud_access_token'),host=localStorage.getItem('homecloud_docker_host');await act(async()=>{page.hooks.clearApiCache();await tick()});assert.equal(calls,2);assert.equal(page.container.querySelector('span').textContent,'Read 2');assert.equal(localStorage.getItem('homecloud_access_token'),token);assert.equal(localStorage.getItem('homecloud_docker_host'),host);}finally{await page.close()}
+});

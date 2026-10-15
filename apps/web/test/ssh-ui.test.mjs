@@ -100,3 +100,10 @@ test('SSH login failures stay visible beside the submit control and allow retry'
  try{await act(async()=>{await new Promise(r=>setTimeout(r,300))});const form=page.container.querySelector('form');form.querySelector('[name=username]').value='ubuntu';form.querySelector('[name=password]').value='fixture-secret';await act(async()=>{form.dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick()});const error=form.querySelector('[role=alert]');assert.match(error.textContent,/Check the username and password/);assert.ok(form.querySelector('.ssh-connection-top').compareDocumentPosition(error)&page.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);assert.ok(error.compareDocumentPosition(form.querySelector('.ssh-connection-fields'))&page.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);assert.equal(form.querySelector('button.btn').disabled,false);assert.ok(form.textContent.includes('sudo account'));
  }finally{await page.close()}
 });
+
+test('Alerts overview counts active conditions instead of stored history and exposes scrollable tables',async()=>{
+ const alerts=[{id:'active',title:'Current condition',severity:'warning',status:'active',source:'Active host',triggered:new Date().toISOString()},{id:'old',title:'Old condition',severity:'critical',status:'resolved',source:'Historical host',triggered:new Date().toISOString()}];
+ const page=await mounted('pages/Alerts.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:{alerts,rules:[]});
+ try{await act(async()=>{await tick()});const aside=page.container.querySelector('aside');assert.ok(aside.textContent.includes('Active Alerts Overview'));assert.ok(aside.textContent.includes('Active host'));assert.ok(!aside.textContent.includes('Historical host'));assert.ok(!aside.textContent.includes('critical'));assert.equal(page.container.querySelector('.table-wrap[role=region]').tabIndex,0);assert.equal(page.container.querySelectorAll('tbody tr').length,1);await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Alert Rules'));assert.ok(page.container.querySelector('.alert-rules'));
+ }finally{await page.close()}
+});

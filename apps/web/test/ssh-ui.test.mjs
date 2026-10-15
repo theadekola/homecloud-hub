@@ -104,7 +104,19 @@ test('SSH login failures stay visible beside the submit control and allow retry'
 test('Alerts overview counts active conditions instead of stored history and exposes scrollable tables',async()=>{
  const alerts=[{id:'active',title:'Current condition',severity:'warning',status:'active',source:'Active host',triggered:new Date().toISOString()},{id:'old',title:'Old condition',severity:'critical',status:'resolved',source:'Historical host',triggered:new Date().toISOString()}];
  const page=await mounted('pages/Alerts.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:{alerts,rules:[]});
- try{await act(async()=>{await tick()});const aside=page.container.querySelector('aside');assert.ok(aside.textContent.includes('Active Alerts Overview'));assert.ok(aside.textContent.includes('Active host'));assert.ok(!aside.textContent.includes('Historical host'));assert.ok(!aside.textContent.includes('critical'));assert.equal(page.container.querySelector('.table-wrap[role=region]').tabIndex,0);assert.equal(page.container.querySelectorAll('tbody tr').length,1);await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Alert Rules'));assert.ok(page.container.querySelector('.alert-rules'));
+ try{await act(async()=>{await tick()});const aside=page.container.querySelector('.active-alert-side');
+  assert.ok([...aside.querySelectorAll('h3')].some(h=>h.textContent==='Alerts Overview'));
+  assert.equal(aside.querySelector('[aria-label="Alert overview period"]').value,'active');
+  assert.equal(aside.querySelector('.active-alert-ring strong').firstChild.textContent,'1');
+  const legend=[...aside.querySelectorAll('.active-alert-legend button')];
+  assert.equal(legend.find(b=>b.querySelector('span').textContent==='Warning').querySelector('b').firstChild.textContent.trim(),'1');
+  assert.equal(legend.find(b=>b.querySelector('span').textContent==='Critical').querySelector('b').firstChild.textContent.trim(),'0');
+  const sources=aside.querySelector('.active-alert-source-bars');
+  assert.equal(sources.querySelectorAll('button').length,1);
+  assert.equal(sources.querySelector('span').textContent,'Active host');
+  assert.equal(sources.querySelector('strong').textContent,'1');
+  assert.ok(!sources.textContent.includes('Historical host'));
+  assert.equal(page.container.querySelector('.table-wrap[role=region]').tabIndex,0);assert.equal(page.container.querySelectorAll('tbody tr').length,1);await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Alert Rules'));assert.ok(page.container.querySelector('.alert-rules'));
  }finally{await page.close()}
 });
 

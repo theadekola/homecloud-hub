@@ -34,19 +34,26 @@ export async function sendNotification(channel,text,{env=process.env,fetcher=fet
  if(!response.ok)throw Error('Notification service rejected delivery');
  if(channel==='telegram'&&(await response.json()).ok!==true)throw Error('Telegram rejected delivery');
 }
+export const defaultNotificationPreferences=()=>({enabled:true,channels:{discord:true,telegram:true,email:true},minimumSeverity:'info',notifyResolved:true});
+export function notificationPreferences(state){const d=defaultNotificationPreferences(),p=state.notificationPreferences||{};return {...d,...p,channels:{...d.channels,...p.channels}};}
+export function validateNotificationPreferences(input){
+ if(!input||typeof input.enabled!=='boolean'||typeof input.notifyResolved!=='boolean'||!['info','warning','critical'].includes(input.minimumSeverity)||!input.channels||['discord','telegram','email'].some(c=>typeof input.channels[c]!=='boolean')||Object.keys(input).some(k=>!['enabled','notifyResolved','minimumSeverity','channels'].includes(k))||Object.keys(input.channels).some(k=>!['discord','telegram','email'].includes(k)))throw Object.assign(Error('Choose valid notification delivery preferences'),{status:400});
+ return {enabled:input.enabled,channels:{discord:input.channels.discord,telegram:input.channels.telegram,email:input.channels.email},minimumSeverity:input.minimumSeverity,notifyResolved:input.notifyResolved};
+}
 export function createNotifier({persistence={get,mutate},env=process.env,send=sendNotification,now=()=>Date.now()}={}){
  let inFlight=null;
  const configured=()=>notificationChannels(env);
- const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
+ const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),preferences:notificationPreferences(persistence.get()),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
   failures:queue.filter(r=>!r.sentAt&&r.error).map(r=>({channel:r.channel,error:r.error,nextAttempt:r.nextAttempt})).slice(-20),
   history:queue.slice(-200).map(r=>{const current=(persistence.get().alerts||[]).find(a=>a.id===r.alertId),alert=r.alert||current;return {id:r.id,channel:r.channel,event:r.event,alertId:r.alertId||null,createdAt:r.createdAt||null,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null,alert:alert?{title:alert.title||null,severity:alert.severity||null,source:alert.source||null,details:alert.details||null}:null,metadataSource:r.alert?'delivery-snapshot':current?'current-alert':null}}),
   lastSent:queue.filter(r=>r.sentAt).at(-1)?.sentAt||null};};
  async function deliver(alerts){
   if(inFlight)return inFlight;
   inFlight=(async()=>{
-   const channels=configured();if(!channels.length)return;
+   const preferences=notificationPreferences(persistence.get()),channels=configured().filter(c=>preferences.channels[c]);if(!preferences.enabled||!channels.length)return;
+   const eligible=alert=>alert.status==='resolved'?preferences.notifyResolved:({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
    persistence.mutate(s=>{s.notificationQueue??=[];
-    for(const alert of alerts){if(!['active','acknowledged','resolved'].includes(alert.status))continue;
+    for(const alert of alerts){if(!['active','acknowledged','resolved'].includes(alert.status)||!eligible(alert))continue;
      const event=alert.status==='resolved'?'resolved':'active',date=event==='resolved'?alert.resolvedAt:alert.triggered;
      if(!date||now()-Date.parse(date)>7*86400000)continue;
      for(const channel of channels){const key=`${alert.id}:${event}:${channel}`;
@@ -57,7 +64,7 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.
     const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId));
    });
-   const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
+   const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&(r.event==='resolved'?preferences.notifyResolved:eligible(r.alert||(alerts.find(a=>a.id===r.alertId)||{})))&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
    for(const item of pending){let error=null;try{await send(item.channel,item.text,{env});}catch{error=`${item.channel} delivery failed. Check its server configuration and service availability.`;}
     persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.attempts++;
      if(error){row.error=error;row.nextAttempt=now()+Math.min(3600000,30000*2**Math.min(row.attempts-1,7));}

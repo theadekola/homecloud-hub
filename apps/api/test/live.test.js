@@ -1,4 +1,5 @@
-import {issueGrant} from '../src/ssh-access.js';
+import {resolveActionApproval} from '../src/action-approval.js';
+import {issueGrant,approvalTargetForPath} from '../src/ssh-access.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -83,15 +84,29 @@ const noData={sampledAt:new Date().toISOString(),services:[{name:'docker',provid
 const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'user',email:'owner@test',name:'Test',role:req.headers['x-test-role']||'owner'};next();},authorize:requireRole,audit:async(...args)=>audit.push(args),monitor:{sample:async()=>structuredClone(noData),invalidate:()=>{}},db:{query:async()=>({rows:[],rowCount:0})}});
 const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
 const url=`http://127.0.0.1:${server.address().port}`;
-async function call(endpoint,method='GET',body,headers={}){if(headers['X-HomeCloud-Confirm']&&(/^\/proxmox\/node\//.test(endpoint)||/^\/actions\/proxmox\//.test(endpoint)))headers={...headers,'X-HomeCloud-SSH-Grant':issueGrant('user',method,endpoint,body)};const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
+async function call(endpoint,method='GET',body,headers={}){if(headers['X-HomeCloud-Confirm']){const approval=await resolveActionApproval(endpoint,body,method);const legacy=/^\/proxmox\/node\//.test(endpoint)?`node:${endpoint.split('/')[3]}`:null;if(approval||legacy)headers={...headers,'X-HomeCloud-SSH-Grant':issueGrant('user',method,endpoint,body,approval?.scope||legacy)};}const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 try{
  await test('guest installation requires owner and confirmation bound to the guest payload',async()=>{
   const endpoint='/node-agents/guest/setup',body={host:'fixture:lxc/131'};
   assert.equal((await call(endpoint,'POST',body,{'x-test-role':'viewer'})).status,403);
-  const challenge=await call(endpoint,'POST',body);assert.equal(challenge.status,409);
-  assert.equal((await call(endpoint,'POST',{host:'fixture:lxc/132'},{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase})).status,409);
-  assert.equal((await call(endpoint,'POST',body,{'X-HomeCloud-Confirm':challenge.body.confirmationPhrase})).status,503);
+  const challenge=await call(endpoint,'POST',body);assert.equal(challenge.status,404);assert.equal(challenge.body.confirmationPhrase,undefined);
+  assert.equal((await call(endpoint,'POST',{host:'fixture:lxc/132'})).status,404);
+  assert.equal((await call(endpoint,'POST',body)).status,404);
   assert.equal((await call('/node-agent/setup-script','POST',{})).status,401);
+ });
+ await test('guest setup requires a guest-bound password grant before delivering a setup job',async()=>{
+  const pairing=await call('/node-agents/pairing','POST',{}),paired=await call('/node-agent/pair','POST',{code:pairing.body.code,name:'pve'}),agentHeaders={Authorization:'Bearer '+paired.body.token};
+  const report={version:3,hosts:[{id:'qemu/101',name:'actual-guest',setup:true,status:'setup_available',online:false}],results:[]};
+  try{await call('/node-agent/poll','POST',report,agentHeaders);const endpoint='/node-agents/guest/setup',body={host:paired.body.id+':qemu/101'};
+   assert.equal((await call(endpoint,'POST',body,{'x-test-role':'operator'})).status,403);
+   const challenge=await call(endpoint,'POST',body);assert.equal(challenge.status,409);assert.equal(challenge.body.sshTarget,'vm:pve:101');
+   assert.equal((await call(endpoint,'POST',body,{'x-homecloud-confirm':challenge.body.confirmationPhrase})).status,428);
+   assert.equal((await call('/ssh/connect','POST',{mode:'authorize',path:endpoint,method:'POST',body,target:'node:pve',host:'attacker',username:'root',password:'not accepted',fingerprint:'fake'})).status,403);
+   const grant=issueGrant('user','POST',endpoint,body,'vm:pve:101'),pending=call(endpoint,'POST',body,{'x-homecloud-confirm':challenge.body.confirmationPhrase,'X-HomeCloud-SSH-Grant':grant});
+   let job;for(let attempt=0;attempt<20&&!job;attempt++){await new Promise(r=>setTimeout(r,5));job=(await call('/node-agent/poll','POST',report,agentHeaders)).body.jobs[0];}assert.ok(job);assert.equal(job.operation,'setup');assert.equal(job.host,'qemu/101');
+   await call('/node-agent/poll','POST',{...report,results:[{id:job.id,status:200,body:Buffer.from(JSON.stringify({message:'fixture setup complete'})).toString('base64')}]},agentHeaders);
+   assert.equal((await pending).status,200);assert.equal((await call(endpoint,'POST',body,{'x-homecloud-confirm':challenge.body.confirmationPhrase,'X-HomeCloud-SSH-Grant':grant})).status,428);
+  }finally{await call('/node-agents/'+paired.body.id,'DELETE')}
  });
  await test('node pairing requires owner, public polling requires agent credentials, and revoked agents stop authenticating',async()=>{
   assert.equal((await call('/node-agents/pairing','POST',{}, {'x-test-role':'viewer'})).status,403);

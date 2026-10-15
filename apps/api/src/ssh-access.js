@@ -1,3 +1,5 @@
+import {approvalTargetForPath,resolveActionApproval} from './action-approval.js';
+export {approvalTargetForPath} from './action-approval.js';
 import {shellExpired} from './ssh-idle.js';
 import {StringDecoder} from 'node:string_decoder';
 import path from 'node:path';
@@ -15,17 +17,19 @@ export function actionTarget(req){
  if(req.params.provider==='proxmox'&&['vm','lxc'].includes(req.params.resourceType))return `node:${req.body.node}`;
  return null;
 }
-export function approvalTargetForPath(path,body={}){
- if(typeof path!=='string')return null;
- const node=path.match(/^\/proxmox\/node\/([^/]+)\/(?:power\/(?:reboot|shutdown)|service\/[^/]+\/(?:start|stop|restart))$/);
- if(node)return `node:${decodeURIComponent(node[1])}`;
- const guest=path.match(/^\/actions\/proxmox\/(?:vm|lxc)\/\d+\/(?:start|stop|shutdown|reboot|reset|suspend|resume|snapshot|delete-snapshot|clone|delete)$/);
- if(guest&&typeof body.node==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(body.node))return `node:${body.node}`;
- return null;
+const binding=(user,method,path,body,scope)=>crypto.createHash('sha256').update(JSON.stringify([user,method,path,body,scope])).digest('hex');
+export function issueGrant(user,method,path,body,scope=approvalTargetForPath(path,body,method)||''){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{binding:binding(user,method,path,body,scope),expires:Date.now()+60000});return token;}
+export function consumeGrant(token,user,method,path,body,scope=approvalTargetForPath(path,body,method)||''){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body,scope);}
+export async function verifyApprovalPrivilege(client,password){
+ const probe=(command,stdin)=>new Promise((resolve,reject)=>{
+  let output='',settled=false;const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value)};
+  const timer=setTimeout(()=>{client.end();finish(failure('SSH permission verification timed out',422))},12000);
+  client.exec(command,(error,stream)=>{if(error)return finish(failure('SSH permission verification failed',422));stream.on('data',chunk=>{output=(output+chunk.toString()).slice(-256)});stream.stderr?.on('data',()=>{});stream.on('error',()=>finish(failure('SSH permission verification failed',422)));stream.on('close',code=>finish(null,code===0?output.trim():''));stream.end(stdin||'');});
+ });
+ if(await probe('/usr/bin/id -u')==='0')return;
+ if(typeof password!=='string'||password.length>2048||/[\r\n]/.test(password))throw failure('Enter a valid fresh SSH and sudo password');
+ if(await probe("/usr/bin/sudo -k -S -p '' -- /usr/bin/id -u",password+'\n')!=='0')throw failure('Protected actions require root or verified sudo access on this target',403);
 }
-const binding=(user,method,path,body)=>crypto.createHash('sha256').update(JSON.stringify([user,method,path,body])).digest('hex');
-export function issueGrant(user,method,path,body){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{binding:binding(user,method,path,body),expires:Date.now()+60000});return token;}
-export function consumeGrant(token,user,method,path,body){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body);}
 export async function connectSSH(input,user){
  if(input.mode==='authorize'&&(input.saved||input.useSavedPassword))throw failure('Action approval requires a freshly entered target password',403);
  if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:input.mode==='sftp'?'sftp':'shell'};}
@@ -37,8 +41,8 @@ export async function connectSSH(input,user){
  const client=new Client();let fingerprint='';
  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',e=>{client.end();reject(fingerprint&&input.fingerprint!==fingerprint?Object.assign(failure('Verify the target SSH host fingerprint before connecting',409),{fingerprint}):failure('SSH authentication or connection failed: '+e.message,422))});client.connect({host:input.host,port,username:input.username,password:input.password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>{fingerprint='SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'');return input.fingerprint===fingerprint;}})});
  if(input.mode==='authorize'){
-  try{const uid=await new Promise((resolve,reject)=>client.exec('id -u',(err,stream)=>{if(err)return reject(err);let text='';stream.on('data',d=>text+=d);stream.on('close',()=>resolve(text.trim()));}));if(uid!=='0')throw failure('Protected actions require the target root account',403);
-   const expected=approvalTargetForPath(input.path,input.body);if(!expected||input.method!=='POST')throw failure('Invalid action path');if(expected!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body)};
+  try{await verifyApprovalPrivilege(client,input.password);
+   const approval=await resolveActionApproval(input.path,input.body,input.method,{dockerHost:input.dockerHost});if(!approval)throw failure('Invalid action path');if(approval.target!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body,approval.scope)};
   }finally{client.end();}
  }
  let stream;try{stream=await new Promise((resolve,reject)=>input.mode==='sftp'?client.sftp((e,s)=>e?reject(e):resolve(s)):client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));}catch(e){client.end();throw e;}

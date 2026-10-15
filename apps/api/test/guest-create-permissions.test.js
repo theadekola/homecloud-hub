@@ -7,6 +7,6 @@ test('creation options and privileged/HA operations preserve role and confirmati
  try{assert.equal((await call('/proxmox/create-options/n1','viewer')).status,403);assert.equal((await call('/proxmox/creation/unknown/ha','operator',{})).status,403);
  const ct={name:'fixture',node:'n1',ostemplate:'local:vztmpl/os.tar.zst',storage:'local',password:'fixture-secret-password',unprivileged:'0'};assert.equal((await call('/proxmox/ct','operator',ct)).status,403);
  const challenge=await call('/proxmox/ct','owner',ct);assert.equal(challenge.status,409);assert.ok(challenge.body.confirmationPhrase);assert.ok(!JSON.stringify(challenge.body).includes(ct.password));
- assert.equal((await call('/proxmox/vm','operator',{name:'fixture',node:'n1',storage:'local',addHa:'1'})).status,403);const ha=await call('/proxmox/creation/unknown/ha','owner',{});assert.equal(ha.status,409);assert.ok(ha.body.confirmationPhrase);
+ assert.equal((await call('/proxmox/vm','operator',{name:'fixture',node:'n1',storage:'local',addHa:'1'})).status,403);const ha=await call('/proxmox/creation/unknown/ha','owner',{});assert.equal(ha.status,503);assert.equal(ha.body.confirmationPhrase,undefined);
  }finally{await new Promise(r=>server.close(r));fs.rmSync(process.env.DATA_DIR,{recursive:true,force:true});}
 });

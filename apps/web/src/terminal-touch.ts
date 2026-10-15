@@ -1,25 +1,55 @@
 import type {Terminal} from '@xterm/xterm';
+import {copyTerminalSelection} from './ssh-transfer';
 
-// Use xterm's buffer coordinates and selection API so Copy reads the highlight.
-export function attachTerminalTouchSelection(element:HTMLElement,terminal:Terminal,onSelected:()=>void=()=>{}){
+export function attachTerminalTouchSelection(element:HTMLElement,terminal:Terminal){
  let timer:ReturnType<typeof setTimeout>|undefined;
- let start:{x:number;y:number;id:number}|undefined,anchor:{column:number;row:number}|undefined;
- let selecting=false;
+ let start:{x:number;y:number;id:number}|undefined;
+ let selecting=false,first=0,last=0,anchor=0,edge:''|'start'|'end'='',offsetX=0,offsetY=0;
+ const overlay=document.createElement('div');overlay.className='terminal-selection';overlay.hidden=true;
+ const menu=document.createElement('div');menu.className='terminal-selection-menu';menu.setAttribute('role','toolbar');menu.setAttribute('aria-label','Selected terminal text');
+ const button=(label:string,action:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',action);menu.append(b);return b;};
+ const copy=button('Copy',()=>{void copyTerminalSelection(terminal.getSelection()).then(()=>{copy.textContent='Copied';}).catch(()=>{copy.textContent='Copy unavailable';});});
+ button('Select All',()=>{terminal.selectAll();first=0;last=terminal.buffer.active.length*terminal.cols-1;position();});
+ button('Done',()=>{terminal.clearSelection();overlay.hidden=true;});
+ const handle=(name:string)=>{const b=document.createElement('button');b.type='button';b.className=`terminal-selection-handle ${name}`;b.dataset.selectionHandle=name;b.setAttribute('aria-label',`Drag selection ${name}`);overlay.append(b);return b;};
+ const leftHandle=handle('start'),rightHandle=handle('end');overlay.append(menu);element.append(overlay);
  const clear=()=>{clearTimeout(timer);timer=undefined;};
+ const geometry=()=>{const screen=element.querySelector('.xterm-screen');if(!screen)return;const rect=screen.getBoundingClientRect();if(!rect.width||!rect.height)return;return {rect,width:rect.width/terminal.cols,height:rect.height/terminal.rows};};
  const cellAt=(x:number,y:number)=>{
-  const screen=element.querySelector('.xterm-screen');if(!screen)return;
-  const rect=screen.getBoundingClientRect();if(!rect.width||!rect.height)return;
-  return {column:Math.max(0,Math.min(terminal.cols-1,Math.floor((x-rect.left)*terminal.cols/rect.width))),row:terminal.buffer.active.viewportY+Math.max(0,Math.min(terminal.rows-1,Math.floor((y-rect.top)*terminal.rows/rect.height)))};
+  const g=geometry();if(!g)return;
+  return {column:Math.max(0,Math.min(terminal.cols-1,Math.floor((x-g.rect.left)/g.width))),row:terminal.buffer.active.viewportY+Math.max(0,Math.min(terminal.rows-1,Math.floor((y-g.rect.top)/g.height)))};
  };
+ function position(){
+  if(overlay.hidden)return;const g=geometry();if(!g)return;
+  const bounds=element.getBoundingClientRect(),view=terminal.buffer.active.viewportY;
+  const place=(b:HTMLElement,index:number,end:boolean)=>{
+   const row=Math.floor(index/terminal.cols)-view,column=index%terminal.cols;
+   b.hidden=row<0||row>=terminal.rows;
+   b.style.left=`${g.rect.left-bounds.left+(column+(end?1:0))*g.width}px`;
+   const y=g.rect.top-bounds.top+(row+(end?1:0))*g.height;
+   b.style.top=`${end?Math.min(bounds.height-18,y):Math.max(18,y)}px`;
+  };
+  place(leftHandle,first,false);place(rightHandle,last,true);
+  const row=Math.max(0,Math.min(terminal.rows-1,Math.floor(first/terminal.cols)-view));
+  menu.style.top=`${Math.max(4,g.rect.top-bounds.top+row*g.height-48)}px`;
+ }
+ const select=()=>{terminal.select(first%terminal.cols,Math.floor(first/terminal.cols),last-first+1);overlay.hidden=false;copy.textContent='Copy';position();};
  const begin=(event:TouchEvent)=>{
-  clear();start=undefined;anchor=undefined;selecting=false;
+  clear();start=undefined;edge='';selecting=false;
+  const target=event.target as HTMLElement;
+  if(target.closest('.terminal-selection-menu'))return;
   if(event.touches.length!==1)return;
   const touch=event.touches[0];start={x:touch.clientX,y:touch.clientY,id:touch.identifier};
+  const grabbed=target.closest<HTMLElement>('[data-selection-handle]');
+  if(grabbed&&!overlay.hidden){
+   edge=grabbed.dataset.selectionHandle as 'start'|'end';selecting=true;
+   const g=geometry();if(g){const index=edge==='start'?first:last;offsetX=touch.clientX-(g.rect.left+(index%terminal.cols+.5)*g.width);offsetY=touch.clientY-(g.rect.top+(Math.floor(index/terminal.cols)-terminal.buffer.active.viewportY+.5)*g.height);}
+   event.preventDefault();event.stopImmediatePropagation();return;
+  }
+  overlay.hidden=true;
   timer=setTimeout(()=>{
-   if(!start)return;
-   const cell=cellAt(start.x,start.y);if(!cell)return;
+   if(!start)return;const cell=cellAt(start.x,start.y);if(!cell)return;
    const line=terminal.buffer.active.getLine(cell.row);if(!line)return;
-   // Wide characters occupy a leading cell plus an empty continuation cell.
    let left=cell.column,right=cell.column;
    if(line.getCell(left)?.getWidth()===0&&left>0)left--;
    const text=(column:number)=>line.getCell(column)?.getChars()||' ';
@@ -27,29 +57,36 @@ export function attachTerminalTouchSelection(element:HTMLElement,terminal:Termin
     while(left>0&&(line.getCell(left-1)?.getWidth()===0||text(left-1).trim()))left--;
     while(right+1<terminal.cols&&(line.getCell(right+1)?.getWidth()===0||text(right+1).trim()))right++;
    }
-   anchor={column:left,row:cell.row};selecting=true;terminal.blur();
-   terminal.select(left,cell.row,right-left+1);onSelected();
-  },3000);
+   first=cell.row*terminal.cols+left;last=cell.row*terminal.cols+right;anchor=first;
+   selecting=true;terminal.blur();select();
+  },1000);
  };
  const move=(event:TouchEvent)=>{
   if(!start)return;
-  if(event.touches.length!==1){clear();start=undefined;selecting=false;return;}
+  if(event.touches.length!==1){cancel();return;}
   const touch=Array.from(event.touches).find(t=>t.identifier===start!.id);if(!touch)return;
   if(!selecting){if(Math.hypot(touch.clientX-start.x,touch.clientY-start.y)>10){clear();start=undefined;}return;}
   event.preventDefault();event.stopImmediatePropagation();
-  const cell=cellAt(touch.clientX,touch.clientY);if(!cell||!anchor)return;
-  const a=anchor.row*terminal.cols+anchor.column,b=cell.row*terminal.cols+cell.column;
-  const first=Math.min(a,b);terminal.select(first%terminal.cols,Math.floor(first/terminal.cols),Math.abs(b-a)+1);
+  const g=geometry();if(g&&(touch.clientY<g.rect.top||touch.clientY>g.rect.bottom))terminal.scrollLines(touch.clientY<g.rect.top?-1:1);
+  const cell=cellAt(touch.clientX-(edge?offsetX:0),touch.clientY-(edge?offsetY:0));if(!cell)return;
+  const index=cell.row*terminal.cols+cell.column;
+  if(edge==='start')first=Math.min(index,last);
+  else if(edge==='end')last=Math.max(index,first);
+  else{first=Math.min(anchor,index);last=Math.max(anchor,index);}
+  select();
  };
- const end=(event:TouchEvent)=>{clear();if(selecting){event.preventDefault();event.stopImmediatePropagation();}start=undefined;selecting=false;};
- const cancel=()=>{clear();start=undefined;selecting=false;};
- const menu=(event:Event)=>{if(start||selecting)event.preventDefault();};
- element.addEventListener('touchstart',begin,{capture:true,passive:true});
+ const end=(event:TouchEvent)=>{clear();if(selecting){event.preventDefault();event.stopImmediatePropagation();}start=undefined;selecting=false;edge='';};
+ function cancel(){clear();start=undefined;selecting=false;edge='';}
+ const scroll=()=>{if(!selecting)cancel();position();};
+ const menuEvent=(event:Event)=>{if(start||selecting)event.preventDefault();};
+ const selection=terminal.onSelectionChange?.(()=>{if(!terminal.hasSelection())overlay.hidden=true;});
+ const render=terminal.onRender?.(()=>position());
+ element.addEventListener('touchstart',begin,{capture:true,passive:false});
  element.addEventListener('touchmove',move,{capture:true,passive:false});
  element.addEventListener('touchend',end,{capture:true,passive:false});
  element.addEventListener('touchcancel',cancel,true);
- element.addEventListener('contextmenu',menu);
- element.addEventListener('scroll',cancel,true);
+ element.addEventListener('contextmenu',menuEvent);
+ element.addEventListener('scroll',scroll,true);
  document.addEventListener('visibilitychange',cancel);
- return ()=>{cancel();element.removeEventListener('touchstart',begin,true);element.removeEventListener('touchmove',move,true);element.removeEventListener('touchend',end,true);element.removeEventListener('touchcancel',cancel,true);element.removeEventListener('contextmenu',menu);element.removeEventListener('scroll',cancel,true);document.removeEventListener('visibilitychange',cancel);};
+ return ()=>{cancel();selection?.dispose();render?.dispose();overlay.remove();element.removeEventListener('touchstart',begin,true);element.removeEventListener('touchmove',move,true);element.removeEventListener('touchend',end,true);element.removeEventListener('touchcancel',cancel,true);element.removeEventListener('contextmenu',menuEvent);element.removeEventListener('scroll',scroll,true);document.removeEventListener('visibilitychange',cancel);};
 }

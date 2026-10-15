@@ -1,0 +1,178 @@
+/* Shared sizing comes after the page themes. Keep metric dimensions here so
+   page-specific colors and charts can change without changing the card scale. */
+:root {
+  --space-panel: 16px;
+  --space-grid: 12px;
+  --metric-height: 144px;
+  --metric-icon: 44px;
+  --metric-glyph: 22px;
+  --metric-value: 24px;
+}
+:root[data-density="compact"] { --space-panel: 12px; --metric-height: 128px; --metric-icon: 40px; --metric-value: 22px; }
+.brand-icon { flex-shrink: 0; }
+.brand b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.content { font-size: 14px; line-height: 1.5; }
+.content > *, .content .card { min-width: 0; }
+.content .pve-heading { flex-wrap: wrap; align-items: flex-start; }
+.content .pve-heading > div:first-child { flex: 1 1 360px; min-width: 0; }
+.content .pve-heading-actions { flex-wrap: wrap; min-width: 0; }
+.content :is(.cluster-nodes, .vm-manager) { grid-template-columns: minmax(0, 1fr); }
+.content :is(.cluster-nodes, .vm-manager) > * { min-width: 0; }
+.content.content :is(.page-header, .volume-header, .vm-heading) { gap: 12px; flex-wrap: wrap; }
+.content.content :is(.page-header, .volume-header, .vm-heading) > div { min-width: 0; }
+.content.content :is(.page-header h1, .page-header h2, .volume-header h2, .vm-heading h2, .vm-title h2, .nodes-title h2, .overview-toolbar h1, .pve-heading h1) {
+  font-size: clamp(22px, 2vw, 26px); line-height: 1.25; letter-spacing: -.025em;
+}
+.content.content .page-header p { font-size: 13px; line-height: 1.5; }
+.content.content :is(.card > h3, .widget-title h3, .widget-heading h3, .section-title h3) {
+  font-size: 16px; line-height: 1.4;
+}
+.content .header-actions { flex-wrap: wrap; min-width: 0; }
+.content :is(.btn, .tab) { font-size: 13px; line-height: 1.4; min-height: 36px; }
+.content .btn { padding: 8px 12px; gap: 7px; }
+.content :is(.btn, .icon-btn) > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.content :is(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+  max-width: 100%; min-width: 0;
+}
+.content .table-wrap { max-width: 100%; overflow-x: auto; }
+.content .table-wrap :is(td, th) { font-size: 12px; line-height: 1.5; }
+.content .table-wrap th { font-size: 11px; }
+.content .table-wrap .badge { font-size: 11px; white-space: nowrap; }
+.content .card .tabs { min-width: 0; }
+.content .overview-v2 .resource-tile { min-height: 0; }
+.content.content :is(.report-unified, .destination-unified) .card :is(small, .muted) {
+  font-size: 11px; line-height: 1.5;
+}
+.content.content .report-unified :is(.report-chart-key button, .report-legend button, .report-builder-list b, .report-storage-list > button) {
+  font-size: 12px;
+}
+.content.content .report-unified .report-middle > .card {
+  height: auto; min-height: 220px; overflow: visible;
+}
+.content.content .report-unified :is(.report-source-note, .report-pagination small, .report-pagination span) { font-size: 11px; }
+
+/* These explicit classes identify metric collections, never detail panels or
+   chart legends. auto-fill keeps a three-card tab at the same scale as six
+   cards on another tab, and responds to sidebar width as well as viewport. */
+.content .metric-grid.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+  gap: var(--space-grid);
+  min-width: 0;
+}
+.content .metric-grid.metric-grid > * {
+  display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+  gap: 12px; min-width: 0; min-height: var(--metric-height);
+  height: auto; max-height: none; grid-column: auto;
+  /* Older page themes used !important for these two properties. */
+  padding: var(--space-panel) !important;
+  border-radius: 12px; text-align: left;
+  overflow: visible; container-type: inline-size;
+}
+.content .metric-grid.metric-grid > :last-child { grid-column: auto; }
+.content .metric-grid.metric-grid > * > :is(div, span):not(:has(> svg)) {
+  min-width: 0; flex: 1; order: 0;
+}
+.content .metric-grid.metric-grid :is(div, span):has(> strong) {
+  display: block; min-width: 0; overflow-wrap: anywhere;
+}
+.content .metric-grid.metric-grid :is(strong, .stat-value) {
+  display: block; font-size: clamp(18px, 11cqi, var(--metric-value)) !important; line-height: 1.2;
+  font-weight: 700; letter-spacing: -.025em; margin: 6px 0;
+  min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+}
+.content .metric-grid.metric-grid :is(small, .small) {
+  display: block; font-size: 12px; line-height: 1.45;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.content .metric-grid.metric-grid :is(small, .small) ~ :is(small, .small),
+.content .metric-grid.metric-grid strong + :is(small, span),
+.content .metric-grid.metric-grid .stat-value + .small {
+  font-size: 11px; line-height: 1.45;
+}
+.content .metric-grid.metric-grid .overview-stat > div > span { font-size: 12px; }
+
+/* No flex shrinking: equal width and height prevent oval icon backgrounds.
+   Direct SVG variants include their padding inside the same 44px footprint. */
+.content .metric-grid.metric-grid :is([class$="-icon"], i):has(> svg),
+.content .metric-grid.metric-grid > * > span:has(> svg),
+.content .metric-grid.metric-grid .performance-stat-content > span {
+  display: grid; place-items: center; order: 1;
+  width: var(--metric-icon); height: var(--metric-icon);
+  min-width: var(--metric-icon); min-height: var(--metric-icon);
+  flex: 0 0 var(--metric-icon); padding: 0; border-radius: 12px;
+}
+.content .metric-grid.metric-grid :is([class$="-icon"], i, span) > svg {
+  width: var(--metric-glyph); height: var(--metric-glyph); padding: 0;
+}
+.content .metric-grid.metric-grid > * > svg {
+  display: block; order: 1; box-sizing: border-box;
+  width: var(--metric-icon); height: var(--metric-icon);
+  flex: 0 0 var(--metric-icon); padding: 11px;
+  border-radius: 12px; background: #3985ff20; color: #68a4ff;
+}
+.content .metric-grid.metric-grid > .card:has(> button:only-child) { padding: 0 !important; }
+.content .metric-grid.metric-grid > .card > button:only-child {
+  min-width: 0; width: 100%; height: 100%; padding: var(--space-panel);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border-radius: inherit;
+}
+.content .metric-grid.metric-grid > .card > button:only-child > span:not(:has(> svg)) {
+  flex: 1; min-width: 0;
+}
+.content .metric-grid.metric-grid.performance-stats > .card {
+  flex-direction: column; align-items: stretch; gap: 8px;
+}
+.content .metric-grid .performance-stat-content { display: flex; width: 100%; gap: 12px; }
+.content .metric-grid .performance-stat-content > div { flex: 1; min-width: 0; }
+.content .metric-grid.performance-stats > .card > .recharts-responsive-container { flex: none; }
+
+@media (min-width: 801px) and (max-width: 1200px) {
+  .content .pve-page .pve-resource-summary .pve-storage-list button {
+    grid-template-columns: 9px minmax(0, 1fr) !important;
+  }
+  .content .pve-page .pve-resource-summary .pve-storage-list button b {
+    grid-column: 2; min-width: 0; white-space: normal; overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 800px) {
+  :root { --space-panel: 14px; --space-grid: 10px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
+  :root[data-density="compact"] { --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
+  .content { padding: 16px; }
+  .content .metric-grid.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .content .metric-grid.metric-grid > *,
+  .content .metric-grid.metric-grid > .card > button:only-child {
+    display: block; position: relative;
+  }
+  .content .metric-grid.metric-grid :is([class$="-icon"], i):has(> svg),
+  .content .metric-grid.metric-grid > * > span:has(> svg),
+  .content .metric-grid.metric-grid > * > svg,
+  .content .metric-grid.metric-grid .performance-stat-content > span {
+    position: absolute; top: var(--space-panel); right: var(--space-panel);
+  }
+  .content .metric-grid.metric-grid > * > svg { padding: 8px; }
+  .content .metric-grid.metric-grid :is(div, span):has(> strong) > :first-child,
+  .content .metric-grid.metric-grid .stat > div:first-child > :first-child {
+    padding-right: calc(var(--metric-icon) + 8px); min-height: var(--metric-icon);
+  }
+  .content .metric-grid.metric-grid :is(strong, .stat-value) {
+    font-size: var(--metric-value) !important; overflow-wrap: break-word;
+  }
+  .content.content :is(.btn, .tab, .icon-btn) { min-height: 44px; }
+  .content.content .icon-btn { min-width: 44px; }
+  .content.content :is(input:not([type=checkbox]):not([type=radio]):not(.xterm-helper-textarea), select, textarea:not(.xterm-helper-textarea)) {
+    font-size: 16px; min-height: 44px;
+  }
+  .content.content .header-actions { width: 100%; }
+  .content.content .header-actions > * { max-width: 100%; }
+  .content .modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
+}
+@media (max-width: 380px) {
+  .content .metric-grid.metric-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (pointer: coarse) {
+  .content :is(.btn, .tab, .icon-btn) { min-height: 44px; }
+}

@@ -51,7 +51,7 @@ export default function ProxmoxOverview({management}:{management:(view:string)=>
 
  {(live.error||failure)&&<p className="login-error" role="alert">{failure||live.error}</p>}
  {!!errors.length&&<details className="pve-errors"><summary>{errors.length} unavailable API readings{permissionErrors?' — Proxmox permissions need attention':''}</summary>{permissionErrors&&<p>In Proxmox → Datacenter → Permissions, grant PVEAuditor at / with Propagate enabled to both the user and its privilege-separated API token. This provides read access. Management actions require their own additional privileges.</p>}<ul>{errors.map((e:string)=><li key={e}>{e}</li>)}</ul></details>}
- {view==='Overview'?<><div className="pve-stats">{[
+ {view==='Overview'?<><div className="pve-stats metric-grid">{[
  ['Total Nodes',inventoryComplete(data,live.error)?nodes.length:'Unknown',`${online} Online`,Server,'Nodes'],['Total VMs',inventoryComplete(data,live.error)?vms.length:'Unknown',`${vms.filter((v:any)=>v.status==='running').length} Running`,Monitor,'Virtual Machines'],['Total LXC',inventoryComplete(data,live.error)?lxc.length:'Unknown',`${lxc.filter((v:any)=>v.status==='running').length} Running`,Box,'LXC Containers'],['Total CPU',cpuUsed==null?'Unknown':cpuUsed.toFixed(1),totalCores==null?'Core capacity unknown':`of ${totalCores} cores in use`,Cpu,'Nodes'],['Total Memory',bytes(usedMemory),`of ${bytes(totalMemory)}`,MemoryStick,'Nodes'],['Total Storage',bytes(usedStorage),'Per-node entries; shared pools may repeat',HardDrive,'Storage']
  ].map(([label,value,sub,Icon,target]:any)=><button className="pve-stat" key={label} onClick={()=>setView(target)}><div><small>{label}</small><strong>{value}</strong><span>{sub}</span></div><i><Icon size={25}/></i></button>)}</div>
  {navigation}

@@ -29,15 +29,15 @@ async function call(endpoint,method='GET',body={},headers={}){
  return {status:res.status,body:await res.json()};
 }
 try{
- await test('every destructive Docker endpoint binds confirmation to its selected host',async()=>{
+ await test('destructive Docker endpoints reject unknown selected hosts without offering unrelated approval',async()=>{
   for(const [endpoint,method] of [['/docker/volume/data','DELETE'],['/docker/network/net','DELETE'],
    ['/docker/image/image','DELETE'],['/docker/prune/volumes','POST'],['/docker/stack/app/stop','POST'],
    ['/actions/docker/container/app/stop','POST']]){
    const a=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-a:lxc/101'});
    const b=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-b:lxc/101'});
-   assert.equal(a.status,409);assert.equal(b.status,409);assert.notEqual(a.body.confirmationPhrase,b.body.confirmationPhrase);
-   const replay=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-b:lxc/101','X-HomeCloud-Confirm':a.body.confirmationPhrase});
-   assert.equal(replay.status,409);
+   assert.equal(a.status,404);assert.equal(b.status,404);assert.match(a.body.error,/Selected Docker host/);assert.equal(a.body.confirmationPhrase,undefined);
+   const replay=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-b:lxc/101','X-HomeCloud-Confirm':'unrelated confirmation'});
+   assert.equal(replay.status,404);
   }
  });
  await test('global monitoring clears request host context without changing selected-host actions',async()=>{

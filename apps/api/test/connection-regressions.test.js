@@ -67,7 +67,7 @@ try{
   const wrong=await call('/auth/login','POST',{email:'owner@test',password:password.trim()});assert.equal(wrong.status,401);
  });
  await test('user creation stores normalized names and emails',async()=>{
-  assert.equal((await call('/users','POST',{email:'  PERSON@Test  ',name:'  Person  ',password:'a-long-password'})).status,200);
-  assert.equal(createdArgs[0],'person@test');assert.equal(createdArgs[1],'Person');
+  assert.equal((await call('/users','POST',{email:'  PERSON@Test.local  ',name:'  Person  ',password:'a-long-password'})).status,200);
+  assert.equal(createdArgs[0],'person@test.local');assert.equal(createdArgs[1],'Person');
  });
 }finally{await new Promise(resolve=>server.close(resolve));fs.rmSync(process.env.DATA_DIR,{recursive:true,force:true});}

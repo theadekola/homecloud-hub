@@ -42,13 +42,16 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const app=express();
  if(process.env.TRUST_PROXY)app.set('trust proxy',Number(process.env.TRUST_PROXY)||1);
  app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'2mb'}));
- app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false}));
+ app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false,skip:req=>{if(req.path!=='/api/node-agent/poll')return false;try{req.nodeAgent=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));return true;}catch{return false;}}}));
+ const agentPollLimiter=rateLimit({windowMs:60000,limit:120,standardHeaders:true,legacyHeaders:false,keyGenerator:req=>req.nodeAgent.id});
+
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
  app.get('/api/node-agent/download',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/homecloud-node-agent.py',import.meta.url))));
  app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
  app.get('/api/docker-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-docker-agent.sh',import.meta.url))));
  app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name,req.body.kind)));
- app.post('/api/node-agent/poll',(req,res)=>{const node=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json(pollAgent(node,req.body));});
+ app.post('/api/node-agent/poll',(req,res,next)=>{req.nodeAgent=req.nodeAgent||authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));next();},agentPollLimiter,(req,res)=>res.json(pollAgent(req.nodeAgent,req.body)));
+
  app.post('/api/node-agent/setup-script',(req,res)=>{authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json({script:readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')});});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
  app.post('/api/auth/register',loginLimiter,async(req,res)=>{
@@ -62,7 +65,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);
    res.json({user:{id:user.id,email:user.email,name:user.name,role:user.role},...await issueTokens(user)});
  });
- app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch{res.status(401).json({error:'Refresh token rejected'});}});
+ app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch(e){res.status(e.status===503?503:401).json({error:e.status===503?e.message:'Refresh token rejected'});}});
+
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
  app.use('/api',authenticate);
  app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
@@ -331,7 +335,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/users',async()=>({users:(await db.query(`SELECT id,name,email,role,status,two_factor_enabled AS "twoFactor",last_login AS "lastLogin",created_at AS "createdAt" FROM users ORDER BY created_at`)).rows}),'admin');
  action('post','/users','admin','user.create',async req=>{
    const {email,name,password,role='viewer'}=req.body;if(!roles[role]||(role==='owner'&&req.user.role!=='owner')||roles[role]>roles[req.user.role])throw httpError('Role cannot be granted',403);
-   const normalizedEmail=required(email,'Email').toLowerCase(),normalizedName=required(name,'Name');if(typeof password!=='string'||password.length<12)throw httpError('Password must have at least 12 characters');
+   const normalizedEmail=required(email,'Email').toLowerCase(),normalizedName=required(name,'Name');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)||normalizedEmail.length>254)throw httpError('Enter a valid email address');if(normalizedName.length>200)throw httpError('Name must be at most 200 characters');if(typeof password!=='string'||password.length<12||Buffer.byteLength(password)>72)throw httpError('Password must have at least 12 characters and at most 72 bytes');
+
    const hash=await bcrypt.hash(password,12);try{return (await db.query(`INSERT INTO users(email,name,password_hash,role,status) VALUES($1,$2,$3,$4,'active') RETURNING id,email,name,role,status`,[normalizedEmail,normalizedName,hash,role])).rows[0];}catch(e){if(e.code==='23505')throw httpError('Email already exists',409);throw e;}
  });
  action('post','/users/:id/toggle','admin','user.toggle',async req=>{

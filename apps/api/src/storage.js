@@ -4,12 +4,16 @@ import {required,httpError,pveWrite,encode} from './infrastructure.js';
 export async function storageInventory(query=pve){
  const errors=[],resources=[],readNodes=[];
  const nodes=await query('/nodes');if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];
- try{configs=await query('/storage');}catch(e){errors.push(`Storage configuration: ${e.message}`);}
+ try{configs=await query('/storage');if(!Array.isArray(configs))throw new Error('Invalid storage configuration response');}catch(e){configs=[];errors.push(`Storage configuration: ${e.message}`);}
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
   try{const entries=await query(`/nodes/${encode(node.node)}/storage`);
    if(!Array.isArray(entries))throw new Error('Invalid node storage response');
    for(const row of entries){const config=configs.find(c=>c.storage===row.storage)||{};
-    resources.push({id:`${node.node}/${row.storage}`,name:row.storage,node:node.node,type:row.type||config.type||'Unknown',shared:row.shared==null?(config.shared==null?null:Boolean(config.shared)):Boolean(row.shared),status:row.enabled===0?'disabled':row.active===1?'online':row.active===0?'offline':'unknown',capacity:row.total??null,used:row.used??null,available:row.avail??null,usage:row.total>0&&typeof row.used==='number'?row.used/row.total*100:null,content:row.content||config.content||null});
+    const flag=value=>[true,1,'1'].includes(value)?true:[false,0,'0'].includes(value)?false:null;
+    const capacity=Number.isFinite(row.total)&&row.total>0?row.total:null;
+    const reading=value=>capacity!==null&&Number.isFinite(value)&&value>=0&&value<=capacity?value:null;
+    const used=reading(row.used),available=reading(row.avail),enabled=flag(row.enabled),active=flag(row.active);
+    resources.push({id:`${node.node}/${row.storage}`,name:row.storage,node:node.node,type:row.type||config.type||'Unknown',shared:flag(row.shared??config.shared),status:enabled===false||flag(config.disable)===true?'disabled':active===true?'online':active===false?'offline':'unknown',capacity,used,available,usage:capacity!==null&&used!==null?used/capacity*100:null,content:row.content||config.content||null,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
    }
    readNodes.push(node.node);
   }catch(e){errors.push(`${node.node} storage: ${e.message}`);}

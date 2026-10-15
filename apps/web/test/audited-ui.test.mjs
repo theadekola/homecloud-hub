@@ -438,3 +438,37 @@ test('Retention viewer can read policy rules without private audit reads or clea
 test('Retention cleanup execution stays disabled when the provider has no explicit removals',async()=>{
  const calls=[],base=retentionObjectApi(calls);const page=await mounted('pages/Retention.tsx',{},async(p,init)=>p.startsWith('/retention/preview?')?{items:[{volid:'backup:kept',keep:1},{volid:'backup:unknown'}]}:base(p,init));try{await page.click(button(page.container,'Preview Cleanup'));await act(async()=>{page.container.querySelector('.modal form').dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));});assert.equal(button(page.container,'Run Cleanup').disabled,true);assert.equal(calls.some(c=>c.p==='/retention/run'),false);}finally{await page.close();}
 });
+
+test('destinations remove category tabs and category graphics filter the unified table',async()=>{
+ const page=await mounted('pages/BackupDestinations.tsx',{},destinationApi);try{
+  assert.equal(page.container.querySelector('.destination-overview>.tabs'),null);
+  await page.click([...page.container.querySelectorAll('.destination-legend button')].find(b=>b.textContent.includes('Network')));
+  assert.equal(page.container.querySelector('[aria-label="Backup destination type"]').value,'category:Network');assert.equal(page.container.querySelectorAll('.destination-table tbody tr').length,1);assert.ok(page.container.querySelector('.destination-identity').textContent.includes('shared'));
+  await page.click(button(page.container,'Reset Filters'));assert.equal(page.container.querySelectorAll('.destination-table tbody tr').length,2);
+  await page.click(page.container.querySelector('[aria-label="Close destination details"]'));assert.equal(page.container.querySelector('.destination-details'),null);await page.click(button(page.container,'Show Details'));assert.ok(page.container.querySelector('.destination-details'));
+ }finally{await page.close()}
+});
+test('destination selection checks all node copies of shared storage using reads only',async()=>{
+ const calls=[];const page=await mounted('pages/BackupDestinations.tsx',{},async(p,init)=>{calls.push({p,init});return destinationApi(p)});try{
+  await page.click(page.container.querySelector('[aria-label="Select destination n2/shared"]'));await page.click(button(page.container,'Check Selected'));
+  assert.deepEqual(calls.filter(c=>c.p.includes('history=0')).map(c=>c.p).sort(),['/proxmox/storage/n1/shared?history=0','/proxmox/storage/n2/shared?history=0']);assert.ok(!calls.some(c=>['POST','PUT','DELETE'].includes(c.init?.method)));
+ }finally{await page.close()}
+});
+test('destination missing totals remain unknown in table and detail, partial API data stays partial',async()=>{
+ const page=await mounted('pages/BackupDestinations.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/proxmox/storage'?{resources:[{id:'n1/empty',node:'n1',name:'empty',content:'backup',type:'dir',shared:false,status:'offline',capacity:0,used:0,available:0,path:'/mnt/empty'}],coverage:{complete:false},errors:[]}:{status:{total:0,used:0,avail:0},errors:[]});try{
+  assert.ok(page.container.querySelector('.destination-stats').textContent.includes('Unknown'));assert.ok(!page.container.querySelector('.destination-table tbody').textContent.includes('0.0 GiB'));assert.ok(!page.container.querySelector('.destination-facts').textContent.includes('0.0 GiB'));assert.ok(page.container.querySelector('.destination-facts').textContent.includes('/mnt/empty'));
+  await page.click(button(page.container,'Edit'));assert.equal(button(page.container,'Disable Destination').disabled,true);
+ }finally{await page.close()}
+});
+test('destination content errors do not look like empty archives and viewers cannot change storage',async()=>{
+ const calls=[];const page=await mounted('pages/BackupDestinations.tsx',{},async(p,init)=>{calls.push({p,init});return p==='/auth/me'?{user:{role:'viewer'}}:p==='/proxmox/storage'?destinationFixture:{status:{active:1,enabled:1},content:[],errors:['content: Provider denied access']}});try{
+  assert.equal(button(page.container,'Add Destination').disabled,true);assert.equal(button(page.container,'Browse Archives').disabled,true);await page.click(button(page.container,'Edit'));assert.equal(button(page.container,'Disable Destination').disabled,true);assert.ok(page.container.querySelector('.destination-detail-errors').textContent.includes('Provider denied access'));assert.ok(!calls.some(c=>['POST','PUT','DELETE'].includes(c.init?.method)));
+ }finally{await page.close()}
+});
+test('destination pagination and selection follow storage rows while detail writes use exact identity',async()=>{
+ const calls=[],resources=Array.from({length:8},(_,i)=>({id:'pve/store'+i,name:'store'+i,node:'pve',type:'dir',content:'backup',status:'online',shared:false,capacity:100,used:20,available:80}));
+ const page=await mounted('pages/BackupDestinations.tsx',{},async(p,init)=>{calls.push({p,init});return p==='/auth/me'?{user:{role:'owner'}}:p==='/proxmox/storage'?{resources,errors:[]}:{status:{active:1,enabled:1},errors:[]}});try{
+  assert.equal(page.container.querySelectorAll('.destination-table tbody tr').length,6);await page.click(page.container.querySelector('[aria-label="Next destinations page"]'));assert.equal(page.container.querySelectorAll('.destination-table tbody tr').length,2);await page.click(page.container.querySelector('[aria-label="Inspect destination pve/store7"]'));await page.click(button(page.container,'Edit'));await page.click(button(page.container,'Disable Destination'));
+  const write=calls.find(c=>c.init?.method==='PUT');assert.equal(write.p,'/proxmox/storage/store7/enabled');assert.deepEqual(JSON.parse(write.init.body),{enabled:false});
+ }finally{await page.close()}
+});

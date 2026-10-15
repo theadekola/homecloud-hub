@@ -7,7 +7,15 @@ current section. Section buttons provide System, Security, Notifications,
 Connections, Integrations, Appearance, Backup & Restore and Advanced views.
 Connections retains its existing connection inventory and health guides.
 
-## Save behavior
+## Edit and save behavior
+
+Settings open in read-only mode with an Edit button. Edit unlocks supported fields
+and replaces that button with Save Changes and Cancel. Cancel restores the latest
+saved server values and browser preferences without sending a write. A successful
+save returns to read-only mode; a failed save remains editable. Edit state and
+drafts persist between settings sections. Opening Connections while editing asks
+before discarding the draft. Read-only roles still cannot unlock shared settings.
+Imports also require Edit before staging values for review.
 
 Save Changes submits only the supported shared fields (`siteName`, `description`,
 `refresh`) to the existing authenticated settings API for administrators/owners.
@@ -55,3 +63,31 @@ local preferences, section/search navigation, safe import staging, invalid local
 fallback, and cache invalidation without logout. Rendered browser fixtures check
 all sections at 320, 375, 390, 768, 1024, 1440 and 1920px. No live services or guests
 are changed by the redesign or its tests.
+
+## System section
+
+The System tab follows the reference’s card layout with System Information,
+System Behaviour, Resource Limits, Logging & Diagnostics, System Services,
+System Maintenance, Danger Zone and System Backup.
+
+Runtime metadata includes the OS/kernel, architecture, API process uptime and
+server timestamp. These may describe a container, not the physical host. API
+policy metadata comes from shared constants used by the actual JSON-body limit,
+general rate limiter and monitoring scheduler. The values are informational and
+cannot be changed through the settings write API. The general rate limit is per
+client/IP; login and authenticated paired-agent polling retain separate limits.
+
+The supported shared setting in System Behaviour is page refresh cadence.
+Deployment boot policy, update source, session expiry, worker/session limits and
+maintenance mode remain informational. System Services shows the last observed
+API/provider readings, not fabricated daemon statuses or restart controls.
+
+Auditors and higher roles can open or download the latest audit records from the
+existing audit API. Owners can run existing provider read diagnostics and download
+those results. Cache clear, data refresh and connection health remain available
+without editing settings. Reload Interface retains a confirmation and can disconnect
+open terminals; it does not restart services. Restart, reboot, stop-all, database
+optimization, index rebuilding and factory reset are not implemented as remote
+operations. System Backup exports only supported general settings; restore stages
+a validated settings file and still requires Save Changes. No credentials or full
+application data are included.

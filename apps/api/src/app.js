@@ -1,3 +1,4 @@
+import {apiPolicy} from './api-policy.js';
 import {connectionHealth} from './connection-health.js';
 import {createReadCache} from './read-cache.js';
 import {resolveActionApproval} from './action-approval.js';
@@ -45,8 +46,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&!/^\/api\/(auth|ssh|node-agent)(?:\/|$)/.test(req.path))readCache.clear();});next();});
 
  if(process.env.TRUST_PROXY)app.set('trust proxy',Number(process.env.TRUST_PROXY)||1);
- app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'2mb'}));
- app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false,skip:req=>{if(req.path!=='/api/node-agent/poll')return false;try{req.nodeAgent=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));return true;}catch{return false;}}}));
+ app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:apiPolicy.jsonBodyBytes}));
+ app.use(rateLimit({windowMs:60000,limit:apiPolicy.requestsPerMinute,standardHeaders:true,legacyHeaders:false,skip:req=>{if(req.path!=='/api/node-agent/poll')return false;try{req.nodeAgent=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));return true;}catch{return false;}}}));
  const agentPollLimiter=rateLimit({windowMs:60000,limit:120,standardHeaders:true,legacyHeaders:false,keyGenerator:req=>req.nodeAgent.id});
 
  const loginLimiter=rateLimit({windowMs:900000,limit:20,standardHeaders:true,legacyHeaders:false});
@@ -374,7 +375,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/diagnostics',()=>providerDiagnostics(),'owner');
  read('/notifications',()=>notifier.status(),'owner');
  action('post','/notifications/test','owner','notification.test',req=>notifier.test(required(req.body.channel,'Channel')));
- read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
+ read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
 
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};

@@ -15,7 +15,7 @@ const response=(status,body={})=>new Response(JSON.stringify(body),{status,heade
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage};
 try{
  await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
-  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
+  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-api-write')return;assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
  });
  await test('PUT and DELETE target approvals use SSH modal metadata and pin selected Docker host without native passkeys',async()=>{
   for(const method of ['PUT','DELETE']){const c=await client();c.setTokens('token','refresh');c.setDockerHost('original-host');let detail,requests=[];window.prompt=()=>{throw Error('Native confirmation must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-ssh-approval'){detail=e.detail;c.setDockerHost('changed-host');detail.resolve('verified grant')}};
@@ -80,5 +80,11 @@ try{
  await test('temporary account-service failures retain both access and refresh tokens',async()=>{
   const c=await client();c.setTokens('old','refresh');globalThis.fetch=async url=>url.endsWith('/auth/refresh')?response(503,{error:'Account service temporarily unavailable'}):response(401);
   await assert.rejects(c.api('/auth/me'),{status:503});assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('homecloud_refresh_token'),'refresh');
+ });
+ await test('successful writes invalidate read caches while GET, SSH and failed writes do not',async()=>{
+  const c=await client(),events=[];window.dispatchEvent=e=>events.push(e.type);globalThis.fetch=async()=>response(200,{});
+  await c.api('/storage');await c.api('/ssh/session/one',{method:'POST',body:'{}'});assert.deepEqual(events,[]);
+  await c.api('/actions/docker/container/one/restart',{method:'POST',body:'{}'});assert.deepEqual(events,['homecloud-api-write']);
+  globalThis.fetch=async()=>response(403,{error:'Denied'});await assert.rejects(c.api('/users',{method:'POST',body:'{}'}));assert.equal(events.length,1);
  });
 }finally{Object.assign(globalThis,original);}

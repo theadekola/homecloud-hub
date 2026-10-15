@@ -1,3 +1,4 @@
+import {createReadCache} from './read-cache.js';
 import {resolveActionApproval} from './action-approval.js';
 import {updateShellPresence} from './ssh-idle.js';
 import {streamShellOutput} from './ssh-stream.js';
@@ -39,7 +40,9 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
- const app=express();
+ const app=express(),readCache=createReadCache();
+ app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&!/^\/api\/(auth|ssh|node-agent)(?:\/|$)/.test(req.path))readCache.clear();});next();});
+
  if(process.env.TRUST_PROXY)app.set('trust proxy',Number(process.env.TRUST_PROXY)||1);
  app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:'2mb'}));
  app.use(rateLimit({windowMs:60000,limit:600,standardHeaders:true,legacyHeaders:false,skip:req=>{if(req.path!=='/api/node-agent/poll')return false;try{req.nodeAgent=authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));return true;}catch{return false;}}}));
@@ -105,7 +108,12 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    clusterStore.remove();await monitor.invalidate();await audit(req,'connection.proxmox.remove','proxmox',{},'success');
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
- const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>res.json(await handler(req)));
+ const connectionScope=()=>crypto.createHash('sha256').update(JSON.stringify([clusterConfig(),dockerConfig(),Object.entries(process.env).filter(([key])=>/^(TRUENAS_|OPNSENSE_|TAILSCALE_)/.test(key))])).digest('hex');
+ const cachedReads=new Set(['/docker','/storage','/network','/backups','/schedules','/retention','/proxmox/storage','/storage/disks','/storage/datasets','/storage/snapshots']);
+ const forceRead=req=>req?.query?.refresh==='1'||req?.get?.('X-HomeCloud-Refresh')==='1';
+ const sampleView=async req=>{if(!monitor.isRefreshing)return monitor.sample(forceRead(req));if(forceRead(req))void monitor.sample(true).catch(()=>{});const s=await monitor.sample();return {...s,refreshing:!!s.refreshing||monitor.isRefreshing()};};
+ const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>{res.set('Cache-Control','no-store');if(!cachedReads.has(path))return res.json(await handler(req));const url=new URL(req.originalUrl,'http://local');url.searchParams.delete('refresh');url.searchParams.sort();const key=JSON.stringify([req.user?.sub,req.user?.role,connectionScope(),selectedAgentHost(),url.pathname+url.search]);res.json(await readCache.run(key,()=>handler(req),{force:forceRead(req)}));});
+
  app.get('/api/ssh/connections',authorize('admin'),(req,res)=>{try{res.json(publicSavedSSH(req.user.sub));}catch(e){res.status(500).json({error:'Saved connections unavailable'});}});
  const approvalHosts=new Map();
  app.delete('/api/ssh/connections',authorize('admin'),(req,res)=>{deleteSavedSSH(req.user.sub,req.body.target);res.json({ok:true});});
@@ -134,19 +142,24 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  action('post','/node-agents/guest/bootstrap','owner','guest.install-agent-docker',req=>bootstrapGuest(req.body));
  action('post','/node-agents/guest/setup','owner','guest.install-docker',req=>installAgentHost(required(req.body.host,'Guest host')),true);
- const snapshot=async provider=>{
+ const snapshot=async(provider,force=false)=>{
+
    if(provider==='docker'&&selectedAgentHost())return {...await dockerSnapshot(),sampledAt:new Date().toISOString(),mode:'node-agent'};
+   if(monitor.provider){const result=await monitor.provider(provider,{force});if(!result.data)throw httpError(result.service?.error||`${provider} is not configured`,result.service?.status==='error'?502:503);return {...result.data,sampledAt:result.sampledAt,mode:'live'};}
    const s=await monitor.sample();const service=s.services.find(x=>x.provider===provider);
    if(!s[provider])throw httpError(service?.error||`${provider} is not configured`,service?.status==='error'?502:503);
    return {...s[provider],sampledAt:s.sampledAt,mode:'live'};
  };
- const selectedDocker=async s=>{
+ const selectedDocker=async(s,force=false)=>{
+
    if(!selectedAgentHost())return {inventory:s.docker||null,id:'direct',errors:[]};
-   try{return {inventory:await dockerSnapshot({timeoutMs:30000,metrics:false}),id:selectedAgentHost(),errors:[]};}
+   try{return {inventory:await readCache.run('docker-host:'+selectedAgentHost(),()=>dockerSnapshot({timeoutMs:15000,metrics:false}),{force}),id:selectedAgentHost(),errors:[]};}
+
    catch{return {inventory:null,id:selectedAgentHost(),errors:['Selected Docker host is unavailable. Inspect its node agent; no other host was substituted.']};}
  };
  const providerReads=async requests=>{
-   const s=await monitor.sample();const response={errors:[],connectors:s.services};
+   const s=await sampleView();const response={errors:[],connectors:s.services,refreshing:!!s.refreshing};
+
    await Promise.all(requests.map(async([key,provider,handler])=>{
      response[key]=[];
      if(!providers[provider].configured())return;
@@ -156,11 +169,14 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  };
  read('/discovery',async()=>discovered(await monitor.sample()));
  read('/dashboard',async req=>{
-   const s=await monitor.sample(req.query.refresh==='1'),inventory=discovered(s);return {sampledAt:s.sampledAt,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
+   const s=await sampleView(req),inventory=discovered(s);return {sampledAt:s.sampledAt,refreshing:!!s.refreshing,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
+
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:s.docker||inventory.reports.some(r=>r.status==='online')?inventory.resources.filter(r=>r.kind==='Docker container'&&r.status!=='stale').length:null,alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
- read('/monitoring',async req=>{const s=await monitor.sample(req.query.refresh==='1');return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
- read('/proxmox',async req=>{if(req.query.refresh==='1')await monitor.sample(true);const config=clusterConfig();return {...await snapshot('proxmox'),cluster:config.url?{name:config.name,url:config.url}:null};});
+ read('/monitoring',async req=>{const s=await sampleView(req);return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,opnsense:undefined,tailscale:undefined};});
+
+ read('/proxmox',async req=>{if(forceRead(req))void monitor.sample(true).catch(()=>{});const config=clusterConfig();return {...await snapshot('proxmox',forceRead(req)),cluster:config.url?{name:config.name,url:config.url}:null};});
+
  read('/proxmox/storage',()=>storageInventory());
  read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
  action('put','/network/dns/:node','admin','network.dns.configure',req=>networkDnsWrite(req.params.node,req.body),true);
@@ -201,13 +217,14 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/truenas',()=>snapshot('truenas'));
  read('/opnsense',()=>snapshot('opnsense'));
  read('/vpn',()=>snapshot('tailscale'));
- read('/storage',async req=>{const s=await monitor.sample(req.query.refresh==='1'),errors=[];let proxmox=[],coverage={complete:true,expectedNodes:[],readNodes:[],missingNodes:[]};
+ read('/storage',async req=>{const s=await sampleView(req),errors=[];let proxmox=[],coverage={complete:true,expectedNodes:[],readNodes:[],missingNodes:[]};
    if(providers.proxmox.configured())try{const result=await storageInventory();proxmox=result.resources;coverage=result.coverage;errors.push(...result.errors);}catch(e){coverage.complete=false;errors.push(e.message);}
    if(providers.truenas.configured()&&(!s.truenas||(s.truenas.errors||[]).some(e=>/^pool\.(query|dataset\.query):/.test(e)))){coverage.complete=false;errors.push('TrueNAS pool capacity readings are incomplete');}
-   const selected=await selectedDocker(s);errors.push(...selected.errors);
+   const selected=await selectedDocker(s,forceRead(req));errors.push(...selected.errors);
    const pools=[...proxmox.map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[])];
-   return {pools,summary:storageSummary(pools,coverage),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},volumes:selected.inventory?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt};});
- read('/storage/disks',async()=>{const s=await monitor.sample(),errors=[];let resources=[];if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString()};});
+   return {pools,summary:storageSummary(pools,coverage),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},volumes:selected.inventory?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt,refreshing:!!s.refreshing};});
+ read('/storage/disks',async req=>{const s=await sampleView(req),errors=[];let resources=[];if(s.refreshing)errors.push('Some provider measurements are still loading.');if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString(),refreshing:!!s.refreshing};});
+
  read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
  read('/storage/snapshots/browse',async req=>{const id=required(req.query.id,'Snapshot');const list=await truenas('pool.snapshot.query',[[['id','=',id]]]);if(!list.some(s=>(s.id||s.name)===id))throw httpError('Snapshot not found',404);const split=id.lastIndexOf('@'),dataset=id.slice(0,split),name=id.slice(split+1);if(split<1||!name||/[\/\\]/.test(name)||['.','..'].includes(name))throw httpError('Invalid snapshot path');const root=await datasetRoot(dataset);return {path:`${root}/.zfs/snapshot/${name}`,entries:await truenas('filesystem.listdir',[`${root}/.zfs/snapshot/${name}`,[],{limit:200}])};});
  read('/storage/performance',req=>storagePerformance({enabled:providers.proxmox.configured(),source:req.query.source,timeframe:req.query.timeframe||'day'}));
@@ -222,15 +239,20 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/storage/snapshots/guest/create','operator','proxmox.snapshot.create',req=>guestSnapshot(req.body,'create'));
  action('post','/storage/snapshots/guest/rollback','admin','proxmox.snapshot.rollback',req=>guestSnapshot(req.body,'rollback'),true);
  action('post','/storage/snapshots/guest/delete','admin','proxmox.snapshot.delete',req=>guestSnapshot(req.body,'delete'),true);
- read('/storage/datasets',async req=>{const s=await monitor.sample(req.query.refresh==='1');return datasetInventory({proxmox:providers.proxmox.configured(),truenasEnabled:providers.truenas.configured(),snapshot:s.truenas||{}});});
+ read('/storage/datasets',async req=>{const s=await sampleView(req);return {...await datasetInventory({proxmox:providers.proxmox.configured(),truenasEnabled:providers.truenas.configured(),snapshot:s.truenas||{}}),refreshing:!!s.refreshing};});
+
  read('/storage/datasets/browse',async req=>({entries:await truenas('filesystem.listdir',[await datasetRoot(req.query.dataset),[],{limit:200}])}));
  read('/storage/datasets/permissions',async req=>({permissions:await truenas('filesystem.getacl',[await datasetRoot(req.query.dataset),true])}));
- read('/network',async()=>{
-   const s=await monitor.sample();const interfaces=[],errors=[];
+ read('/network',async req=>{
+
+   const s=await sampleView(req);const interfaces=[],errors=[];
+
    if(providers.proxmox.configured())try{const inventory=await networkInventory();interfaces.push(...inventory.interfaces.map(n=>({...n,provider:'proxmox'})));errors.push(...inventory.errors);}catch(e){errors.push(`proxmox: ${e.message}`);}
    interfaces.push(...(s.opnsense?.interfaces||[]).map(n=>({...n,provider:'opnsense'})));
-   const selected=await selectedDocker(s);errors.push(...selected.errors);
-   return {interfaces,dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},networks:selected.inventory?.networks||[],services:s.opnsense?.services||[],errors,connectors:s.services.filter(x=>['proxmox','docker','opnsense'].includes(x.provider)),sampledAt:s.sampledAt};
+   const selected=await selectedDocker(s,forceRead(req));errors.push(...selected.errors);
+
+   return {interfaces,dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},networks:selected.inventory?.networks||[],services:s.opnsense?.services||[],errors,connectors:s.services.filter(x=>['proxmox','docker','opnsense'].includes(x.provider)),sampledAt:s.sampledAt,refreshing:!!s.refreshing};
+
  });
  action('post','/actions/:provider/:resourceType/:resourceId/:action','operator','infrastructure.action',async req=>{
    const {provider,resourceType,resourceId,action:operation}=req.params;const body=req.body||{};
@@ -320,7 +342,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/vpn/device/:id/authorize','admin','tailscale.device.authorize',req=>tailscale(`device/${encode(req.params.id)}/authorized`,'POST',{authorized:req.body.authorized===true}),true);
  action('delete','/vpn/device/:id','admin','tailscale.device.delete',req=>tailscale(`device/${encode(req.params.id)}`,'DELETE'),true);
  action('post','/vpn/device/:id/routes','admin','tailscale.device.routes',req=>{if(!Array.isArray(req.body.routes)||req.body.routes.some(r=>typeof r!=='string'))throw httpError('Routes must be an array of CIDRs');return tailscale(`device/${encode(req.params.id)}/routes`,'POST',{routes:req.body.routes});},true);
- read('/alerts',async()=>{await monitor.sample();return {alerts:get().alerts,rules:get().rules};});
+ read('/alerts',async()=>{void monitor.sample().catch(()=>{});return {alerts:get().alerts,rules:get().rules};});
+
  action('post','/alerts/rules','admin','alert.rule.create',async req=>{const {name,metric,provider='all',severity='warning'}=req.body;if(!['cpu','memory','storage'].includes(metric)||!['all',...Object.keys(providers)].includes(provider)||!['critical','warning'].includes(severity))throw httpError('Invalid alert rule');const rule={id:crypto.randomUUID(),name:required(name,'Name'),metric,provider,severity,threshold:integer(req.body.threshold,'Threshold',1,100),enabled:true};mutate(s=>s.rules.push(rule));return rule;});
  action('put','/alerts/rules/:id','admin','alert.rule.update',async req=>{const b=req.body,patch={};if(b.name!==undefined)patch.name=required(b.name,'Name');if(b.metric!==undefined){if(!['cpu','memory','storage'].includes(b.metric))throw httpError('Invalid metric');patch.metric=b.metric;}if(b.provider!==undefined){if(!['all',...Object.keys(providers)].includes(b.provider))throw httpError('Invalid provider');patch.provider=b.provider;}if(b.severity!==undefined){if(!['critical','warning'].includes(b.severity))throw httpError('Invalid severity');patch.severity=b.severity;}if(b.threshold!==undefined)patch.threshold=integer(b.threshold,'Threshold',1,100);if(b.enabled!==undefined){if(typeof b.enabled!=='boolean')throw httpError('Invalid enabled state');patch.enabled=b.enabled;}if(!get().rules.some(r=>r.id===req.params.id))throw httpError('Rule not found',404);mutate(s=>Object.assign(s.rules.find(r=>r.id===req.params.id),patch));return {updated:true};});
  action('delete','/alerts/rules/:id','admin','alert.rule.delete',async req=>{mutate(s=>s.rules=s.rules.filter(r=>r.id!==req.params.id));});
@@ -349,7 +372,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/diagnostics',()=>providerDiagnostics(),'owner');
  read('/notifications',()=>notifier.status(),'owner');
  action('post','/notifications/test','owner','notification.test',req=>notifier.test(required(req.body.channel,'Channel')));
- read('/settings',async()=>({system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:(await monitor.sample()).services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}}));
+ read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
+
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};
    mutate(s=>s.settings=settings);return settings;

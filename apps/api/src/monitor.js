@@ -23,24 +23,38 @@ export function alertConditions(snapshot,rules){
   return conditions;
 }
 export function createMonitor(sources=providers,persistence={get,mutate},checkServices=extraServices,fleet=async()=>({hosts:[]}),notify=async()=>{}){
-  let latest=null,inFlight=null;
-  async function sample(force=false){
-    if(!force&&latest){
-      if(!inFlight&&Date.now()-Date.parse(latest.sampledAt)>=10000)void sample(true).catch(()=>{});
-      return latest;
-    }
-    if(inFlight)return inFlight;
-    inFlight=agentContext.run({host:''},async()=>{
-      const snapshot={sampledAt:new Date().toISOString(),services:[],hosts:[]};
-      await Promise.all(Object.entries(sources).map(async([name,source])=>{
-        if(!source.configured()){snapshot.services.push({id:name,name,provider:name,status:'not-configured',response:null});return;}
-        const started=Date.now();
-        try{snapshot[name]=await source.read();const errors=snapshot[name].errors||[];snapshot.services.push({id:name,name,provider:name,status:errors.length?'partial':'reachable',response:Date.now()-started,...(errors.length?{error:errors.join('; ')}:{})});}
-        catch(error){snapshot.services.push({id:name,name,provider:name,status:'error',response:Date.now()-started,error:error.message});}
-      }));
-      try{snapshot.dockerFleet=await fleet();for(const h of snapshot.dockerFleet.hosts)snapshot.services.push({id:`docker:${h.id}`,name:`Docker ${h.node} / ${h.name}`,provider:'docker',hostId:h.id,status:h.status,response:h.response??null,error:h.error});}catch{snapshot.services.push({id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'error',error:'Docker host inventory failed'});}
-      try{snapshot.services.push(...await checkServices());}catch(e){snapshot.services.push({name:'Additional service configuration',status:'error',error:e.message});}
-      snapshot.hosts=[...(snapshot.proxmox?.nodes||[]).map(n=>({name:n.name,status:n.status,cpu:n.cpu,memoryPercent:n.memoryPercent,cores:n.cores,uptime:n.uptime})),...(snapshot.docker?[{name:snapshot.docker.host.hostname,status:'reachable'}]:[]),...(snapshot.dockerFleet?.hosts||[]).map(h=>({id:h.id,name:`${h.node} / ${h.name}`,status:h.status})),...(snapshot.truenas?[{name:snapshot.truenas.info.hostname,status:'reachable'}]:[])];
+ let latest=null,inFlight=null,progress=null,completed=0,generation=0;
+ const readings=new Map();
+ const empty=()=>({sampledAt:new Date().toISOString(),services:[],hosts:[],metrics:persistence.get().metrics,alerts:persistence.get().alerts});
+ const hosts=s=>[...(s.proxmox?.nodes||[]).map(n=>({name:n.name,status:n.status,cpu:n.cpu,memoryPercent:n.memoryPercent,cores:n.cores,uptime:n.uptime})),...(s.docker?[{name:s.docker.host.hostname,status:'reachable'}]:[]),...(s.dockerFleet?.hosts||[]).map(h=>({id:h.id,name:`${h.node} / ${h.name}`,status:h.status})),...(s.truenas?[{name:s.truenas.info.hostname,status:'reachable'}]:[])];
+ function collect(name,force=false){
+  const prior=readings.get(name);
+  if(prior?.pending)return prior.pending;
+  if(!force&&prior?.result&&Date.now()-prior.time<10000)return Promise.resolve(prior.result);
+  const ticket=generation,row={...prior},source=sources[name];
+  const work=Promise.resolve().then(()=>agentContext.run({host:''},async()=>{
+   const started=Date.now();let result;
+   if(!source?.configured())result={service:{id:name,name,provider:name,status:'not-configured',response:null}};
+   else try{const data=await source.read(),errors=data.errors||[];result={data,service:{id:name,name,provider:name,status:errors.length?'partial':'reachable',response:Date.now()-started,...(errors.length?{error:errors.join('; ')}:{})}};}
+   catch(error){result={service:{id:name,name,provider:name,status:'error',response:Date.now()-started,error:error.message}};}
+   if(ticket===generation&&readings.get(name)===row){row.result=result;row.time=Date.now();row.pending=null;}
+   return result;
+  }));row.pending=work;readings.set(name,row);return work;
+ }
+ async function sample(force=false){
+  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});return latest;}
+  if(!inFlight){
+   const ticket=generation,snapshot=empty();progress=snapshot;
+   for(const [name,source] of Object.entries(sources))snapshot.services.push({id:name,name,provider:name,status:source.configured()?'pending':'not-configured',response:null});
+   snapshot.services.push({id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'pending',response:null});
+   const work=agentContext.run({host:''},async()=>{
+    await Promise.all([
+     ...Object.keys(sources).map(async name=>{const result=await collect(name,true);if(result.data)snapshot[name]=result.data;snapshot.services=snapshot.services.map(s=>s.id===name?result.service:s);}),
+     (async()=>{let services;try{snapshot.dockerFleet=await fleet();services=snapshot.dockerFleet.hosts.map(h=>({id:`docker:${h.id}`,name:`Docker ${h.node} / ${h.name}`,provider:'docker',hostId:h.id,status:h.status,response:h.response??null,error:h.error}));}catch{services=[{id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'error',error:'Docker host inventory failed'}];}snapshot.services=[...snapshot.services.filter(s=>s.id!=='docker-fleet'),...services];})(),
+     (async()=>{try{snapshot.services.push(...await checkServices());}catch(e){snapshot.services.push({name:'Additional service configuration',status:'error',error:e.message});}})()
+    ]);
+    snapshot.hosts=hosts(snapshot);
+    if(ticket!==generation)return snapshot;
       const measured=snapshot.proxmox?.nodes?.filter(n=>n.status==='online')||[];
       const mean=key=>{const values=measured.map(n=>n[key]).filter(v=>typeof v==='number');return values.length?Math.round(values.reduce((sum,v)=>sum+v,0)/values.length):null;};
       persistence.mutate(state=>{
@@ -58,10 +72,18 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
       });
       snapshot.metrics=persistence.get().metrics;
       snapshot.alerts=persistence.get().alerts;
-      latest=snapshot;Promise.resolve().then(()=>notify(snapshot.alerts)).catch(()=>{});return snapshot;
-    }).finally(()=>{inFlight=null;});
-    return inFlight;
+    latest=snapshot;completed=Date.now();Promise.resolve().then(()=>notify(snapshot.alerts)).catch(()=>{});return snapshot;
+   });
+   inFlight=work;void work.finally(()=>{if(inFlight===work){inFlight=null;progress=null;}}).catch(()=>{});
   }
-  return {sample,invalidate:async()=>{latest=null;if(inFlight){await inFlight.catch(()=>{});latest=null;}}};
+  if(force)return inFlight;
+  // First paint is bounded. Partial scans never resolve persisted alerts.
+  let timer;const partial=progress,pending=inFlight;return Promise.race([pending,new Promise(resolve=>{timer=setTimeout(()=>resolve({...partial,hosts:hosts(partial),refreshing:true}),250);})]).finally(()=>clearTimeout(timer));
+ }
+ return {sample,isRefreshing:()=>!!inFlight,provider:async(name,{force=false}={})=>{
+  if(force)return {...await collect(name,true),sampledAt:new Date().toISOString()};
+  const cached=readings.get(name);if(cached?.result){if(!cached.pending&&Date.now()-cached.time>=10000)void collect(name,true);return {...cached.result,sampledAt:new Date(cached.time).toISOString()};}
+  return {...await collect(name),sampledAt:new Date().toISOString()};
+ },invalidate:async()=>{generation++;latest=null;progress=null;inFlight=null;readings.clear();}};
 }
 export const monitor=createMonitor(providers,{get,mutate},extraServices,dockerFleet,alerts=>notifier.deliver(alerts));

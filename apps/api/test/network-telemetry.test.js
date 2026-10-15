@@ -30,6 +30,7 @@ test('authenticated poll telemetry is optional and does not interfere with exist
  const node=a.pairNode(a.createPairing({name:'Friendly name'}).code,'a'),identity=a.authenticateAgent(node.token),hosts=[{id:'node',online:true}];try{
  a.pollAgent(identity,{version:2,hosts});assert.equal(a.agentNetworkReports().find(r=>r.id===node.id).version,2);
  a.pollAgent(identity,{version:3,hosts,network:{...sample(10),node:'b'}});assert.equal(a.agentNetworkReports().find(r=>r.id===node.id).hostname,'a');assert.equal(a.agentNetworkReports().find(r=>r.id===node.id).network.status,'ok');
+ a.pollAgent(identity,{version:4,hosts});assert.equal(a.agentNetworkReports().find(r=>r.id===node.id).version,4);
  const pending=a.agentContext.run({host:node.id+':node'},()=>a.agentRequest('/info'));const job=a.pollAgent(identity,{version:3,hosts,network:{status:'bad'}}).jobs[0];assert.equal(job.path,'/info');assert.equal(a.agentNetworkReports().find(r=>r.id===node.id).network.status,'error');a.pollAgent(identity,{version:3,hosts,results:[{id:job.id,status:200,body:Buffer.from('{"ServerVersion":"fixture"}').toString('base64')}]});assert.equal((await(await pending).json()).ServerVersion,'fixture');
  }finally{a.revokeAgent(node.id)}assert.ok(!a.agentNetworkReports().some(r=>r.id===node.id));
 });

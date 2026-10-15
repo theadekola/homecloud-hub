@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
 import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
-VERSION=3
+VERSION=4
 HOSTS=[]
 RESCAN=threading.Event()
 LOCK=threading.Lock()
@@ -31,7 +31,7 @@ def docker_request(host,path,method='GET',body='',timeout=300):
  if body:command="printf %s "+shlex.quote(body)+" | base64 -d | "+command+' --data-binary @-'
  # Encode binary Docker log frames before they pass through the guest-agent JSON channel.
  script='command -v curl >/dev/null || { echo "Guest curl is missing" >&2; exit 1; }; test -S /var/run/docker.sock || { echo "Docker socket unavailable; install or start Docker" >&2; exit 1; }; ('+command+') | base64'
- output=guest_run(host,script).strip()
+ output=guest_run(host,script,timeout=max(11,timeout+10)).strip()
  try:
   data=base64.b64decode(output);payload,status=data.rsplit(b'\n__HOMECLOUD_STATUS__',1)
  except Exception:raise RuntimeError('Guest returned an invalid Docker response; check curl and Docker service')
@@ -131,6 +131,50 @@ def post(config,path,body):
  request=urllib.request.Request(config['url']+'/api/node-agent/'+path,data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+config.get('token','')})
  with urllib.request.urlopen(request,timeout=30) as response:return json.load(response)
 
+def read_job(job):
+ # Mutations, installations and streaming event reads keep their own serial lane.
+ return job.get('operation','docker')=='docker' and job.get('method')=='GET' and job.get('path','').split('?')[0]!='/events'
+
+def execute_job(job):
+ if job.get('expiresAt',time.time()*1000+1)<=time.time()*1000:return {'id':job['id'],'error':'Request expired before execution'}
+ try:
+  if job.get('operation')=='setup':result=setup_guest(job['host'])
+  else:
+   remaining=max(1,min(300,int((job.get('expiresAt',time.time()*1000+300000)-time.time()*1000)/1000)))
+   result=docker_request(job['host'],job['path'],job['method'],job['body'],timeout=remaining)
+ except Exception as e:result={'error':str(e)[:400]}
+ return {'id':job['id'],**result}
+
+def start_workers():
+ reads,writes,completed,ready=queue.Queue(maxsize=32),queue.Queue(maxsize=16),queue.Queue(),threading.Event()
+ def worker(pending):
+  while True:
+   job=pending.get()
+   try:completed.put(execute_job(job));ready.set()
+   finally:pending.task_done()
+ for pending in [reads]*4+[writes]:threading.Thread(target=worker,args=(pending,),daemon=True).start()
+ return reads,writes,completed,ready
+
+def poll_once(config,reads,writes,completed,ready):
+ started=time.monotonic();ready.clear();results=[]
+ # Drain BEFORE sending. Completed results wake the next poll instead of waiting
+ # through an extra heartbeat. Restore results on transport failure.
+ while len(results)<20:
+  try:results.append(completed.get_nowait())
+  except queue.Empty:break
+ with LOCK:hosts=list(HOSTS);network=NETWORK
+ try:response=post(config,'poll',{'version':VERSION,'hosts':hosts,'results':results,**({'network':network} if network else {})})
+ except Exception:
+  for result in results:completed.put(result)
+  ready.set();raise
+ for job in response['jobs']:
+  try:(reads if read_job(job) else writes).put_nowait(job)
+  except queue.Full:completed.put({'id':job['id'],'error':'Connector is busy; retry after pending operations finish'});ready.set()
+ # At most 100 polls/minute, within the server's authenticated agent budget.
+ time.sleep(max(0,.6-(time.monotonic()-started)))
+ if not completed.empty():return
+ ready.wait(max(0,2-(time.monotonic()-started)))
+
 def main():
  global CONFIG
  parser=argparse.ArgumentParser();parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
@@ -146,22 +190,9 @@ def main():
   os.chmod(args.config,0o600);return
  with open(args.config) as f:config=json.load(f)
  CONFIG=config
- threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start();results=[];pending=queue.Queue();completed=queue.Queue()
- def worker():
-  while True:
-   job=pending.get()
-   if job.get('expiresAt',time.time()*1000+1)<time.time()*1000:
-    completed.put({'id':job['id'],'error':'Request expired before execution'});continue
-   try:result=setup_guest(job['host']) if job.get('operation')=='setup' else docker_request(job['host'],job['path'],job['method'],job['body'])
-   except Exception as e:result={'error':str(e)[:400]}
-   completed.put({'id':job['id'],**result})
- threading.Thread(target=worker,daemon=True).start()
+ threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start()
+ reads,writes,completed,ready=start_workers()
  while True:
-  try:
-   with LOCK:hosts=list(HOSTS);network=NETWORK
-   response=post(config,'poll',{'version':VERSION,'hosts':hosts,'results':results,**({'network':network} if network else {})});results=[]
-   for job in response['jobs']:pending.put(job)
-   while not completed.empty():results.append(completed.get())
-  except Exception as e:print('Node agent connection unavailable: '+str(e),flush=True)
-  time.sleep(2)
+  try:poll_once(config,reads,writes,completed,ready)
+  except Exception as e:print('Node agent connection unavailable: '+str(e),flush=True);time.sleep(2)
 if __name__=='__main__':main()

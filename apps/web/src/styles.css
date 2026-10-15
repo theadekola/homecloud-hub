@@ -1602,3 +1602,13 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .terminal-selection-handle.start:after{bottom:0}
 .terminal-selection-handle.end{transform:translate(-50%,0)}
 .terminal-selection-handle.end:after{top:0}
+
+/* Mobile terminal actions wrap rather than clipping on narrow screens. */
+.terminal-selection-menu{flex-wrap:wrap;justify-content:center;border-radius:16px}
+.terminal-selection-menu button{padding:10px 11px;min-width:44px;min-height:44px}
+.terminal-selection-menu button:disabled{opacity:.45;cursor:default}
+.terminal-manual-paste{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;padding:8px;box-sizing:border-box;max-width:100%}
+.terminal-manual-paste textarea{flex-basis:100%;width:100%;box-sizing:border-box;min-height:64px;font-size:16px;user-select:text;-webkit-user-select:text}
+
+.terminal-selection-menu{max-height:calc(100% - 8px);overflow-y:auto;overflow-x:hidden}
+.terminal-manual-paste textarea{-webkit-touch-callout:default;touch-action:auto}

@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import os from 'node:os';
+import {apiPolicy} from '../src/api-policy.js';
+test('settings report actual API runtime metadata and enforced policy without granting policy writes',async()=>{
+ process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'viewer',role:'viewer'};next()},monitor:{sample:async()=>({services:[]})}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}/api/settings`;
+ try{const res=await fetch(url),data=await res.json();assert.equal(res.status,200);assert.equal(data.system.architecture,os.arch());assert.equal(data.system.operatingSystem,os.type());assert.equal(data.system.release,os.release());assert.ok(Math.abs(Date.now()-Date.parse(data.system.serverTime))<10000);assert.deepEqual(data.policy,apiPolicy);assert.ok(Object.isFrozen(apiPolicy));const denied=await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({siteName:'Forbidden',description:'',refresh:30,policy:{requestsPerMinute:99999}})});assert.equal(denied.status,403);}finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

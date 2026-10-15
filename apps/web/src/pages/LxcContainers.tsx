@@ -37,7 +37,7 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:
   <div className="vm-title"><div><h2>LXC Containers</h2><p>Create, monitor and manage containers reported by the connected Proxmox cluster.</p></div><div><button className="btn secondary" onClick={refresh}><RefreshCw size={14}/>Refresh</button>{operator&&<button className="btn primary" onClick={()=>setModal('create')}>+ Create Container</button>}</div></div>
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   {created&&<Card><p>Creation queued for CT {created.vmid} on {created.node}. Check task history for completion. The container is created stopped.</p><CreationHa created={created} onUpdate={setCreated}/></Card>}
-  <div className="vm-stats">
+  <div className="vm-stats metric-grid">
    <CtStat icon={Box} label="Total Containers" value={inventoryComplete(data)?containers.length:'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
    <CtStat icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${containers.length} containers reporting`}/>
    <CtStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>

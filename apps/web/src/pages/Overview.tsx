@@ -32,7 +32,7 @@ export default function Overview(){
  {(backupError||backupErrors.length>0)&&<p className="login-error" role="alert">Backup inventory: {backupError||backupErrors.join('; ')}</p>}
  {(error||failure)&&<p className="login-error" role="alert">{error||failure}</p>}
  {session.data?.user?.role==='owner'&&data.services?.length===0&&<Card><h3>Connect your infrastructure</h3><p>Add a Proxmox node or Docker host to start discovering resources.</p><Link className="btn primary" to="/settings?tab=Connections&setup=choose">Add Your First Connection</Link></Card>}
- <div className="overview-stats">{[
+ <div className="overview-stats metric-grid">{[
   {label:'Total Servers',value:inventoryKnown?nodes.length:'Unknown',detail:inventoryKnown?`${online} Online`:'Inventory incomplete or unavailable',icon:Server,path:'/proxmox'},
   {label:'Virtual Machines',value:inventoryKnown?guests.filter((g:any)=>g.type==='qemu').length:'Unknown',detail:inventoryKnown?`${guests.filter((g:any)=>g.type==='qemu'&&g.status==='running').length} Running`:'Inventory incomplete or unavailable',icon:Monitor,path:'/proxmox'},
   {label:'Containers',value:inventoryKnown&&dockerKnown?guests.filter((g:any)=>g.type==='lxc').length+inventory.filter((r:any)=>r.kind==='Docker container'&&r.status!=='stale').length:'Unknown',detail:inventoryKnown&&dockerKnown?`${guests.filter((g:any)=>g.type==='lxc'&&g.status==='running').length+inventory.filter((r:any)=>r.kind==='Docker container'&&r.status==='running').length} Running`:'Inventory incomplete or unavailable',icon:Container,path:'/docker'},

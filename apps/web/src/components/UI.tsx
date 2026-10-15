@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 
 export function PageHeader({title, subtitle, actions}:{title:string; subtitle:string; actions?:React.ReactNode}) {
@@ -22,9 +22,22 @@ export function Button({children,onClick,variant='primary',disabled=false}:{chil
 }
 
 export function Modal({open,onClose,title,children}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode}) {
+  const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=onClose;
+  useEffect(()=>{
+    if(!open)return;
+    const previous=document.activeElement as HTMLElement|null;
+    const focusable=()=>Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')||[]).filter(el=>!el.hidden&&el.getAttribute('type')!=='hidden');
+    const key=(event:KeyboardEvent)=>{
+      const modals=document.querySelectorAll('.modal-backdrop');if(dialog.current?.parentElement!==modals[modals.length-1])return;
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close.current();}
+      if(event.key==='Tab'){const controls=focusable(),first=controls[0],last=controls.at(-1);if(!first){event.preventDefault();dialog.current?.focus();return;}if(event.shiftKey&&(document.activeElement===first||!dialog.current?.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey&&(document.activeElement===last||!dialog.current?.contains(document.activeElement))){event.preventDefault();first.focus();}}
+    };
+    (focusable()[0]||dialog.current)?.focus();document.addEventListener('keydown',key);
+    return()=>{document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus();};
+  },[open]);
   if(!open) return null;
-  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={e=>e.stopPropagation()}>
-    <div className="modal-head"><h3>{title}</h3><button className="icon-btn" onClick={onClose}><X size={18}/></button></div>{children}
+  return <div className="modal-backdrop" onMouseDown={onClose}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>
+    <div className="modal-head"><h3 id={titleId}>{title}</h3><button type="button" className="icon-btn" aria-label="Close dialog" onClick={onClose}><X size={18}/></button></div>{children}
   </div></div>
 }
 

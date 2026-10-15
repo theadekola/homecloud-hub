@@ -1,7 +1,7 @@
 import {Download,LoaderCircle} from 'lucide-react';
 import {useEffect,useRef,useState} from 'react';
 import {api} from '../api';
-export default function UpdateButton(){
+export default function UpdateButton({showLabel=false}:{showLabel?:boolean}){
  const [status,setStatus]=useState<any>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[statusError,setStatusError]=useState(''),[checking,setChecking]=useState(false),[transient,setTransient]=useState(false),[requested,setRequested]=useState(false);
  const started=useRef(false),previous=useRef(''),retry=useRef<()=>void>(()=>{}),check=useRef<{checkedAt:string;checkId?:string;time:number}|null>(null);
  const notice=(text:string,temporary=false)=>{setMessage(text);setTransient(temporary);};
@@ -23,5 +23,5 @@ export default function UpdateButton(){
   previous.current=status.current;await api('/updates',{method:'POST'});started.current=true;notice('Update queued. The dashboard may briefly disconnect.');
  }catch(e:any){setBusy(false);notice(e.message);}};
  const running=busy||status?.pending||status?.state==='updating';
- return <div className="software-update"><button className="btn secondary update-button" onClick={statusError?()=>retry.current():update} disabled={running||requested||checking||(!status&&!statusError)} aria-label={statusError?'Retry update status':running?'Updating software':requested?'Checking for software updates':status?.available?'Install software update':'Check for software updates'} title={status?.message||'Check for software updates'}>{running||requested?<LoaderCircle size={20} className="update-spinner" aria-hidden="true"/>:<Download size={20} aria-hidden="true"/>}{status?.available&&<span className="update-dot" aria-label="New update available"/>}</button>{statusError&&<span className="update-message error" role="alert">Update status unavailable: {statusError}</span>}{message&&<span className="update-message" role="status">{message}</span>}</div>;
+ return <div className="software-update"><button type="button" className="btn secondary update-button" onClick={statusError?()=>retry.current():update} disabled={running||requested||checking||(!status&&!statusError)} aria-label={statusError?'Retry update status':running?'Updating software':requested?'Checking for software updates':status?.available?'Install software update':'Check for software updates'} title={status?.message||'Check for software updates'}>{running||requested?<LoaderCircle size={20} className="update-spinner" aria-hidden="true"/>:<Download size={20} aria-hidden="true"/>}{showLabel&&<span>{statusError?'Retry update status':running?'Updating…':requested?'Checking…':status?.available?'Install Update':'Check for Updates'}</span>}{status?.available&&<span className="update-dot" aria-label="New update available"/>}</button>{statusError&&<span className="update-message error" role="alert">Update status unavailable: {statusError}</span>}{message&&<span className="update-message" role="status">{message}</span>}</div>;
 }

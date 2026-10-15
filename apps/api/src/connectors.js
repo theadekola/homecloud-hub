@@ -234,7 +234,7 @@ export async function dockerSnapshot({timeoutMs,metrics=true}={}){
     })));
   }
   return {
-    errors:measured.filter(c=>c.statsError).map(c=>`${c.name}: statistics unavailable`),
+    errors:measured.filter(c=>c.statsError).map(c=>`${c.name}: statistics unavailable${/timed out|timeout|time budget/i.test(c.statsError)?' (measurement deadline exceeded)':/Docker HTTP (401|403)/.test(c.statsError)?' (Docker Engine access rejected)':''}`),
     host:{engineId:info.ID||null,hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
     images:images.map(i=>({id:i.Id,name:i.RepoTags?.join(', ')||i.Id,tags:i.RepoTags||[],digests:i.RepoDigests||[],size:i.Size,created:i.Created,containers:i.Containers})),
     networks:networks.map(n=>({id:n.Id,name:n.Name,driver:n.Driver,scope:n.Scope,subnets:n.IPAM?.Config?.map(c=>c.Subnet).join(', ')||'',internal:n.Internal,gateways:n.IPAM?.Config?.map(c=>c.Gateway).filter(Boolean).join(', ')||'',created:n.Created,labels:n.Labels||{}})),

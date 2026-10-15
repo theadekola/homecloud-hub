@@ -17,7 +17,12 @@ export function createDockerFleet({hosts=agentHosts,read=dockerSnapshot,nodes=()
    const started=now();
    try{const data=await agentContext.run({host:h.id},()=>read({timeoutMs:30000}));
     const measured={...row,status:data.errors?.length?'partial':'reachable',error:data.errors?.length?data.errors.join('; '):undefined,response:now()-started,inventory:data};cache.set(h.id,measured);results.push(measured);
-   }catch{results.push({...row,response:now()-started,error:'Docker inventory unavailable; inspect the selected host and node agent',lastSeen:cache.get(h.id)?.sampledAt||null});}
+   }catch(error){
+    const message=String(error?.message||''),status=message.match(/Docker HTTP (401|403)/)?.[1];
+    // Preserve an actionable cause without exposing arbitrary provider response bodies.
+    const reason=/timed out|timeout|time budget/i.test(message)?'Docker inventory request timed out':status?`Docker HTTP ${status}: Engine access rejected`:/guest agent|guest-agent|qemu/i.test(message)?'Docker inventory unavailable: guest agent access failed':'Docker inventory unavailable; inspect the selected host and node agent';
+    results.push({...row,response:now()-started,error:reason,lastSeen:cache.get(h.id)?.sampledAt||null});
+   }
   };
   // Rolling, bounded work: a slow host does not hold the next host behind its
   // batch, and one paired node cannot consume every slot.

@@ -93,4 +93,51 @@ class AgentTests(unittest.TestCase):
   with patch.object(agent,'post',return_value={'jobs':[{'id':'new','operation':'docker','method':'GET','path':'/info'}]}),patch.object(agent.time,'sleep') as sleep:
    agent.poll_once({},reads,writes,completed,ready)
    self.assertIn('busy',completed.get_nowait()['error']);self.assertEqual(reads.get_nowait()['id'],'existing');self.assertGreater(sleep.call_args.args[0],.5)
+ def test_bulk_stats_runs_one_guest_command_and_preserves_healthy_samples(self):
+  import os,subprocess,time
+  with tempfile.TemporaryDirectory() as folder:
+   executable=pathlib.Path(folder)/'curl'
+   executable.write_text("#!/usr/bin/python3\nimport sys,json,time\na=sys.argv[1:];identity=a[-1].split('/containers/')[1].split('/')[0];time.sleep(.04)\nif identity=='id5':print('000',end='');sys.exit(28)\nopen(a[a.index('-o')+1],'w').write(json.dumps({'cpu_stats':{'cpu_usage':{'total_usage':10}},'memory_stats':{'usage':100}}));print('200',end='')\n")
+   executable.chmod(0o755)
+   def guest(host,script,timeout):
+    self.assertEqual(host,'qemu/100');self.assertNotIn('docker stats',script)
+    script=script.replace('command -v curl >/dev/null && test -S /var/run/docker.sock','true',1)
+    result=subprocess.run(['/bin/sh','-c',script],capture_output=True,text=True,timeout=5,env={**os.environ,'PATH':folder+':/usr/bin:/bin'})
+    self.assertEqual(result.returncode,0,result.stderr);return result.stdout
+   body=base64.b64encode(json.dumps(['id'+str(i) for i in range(16)]).encode()).decode()
+   with patch.object(agent,'guest_run',side_effect=guest) as run:
+    result=agent.docker_stats('qemu/100',body,timeout=10)
+    self.assertEqual(run.call_count,1)
+   samples=json.loads(base64.b64decode(result['body']));self.assertEqual(len(samples),16);self.assertIn('timed out',samples['id5']['error']);self.assertEqual(samples['id15']['stats']['memory_stats']['usage'],100)
+ def test_bulk_stats_rejects_script_input_and_uses_read_lane(self):
+  for ids in [['../outside'],['id; touch /tmp/no'],['x']*17,[]]:
+   with patch.object(agent,'guest_run') as run:
+    with self.assertRaises(RuntimeError):agent.docker_stats('node',base64.b64encode(json.dumps(ids).encode()).decode())
+    run.assert_not_called()
+  self.assertTrue(agent.read_job({'operation':'stats','method':'GET','path':''}))
+  job={'id':'bulk','operation':'stats','host':'node','path':'','method':'GET','body':'fixture','expiresAt':agent.time.time()*1000+5000}
+  with patch.object(agent,'docker_stats',return_value={'status':200,'body':'e30='}) as bulk,patch.object(agent,'docker_request') as single:
+   self.assertEqual(agent.execute_job(job)['status'],200);single.assert_not_called();self.assertLessEqual(bulk.call_args.kwargs['timeout'],5)
+ def test_rescan_keeps_existing_running_guests_while_removing_stopped_guests(self):
+  class StopScan(Exception):pass
+  class StopEvent:
+   def wait(self,*args):raise StopScan()
+  existing=[{'id':'qemu/100','name':'control','online':True},{'id':'qemu/101','name':'stopped','online':True}]
+  def run(args,timeout):return 'VMID NAME STATUS\n100 control running\n101 stopped stopped\n' if args[0]=='qm' else 'VMID STATUS LOCK NAME\n'
+  def probe(identity,path,timeout):
+   self.assertIn('qemu/100',[h['id'] for h in agent.HOSTS]);self.assertNotIn('qemu/101',[h['id'] for h in agent.HOSTS])
+   return {'status':200,'body':base64.b64encode(b'{"ServerVersion":"fixture"}').decode()}
+  with patch.object(agent,'HOSTS',existing),patch.object(agent,'CONFIG',{'kind':'proxmox'},create=True),patch.object(agent,'run',side_effect=run),patch.object(agent,'docker_request',side_effect=probe),patch.object(agent,'RESCAN',StopEvent()):
+   with self.assertRaises(StopScan):agent.scan()
+   self.assertEqual({h['id'] for h in agent.HOSTS},{'node','qemu/100'})
+ def test_failed_guest_enumeration_marks_known_guests_unavailable(self):
+  class StopScan(Exception):pass
+  class StopEvent:
+   def wait(self,*args):raise StopScan()
+  def run(args,timeout):
+   if args[0]=='qm':raise RuntimeError('enumeration failed')
+   return 'VMID STATUS LOCK NAME\n'
+  with patch.object(agent,'HOSTS',[{'id':'qemu/100','name':'control','online':True}]),patch.object(agent,'CONFIG',{'kind':'proxmox'},create=True),patch.object(agent,'run',side_effect=run),patch.object(agent,'docker_request',return_value={'status':200,'body':base64.b64encode(b'{"ServerVersion":"fixture"}').decode()}),patch.object(agent,'RESCAN',StopEvent()):
+   with self.assertRaises(StopScan):agent.scan()
+   row=next(h for h in agent.HOSTS if h['id']=='qemu/100');self.assertFalse(row['online']);self.assertIn('guest list unavailable',row['error'])
 if __name__=='__main__':unittest.main()

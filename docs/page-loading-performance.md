@@ -1,4 +1,4 @@
-# Page loading and connector version 4
+# Page loading and connector version 5
 
 ## Behavior
 
@@ -31,7 +31,7 @@
 ## Update paired connectors after updating HomeCloud
 
 The server and frontend improvements apply when HomeCloud is updated. Faster
-paired-node execution requires **connector version 4 on each paired Proxmox node
+paired-node execution requires **connector version 5 on each paired Proxmox node
 or standalone Docker host**. Versions 1–3 remain compatible, and existing pairings
 are preserved. The Docker host panel shows a reminder for older connectors.
 
@@ -74,3 +74,13 @@ Run `npm test`, `npm run build` and
 `python3 apps/api/test/node-agent-python.test.py`. Performance fixtures use fake
 providers and local queues; live response times still depend on the number of
 hosts, provider health, network and whether each connector has been updated.
+
+## Container statistics and connector version 5
+
+Version 5 collects up to 16 container statistics records inside one guest execution, using bounded local Docker socket reads. This avoids a QEMU/pct round trip for every container. Concurrent snapshots for the same host and connection share in-flight work. Missing or failed measurements stay unknown; a container failure does not discard healthy container samples. Versions 1–4 retain the existing read path, and the UI recommends an update for the batched path.
+
+After updating HomeCloud, use the existing connector `--update` flow on each paired Proxmox node or standalone Docker host. Pairing credentials are preserved. Update the connector on the Proxmox node, not inside each VM. Statistics collection needs guest curl, base64 and a working Docker socket; it does not install another Docker agent or expose an Engine TCP port.
+
+Host selectors verify the Engine before committing a new selection. Discovery now distinguishes ready hosts from the selected connection, and setup verification reports its last actual failure and can be cancelled. Duplicate IPv4/IPv6 port rows are collapsed for display. CPU samples without valid deltas remain unknown; Linux memory subtracts reported inactive cache to match Docker CLI usage.
+
+Discovery retains known running guests while probing them, so incremental scans do not temporarily remove unscanned hosts. Successfully enumerated stopped guests are removed; failed VM/CT enumeration marks known affected guests unavailable instead of advertising them as ready.

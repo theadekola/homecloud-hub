@@ -17,3 +17,5 @@ A shared BrandIcon component controls sizing, local paths and failed-image fallb
 ## Sources
 
 The local `assets/brands/manifest.json` records each SVG source at an immutable upstream commit. `assets/brands/NOTICE.txt` and the included CC0/MIT license texts provide provenance and attribution. About → Credits links to the notice and lists available OS logos.
+
+Feature icons for Dashboard, Storage, Network, Backups, Monitoring, Alerts, Assistant, Shell, SFTP, Users and Settings are original HomeCloud SVG drawings under `public/assets/pages`. Sidebar links and matching page/tab headings share these assets. They remain decorative beside visible text, use fixed dimensions, and fall back to a local outline icon if an image fails. Proxmox and Docker retain their brand logos.

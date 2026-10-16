@@ -1,8 +1,9 @@
+import PageIcon, {pageIconForTitle} from './PageIcon';
 import React, { useEffect, useState, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 
 export function PageHeader({title, subtitle, actions}:{title:string; subtitle:string; actions?:React.ReactNode}) {
-  return <div className="page-header"><div><h1>{title}</h1><p>{subtitle}</p></div><div className="header-actions">{actions}</div></div>
+  return <div className="page-header"><div><h1><PageIcon name={pageIconForTitle(title)} className="page-title-icon"/>{title}</h1><p>{subtitle}</p></div><div className="header-actions">{actions}</div></div>
 }
 
 export function Card({children, className=''}:{children:React.ReactNode; className?:string}) {

@@ -68,8 +68,15 @@ connectors without a heartbeat are not asserted to be outdated. One notice is
 shown per paired host, not once for every discovered guest.
 
 Choose **Update Connector** on the paired host or in its Manage guide. The popup
-asks for a reachable SSH address, port, fresh username/password, verified host-key
-fingerprint and explicit consent. HTTPS is required by the form. Credentials are
+looks up the paired Proxmox node’s IP from the configured cluster, avoiding a
+requirement for short hostnames such as `node01` to resolve inside the HomeCloud
+container. Only an exact or unambiguous node-name match with a valid IP is used.
+Standalone hosts, unavailable cluster readings and ambiguous names retain manual
+SSH address entry. The popup asks for the SSH port, fresh username/password,
+verified host-key fingerprint and explicit consent. Use **Read SSH Fingerprint**
+to retry after correcting an address or a temporary connection failure. DNS errors
+explain that the address must be reachable from HomeCloud; they do not enable the
+verification checkbox or bypass host identity checks. HTTPS is required by the form. Credentials are
 used for this operation only and are not saved. Password-based SSH plus root or
 password-based sudo access must be available from the HomeCloud API server. If
 that access is unavailable, the existing manual `--update` command remains a

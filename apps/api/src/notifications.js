@@ -16,6 +16,7 @@ export function notificationChannels(env=process.env){
 }
 const textFor=(alert,event)=>`HomeCloud ${event==='resolved'?'RECOVERED':alert.severity?.toUpperCase()||'ALERT'}: ${alert.title}\nSource: ${alert.source}\n${alert.details||''}\n${event==='resolved'?alert.resolvedAt:alert.triggered}`;
 export async function sendNotification(channel,text,{env=process.env,fetcher=fetch,transport=nodemailer.createTransport,notification}={}){
+ if(notification)text=messageText(notification);
  if(channel==='email'){
   const port=Number(env.SMTP_PORT||587);if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid SMTP port');
   if(Boolean(env.SMTP_USER)!==Boolean(env.SMTP_PASSWORD))throw Error('Incomplete SMTP authentication');

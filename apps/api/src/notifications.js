@@ -32,8 +32,20 @@ export async function sendNotification(channel,text,{env=process.env,fetcher=fet
   url=new URL(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`);body={chat_id:env.TELEGRAM_CHAT_ID,text:text.slice(0,4096)};
  }else throw Error('Unsupported notification channel');
  const response=await fetcher(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000),redirect:'error'});
- if(!response.ok)throw Error('Notification service rejected delivery');
- if(channel==='telegram'&&(await response.json()).ok!==true)throw Error('Telegram rejected delivery');
+ if(!response.ok)throw Object.assign(Error('Notification service rejected delivery'),{providerStatus:response.status});
+ if(channel==='telegram'){const result=await response.json();if(result.ok!==true)throw Object.assign(Error('Telegram rejected delivery'),{providerStatus:result.error_code});}
+}
+export function notificationTestError(channel,error){
+ const name={discord:'Discord',telegram:'Telegram',email:'SMTP'}[channel]||'Notification',status=error?.providerStatus,code=error?.code||error?.cause?.code;
+ if(status===429)return `${name} rate limit reached. Wait before testing again.`;
+ if(status===401||status===403)return `${name} rejected access. Check the token or webhook permissions${channel==='telegram'?' and that the bot can message the chat':''}.`;
+ if(status===404)return `${name} endpoint was not found. Check that the webhook or bot token is still valid.`;
+ if(channel==='telegram'&&status===400)return 'Telegram rejected the destination. Check the chat ID and start the bot or add it to the intended chat.';
+ if(channel==='email'&&(code==='EAUTH'||error?.responseCode===535))return 'SMTP authentication failed. Check the username, password or app password and relay permissions.';
+ if(channel==='email'&&code==='EENVELOPE')return 'SMTP rejected the sender or recipient. Check both addresses and relay permissions.';
+ if(['CERT_HAS_EXPIRED','DEPTH_ZERO_SELF_SIGNED_CERT','UNABLE_TO_VERIFY_LEAF_SIGNATURE','ERR_TLS_CERT_ALTNAME_INVALID'].includes(code))return `${name} TLS verification failed. Check the hostname, certificate and trusted CA.`;
+ if(['ETIMEDOUT','ESOCKET','ECONNECTION','ECONNREFUSED','ENOTFOUND'].includes(code)||error?.name==='TimeoutError')return `${name} connection failed. Check the host, port, network, DNS and TLS settings.`;
+ return `${name} test failed. Check the entered connection details and service availability.`;
 }
 export const defaultNotificationPreferences=()=>({enabled:true,channels:{discord:true,telegram:true,email:true},minimumSeverity:'info',notifyResolved:true});
 export function notificationPreferences(state){const d=defaultNotificationPreferences(),p=state.notificationPreferences||{};return {...d,...p,channels:{...d.channels,...p.channels}};}
@@ -75,10 +87,10 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
    }
   })().finally(()=>{inFlight=null});return inFlight;
  }
- return {deliver,status,async test(channel){if(!configured().includes(channel))throw Object.assign(Error('Notification channel is not configured'),{status:400});
+ return {deliver,status,async test(channel,{env:override}={}){const testEnvironment=override||environment();if(!notificationChannels(testEnvironment).includes(channel))throw Object.assign(Error('Notification channel is not configured'),{status:400});
   const record={id:crypto.randomUUID(),channel,event:'test',createdAt:new Date(now()).toISOString(),attempts:1};
-  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env:environment()});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
-  catch{record.error=`${channel} test failed. Check the saved configuration and service availability.`;throw Object.assign(Error(record.error),{status:502});}
+  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env:testEnvironment});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
+  catch(error){record.error=notificationTestError(channel,error);throw Object.assign(Error(record.error),{status:502,notificationTest:true});}
   finally{persistence.mutate(s=>{s.notificationQueue??=[];s.notificationQueue.push(record);const keep=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event!=='test'||keep.has(r.id));});}}};
 }
 export const notifier=createNotifier();

@@ -4,7 +4,7 @@ Owners configure Discord, Telegram and SMTP under Settings → Notifications; Tr
 
 1. Open Configure and enter the endpoint and required credentials.
 2. Click Save Configuration. Changes apply without restarting HomeCloud.
-3. Use Test Connection. Notification tests explicitly ask before sending a real message; provider tests perform only a read. AI settings can be tested before saving, as described below.
+3. Use Test Connection. Notification tests explicitly ask before sending a real message; provider tests perform only a read. All configuration popups can test the entered details before saving. Testing never saves or enables an integration; blank secret fields retain the saved credential for the test.
 4. Enable configured notification channels using their delivery switches. A saved configuration is not evidence of successful delivery or provider permissions.
 
 The popup retains entered values after a failed save. Closing a changed form asks before discarding. Saved tokens and passwords are never returned; blank secret fields retain their previous value. An optional SMTP password can be explicitly cleared together with its username. Disconnect overrides both saved and legacy environment credentials and stops HomeCloud use of that integration. It does not delete external resources.
@@ -27,10 +27,10 @@ Owner-only authenticated endpoints:
 - GET /api/configuration/:service returns field metadata, nonsecret values and secret-presence flags.
 - PUT /api/configuration/:service validates and saves known fields; unknown fields and services are rejected.
 - DELETE /api/configuration/:service saves a disabled override.
-- POST /api/configuration/:service/test checks the saved connection. AI tests may include a configuration object to test an unsaved draft. Notification and AI tests require confirm=true.
+- POST /api/configuration/:service/test checks the saved connection, or accepts a configuration object to validate and test an unsaved draft for Discord, Telegram, SMTP, TrueNAS or AI. Notification and AI tests require confirm=true.
 - POST /api/configuration/ai/models lists text-model IDs using the saved key or a configuration draft, without saving it or generating a completion.
 
-Mutations use the existing audit and cache-invalidation mechanisms. Audit results contain only masked configuration or sanitized test results. Tokens, passwords and webhook secrets are not written to audit records or returned in errors. Failed tests do not report success, restart guests or grant privileges.
+Mutations use the existing audit and cache-invalidation mechanisms. Audit results contain only masked configuration or sanitized test results. Tokens, passwords and webhook secrets are not written to audit records or returned in errors. Failed tests do not report success, restart guests or grant privileges. Test notifications are recorded in delivery history without connection secrets. Safe errors identify common SMTP authentication/TLS problems, Telegram chat/token failures and Discord webhook/rate-limit failures.
 
 ## AI Assistant
 

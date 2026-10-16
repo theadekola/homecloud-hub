@@ -76,16 +76,15 @@ export async function restoreArchive(id,body,{query=pve,archives=backupArchives,
   if(point.type!=='qemu')throw httpError('Unknown backup type');
   return {node,task:await write(`/nodes/${encode(node)}/qemu`,'POST',{vmid,archive:point.volid,storage,force:0})};
 }
-export function truenasConfigured(){const env=runtimeEnvironment();return Boolean(env.TRUENAS_URL&&env.TRUENAS_API_KEY);}
-export async function truenas(method,params=[]){
-  try{return await truenasCall(method,params);}catch(error){
-    if(method.startsWith('pool.snapshot.')&&(error.code===-32601||/method.*not found|method.*does not exist/i.test(error.message)))return truenasCall(method.replace('pool.snapshot.','zfs.snapshot.'),params);
+export function truenasConfigured(env=runtimeEnvironment()){return Boolean(env.TRUENAS_URL&&env.TRUENAS_API_KEY);}
+export async function truenas(method,params=[],env=runtimeEnvironment()){
+  try{return await truenasCall(method,params,env);}catch(error){
+    if(method.startsWith('pool.snapshot.')&&(error.code===-32601||/method.*not found|method.*does not exist/i.test(error.message)))return truenasCall(method.replace('pool.snapshot.','zfs.snapshot.'),params,env);
     throw error;
   }
 }
-async function truenasCall(method,params=[]){
-  const env=runtimeEnvironment();
-  if(!truenasConfigured())throw httpError('TrueNAS is not configured',503);
+async function truenasCall(method,params=[],env=runtimeEnvironment()){
+  if(!truenasConfigured(env))throw httpError('TrueNAS is not configured',503);
   const base=new URL(env.TRUENAS_URL);
   if(base.protocol!=='https:')throw httpError('TrueNAS requires an HTTPS URL');
   const legacy=env.TRUENAS_API_MODE==='legacy';

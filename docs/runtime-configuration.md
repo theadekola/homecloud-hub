@@ -1,6 +1,6 @@
 # Runtime integration configuration
 
-Owners can configure Discord, Telegram and SMTP from Settings → Notifications, Settings → Integrations or delivery history. TrueNAS, OPNsense and Tailscale use Settings → Connections → Other Services. Existing Proxmox and Direct Docker API forms remain unchanged.
+Owners can configure Discord, Telegram and SMTP from Settings → Notifications. Integrations links to that workspace; delivery history does not repeat setup or test panels. TrueNAS, OPNsense and Tailscale use Settings → Connections → Other Services. Existing Proxmox and Direct Docker API forms remain unchanged.
 
 1. Open Configure and enter the endpoint and required credentials.
 2. Click Save Configuration. Changes apply without restarting HomeCloud.

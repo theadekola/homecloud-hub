@@ -43,3 +43,5 @@
 
 .notification-settings-recent{grid-column:1/-1}.integrations-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:800px){.integrations-settings-grid{grid-template-columns:1fr}}
 @media(min-width:801px){.system-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.configuration-model-actions{display:flex;align-items:center;gap:14px;margin:12px 0 18px}.configuration-model-actions .btn{flex:none}.configuration-model-actions .settings-note{margin:0}@media(max-width:600px){.configuration-model-actions{align-items:flex-start;flex-direction:column}}

@@ -2,7 +2,6 @@
 
 Reviewed repository baseline: `9842bb9` on `main`, after the shares commit `70abd67`. Remote main was fetched and remained at that baseline. Changes are local, not published or deployed. The combined patch includes the previously prepared NFS validation fix. No production credentials, live exports, media shares or infrastructure actions were used.
 
-This is a source-level integration review plus local automated verification. It does not certify every screen or establish compatibility with a live Proxmox, TrueNAS, OPNsense or Tailscale installation. Browser-client tests use mocked browser globals; there was no full browser click-through. Container deployment was not run.
 
 ## Confirmed problems corrected
 

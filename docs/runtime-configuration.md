@@ -1,6 +1,6 @@
 # Runtime integration configuration
 
-Owners can configure Discord, Telegram and SMTP from Settings → Notifications. Integrations links to that workspace; delivery history does not repeat setup or test panels. TrueNAS, OPNsense and Tailscale use Settings → Connections → Other Services. Existing Proxmox and Direct Docker API forms remain unchanged.
+Owners configure Discord, Telegram and SMTP under Settings → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Integrations.
 
 1. Open Configure and enter the endpoint and required credentials.
 2. Click Save Configuration. Changes apply without restarting HomeCloud.
@@ -15,8 +15,6 @@ The popup retains entered values after a failed save. Closing a changed form ask
 - Telegram: bot token and chat ID.
 - SMTP: hostname, port, optional username/password, sender, recipient and optional trusted PEM CA. Port 465 uses implicit TLS; all other ports require STARTTLS. TLS verification stays enabled.
 - TrueNAS: HTTPS origin, API key, current/legacy protocol and optional trusted PEM CA.
-- OPNsense: HTTPS origin, API key/secret, current/legacy API style and optional trusted PEM CA.
-- Tailscale: tailnet name and API key; the existing public HTTPS API is used.
 
 The application still requires normal database, signing-key and deployment bootstrap configuration. This feature configures supported service connections rather than rewriting deployment files. Unsupported delivery adapters remain labelled unavailable.
 
@@ -32,3 +30,7 @@ Owner-only authenticated endpoints:
 - POST /api/configuration/:service/test checks the saved connection. Notification tests require confirm=true.
 
 Mutations use the existing audit and cache-invalidation mechanisms. Audit results contain only masked configuration or sanitized test results. Tokens, passwords and webhook secrets are not written to audit records or returned in errors. Failed tests do not report success, restart guests or grant privileges.
+
+## AI Assistant
+
+An owner can open Settings → Integrations → Configure AI, or Configure AI on the Assistant page. Enter an OpenAI API key and model, then Save Configuration. Blank key fields retain the encrypted saved key. Changes apply immediately. Test Connection asks permission before sending a small billable request. Assistant queries send current measurements and user text to the fixed OpenAI Responses endpoint. Disconnect disables the saved connection, including environment fallback.

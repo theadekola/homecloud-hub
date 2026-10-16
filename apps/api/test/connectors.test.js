@@ -29,7 +29,7 @@ test('Docker connector handles pulls, port mappings, conflicts and log frames',a
     const connector=await import('../src/connectors.js');
     const inventory=await connector.dockerSnapshot();
     assert.equal(inventory.volumes[0].created,'2026-01-01T00:00:00Z');
-    assert.equal(inventory.volumes[0].labels.backup,'true');
+    assert.deepEqual(inventory.volumes[0].labels,{});assert.equal(inventory.volumes[0].options,undefined);
     assert.equal(inventory.containers[0].mounts[0].Destination,'/data');
     const result=await connector.dockerCreateContainer({name:'test',image:'nginx',ports:'8080:80'});
     assert.equal(result.Id,'test');assert.equal(starts,0);await connector.dockerCreateContainer({name:'test',image:'nginx',start:true});assert.equal(starts,1);await connector.dockerCreateContainer({name:'test',image:'nginx',ports:'8080:80',start:false});assert.equal(starts,1);

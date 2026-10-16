@@ -1,3 +1,4 @@
+import {retireProviders} from './retired-providers.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ if(fs.existsSync(file)){
   const saved=JSON.parse(fs.readFileSync(file,'utf8'));
   if(saved.schema===3)state={...state,...saved};
 }
+const prior=JSON.stringify(state);retireProviders(state);if(JSON.stringify(state)!==prior)save();
 export function get(){return state;}
 export function save(){const temporary=`${file}.tmp`;fs.writeFileSync(temporary,JSON.stringify(state,null,2));fs.renameSync(temporary,file);}
 export function mutate(fn){const previous=state;state=structuredClone(state);try{fn(state);save();return state;}catch(error){state=previous;throw error;}}

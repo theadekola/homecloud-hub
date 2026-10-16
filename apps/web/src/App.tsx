@@ -6,7 +6,7 @@ import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { api, clearTokens, getAccessToken } from './api';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard'; import {Proxmox} from './pages/Live'; import Docker from './pages/Docker'; import Storage from './pages/Storage'; import Network from './pages/Network'; import Backups from './pages/Backups';    import Monitoring from './pages/Monitoring'; import Alerts from './pages/Alerts'; import AI from './pages/AI'; import Users from './pages/Users'; import Settings from './pages/Settings';
+import Dashboard from './pages/Dashboard'; import Proxmox from './pages/Proxmox'; import Docker from './pages/Docker'; import Storage from './pages/Storage'; import Network from './pages/Network'; import Backups from './pages/Backups';    import Monitoring from './pages/Monitoring'; import Alerts from './pages/Alerts'; import AI from './pages/AI'; import Users from './pages/Users'; import Settings from './pages/Settings';
 
 export default function App(){
  const [connectionError,setConnectionError]=useState('');

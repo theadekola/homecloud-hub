@@ -6,7 +6,7 @@ import path from 'node:path';
 import https from 'node:https';
 import { spawnSync } from 'node:child_process';
 import { WebSocketServer } from 'ws';
-import { truenas,opnsense,tailscale,tailscaleSnapshot } from '../src/infrastructure.js';
+import { truenas } from '../src/infrastructure.js';
 const executable=process.platform==='win32'?'C:/Program Files/Git/mingw64/bin/openssl.exe':'openssl';
 const available=spawnSync(executable,['version']).status===0;
 await test('TLS connectors authenticate, surface provider errors and support both TrueNAS protocols',{skip:!available},async()=>{
@@ -31,20 +31,13 @@ await test('TLS connectors authenticate, surface provider errors and support bot
  }));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`https://localhost:${server.address().port}`;
  process.env.TRUENAS_URL=base;process.env.TRUENAS_API_KEY='test-key';process.env.TRUENAS_TLS_CA=cert;
- process.env.OPNSENSE_URL=base;process.env.OPNSENSE_API_KEY='key';process.env.OPNSENSE_API_SECRET='secret';process.env.OPNSENSE_TLS_CA=cert;
  // The default Node CA set is extended only for this test process's HTTP connector.
- process.env.TAILSCALE_API_KEY='tail-key';process.env.TAILSCALE_TAILNET='tail';process.env.TAILSCALE_API_BASE=`${base}/api/v2`;process.env.TAILSCALE_TLS_CA=cert;
  try{
    const result=await truenas('pool.snapshot.query');assert.equal(result[0].id,'pool/data@snapshot');assert.ok(seen.some(r=>r.method==='zfs.snapshot.query'));
    process.env.TRUENAS_API_MODE='legacy';const legacy=await truenas('pool.snapshot.query');assert.equal(legacy[0].id,'pool/data@snapshot');delete process.env.TRUENAS_API_MODE;
    rejected=true;await assert.rejects(truenas('pool.dataset.query'),/authentication rejected/);rejected=false;
-   const firewall=await opnsense('core/system/status');assert.equal(firewall.status,'ok');const request=seen.find(r=>r.path==='/api/core/system/status');assert.equal(request.headers.authorization,`Basic ${Buffer.from('key:secret').toString('base64')}`);
-   await assert.rejects(opnsense('denied'),/403/);
-   const tailnet=await tailscaleSnapshot();assert.equal(tailnet.devices[0].name,'actual-device');assert.equal(tailnet.devices[0].authorized,true);
-   await tailscale('device/device/routes','POST',{routes:['192.168.1.0/24']});const route=seen.find(r=>r.path==='/api/v2/device/device/routes');assert.deepEqual(route.body.routes,['192.168.1.0/24']);assert.equal(route.headers.authorization,'Bearer tail-key');
-   await assert.rejects(tailscale('denied'),/403/);
    // Certificate failure must be visible; no global TLS bypass is allowed.
-   delete process.env.OPNSENSE_TLS_CA;await assert.rejects(opnsense('core/system/status'),/self-signed certificate/);
+   delete process.env.TRUENAS_TLS_CA;await assert.rejects(truenas('pool.dataset.query'),/self-signed certificate/);
    assert.notEqual(process.env.NODE_TLS_REJECT_UNAUTHORIZED,'0');
  }finally{for(const client of wss.clients)client.terminate();await new Promise(resolve=>wss.close(resolve));await new Promise(resolve=>server.close(resolve));}
 });

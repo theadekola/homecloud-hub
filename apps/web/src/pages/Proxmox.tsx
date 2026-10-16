@@ -1,7 +1,7 @@
 
 
 import ProxmoxTasks from './ProxmoxTasks';
-import {useEffect,useState,ReactNode} from 'react';
+import {useEffect,useState} from 'react';
 import {Link,useNavigate,useSearchParams} from 'react-router-dom';
 import {Server,Monitor,Box,Cpu,MemoryStick,HardDrive,ShieldCheck,RefreshCw,Plus,Terminal,Archive,ListChecks,ExternalLink} from 'lucide-react';
 import {AreaChart,Area,ResponsiveContainer,PieChart,Pie,Cell,Tooltip} from 'recharts';
@@ -22,7 +22,7 @@ const pct=(v:any)=>v==null?'Unknown':`${v}%`;
 const duration=(v:any)=>v==null?'Unknown':`${Math.floor(v/86400)}d ${Math.floor(v%86400/3600)}h ${Math.floor(v%3600/60)}m`;
 const sum=(rows:any[],key:string)=>rows.length&&rows.every(r=>typeof r[key]==='number')?rows.reduce((n,r)=>n+r[key],0):null;
 const colors=['#3b82f6','#8b5cf6','#22c55e','#f59e0b','#14b8a6'];
-export default function ProxmoxOverview({management}:{management:(view:string)=>ReactNode}){
+export default function ProxmoxOverview(){
  const [hours,setHours]=useState('24');
  const live=useApi<any>('/proxmox',null),tasks=useApi<any>(`/proxmox/tasks?hours=${hours}`,null),history=useApi<any>('/dashboard',null),network=useApi<any>('/network',null),session=useApi<any>('/auth/me',null);
  const [busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[refreshFailure,setRefreshFailure]=useState(''),[taskResult,setTaskResult]=useState<any>(null);

@@ -21,7 +21,7 @@ Infrastructure names, IP addresses, logs, filenames and prompts may contain pers
 ## Requests outside the installation
 
 - Proxmox, Docker, TrueNAS and SSH targets receive the configured requests needed for their connected features.
-- Enabled Discord, Telegram or SMTP channels receive alert/source/details and recovery messages. Tests send a user-confirmed test message to the configured destination.
+- Enabled Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, custom webhook or IFTTT channels receive alert/source/details and recovery messages. Tests send a user-confirmed request to the configured destination. Custom receivers and IFTTT applets can perform downstream actions.
 - When AI is configured and used, OpenAI receives the user's question and selected infrastructure measurements. AI requests set `store: false`; that setting does not replace the provider's own processing or retention policy. Connection tests use a small test prompt. Model discovery uses the configured key without an assistant completion.
 - The optional host updater contacts the configured Git upstream, normally GitHub. Installation/build/update tooling also downloads selected packages and container images.
 - External documentation, repository, portfolio and social links open their respective sites when followed.

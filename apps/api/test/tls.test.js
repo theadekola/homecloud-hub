@@ -34,6 +34,9 @@ await test('TLS connectors authenticate, surface provider errors and support bot
  process.env.TRUENAS_URL=base;process.env.TRUENAS_API_KEY='test-key';process.env.TRUENAS_TLS_CA=cert;
  // The default Node CA set is extended only for this test process's HTTP connector.
  try{
+   const {sendNotification}=await import('../src/notifications.js');
+   for(const channel of ['gotify','webhook']){await sendNotification(channel,'TLS test',{env:channel==='gotify'?{GOTIFY_URL:base,GOTIFY_APP_TOKEN:'tls-test-key',GOTIFY_CA_PEM:fs.readFileSync(cert,'utf8')}:{WEBHOOK_URL:base+'/hook',WEBHOOK_BEARER_TOKEN:'tls-test-key',WEBHOOK_CA_PEM:fs.readFileSync(cert,'utf8')}});}
+   assert.ok(seen.some(r=>r.path==='/message'&&r.headers['x-gotify-key']==='tls-test-key'));assert.ok(seen.some(r=>r.path==='/hook'&&r.headers.authorization==='Bearer tls-test-key'));
    const draft=await truenas('system.info',[],{TRUENAS_URL:process.env.TRUENAS_URL,TRUENAS_API_KEY:'draft-key',TRUENAS_API_MODE:'current',TRUENAS_CA_PEM:fs.readFileSync(cert,'utf8')});assert.ok(draft);assert.ok(seen.some(r=>r.method==='auth.login_with_api_key'&&r.params[0]==='draft-key'));assert.notEqual(process.env.TRUENAS_API_KEY,'draft-key');
    process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);
    const {createApp}=await import('../src/app.js'),{createConfigurationStore}=await import('../src/runtime-configuration.js'),configuration=createConfigurationStore(path.join(directory,'configuration'));configuration.disable('truenas');

@@ -40,7 +40,7 @@ Application two-factor authentication, intrusion detection and an independent se
 
 Audit records capture submitted operations, failures and returned task identifiers. Provider tasks require later outcome checks. Database administrators can change audit records; the log is not cryptographically immutable. API reachability, successful configuration saves and queued actions are not proof of overall health, successful delivery or completed work.
 
-Snapshots on a pool are not independent off-host backups. HomeCloud does not supply a generic Docker-volume/database backup runner. Discord, Telegram and SMTP messages and configured AI requests can send sensitive infrastructure information outside the installation. See [PRIVACY.md](PRIVACY.md).
+Snapshots on a pool are not independent off-host backups. HomeCloud does not supply a generic Docker-volume/database backup runner. Configured external notification channels (including custom webhooks/IFTTT) and AI requests can send sensitive infrastructure information outside the installation. See [PRIVACY.md](PRIVACY.md).
 
 ## Validation boundaries
 

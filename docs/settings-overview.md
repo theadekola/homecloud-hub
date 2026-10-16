@@ -39,11 +39,11 @@ Sign Out This Browser appears once, under Active Sessions. It removes this brows
 
 ## Delivery and integrations
 
-Notifications is the single delivery-management workspace. Owners can open secure configuration forms for Discord, Telegram and SMTP, set channel/master switches and severity/recovery preferences, send explicit tests, and inspect delivery history. Failed preference writes restore previous values. Unconfigured channels cannot be enabled.
+Notifications is the single delivery-management workspace. Owners can open secure configuration forms for all nine supported notification channels, set channel/master switches and severity/recovery preferences, send explicit tests, and inspect delivery history. Failed preference writes restore previous values. Unconfigured channels cannot be enabled.
 
 All-channel tests and individual-channel tests have distinct scopes. Test actions ask before sending real messages. The embedded delivery history includes filters, paging and details without a second channel-configuration panel, dashboard or test runner. It does not send messages on open or refresh.
 
-Integrations no longer repeats notification switches, secret forms, provider status lists or compatibility runners. It shows supported adapter/automation scope and existing alert-rule observations, with links to Notifications and Connections. It does not claim that unimplemented Slack, Teams, Pushover, custom webhooks, IFTTT or Gotify adapters are connected.
+Integrations no longer repeats notification switches, secret forms, provider status lists or compatibility runners. It shows supported adapter/automation scope and existing alert-rule observations, with links to Notifications and Connections. It does not claim that unconfigured notification adapters are connected.
 
 
 ## Backup and product information

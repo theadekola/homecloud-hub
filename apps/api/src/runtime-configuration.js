@@ -1,3 +1,4 @@
+import {notificationIds,filterKey,httpsEndpoint} from './notification-channels.js';
 import {removeRetiredConfigurations} from './retired-providers.js';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -11,6 +12,15 @@ export const configurationSchemas={
  truenas:{name:'TrueNAS',fields:[field('TRUENAS_URL','HTTPS endpoint','url'),field('TRUENAS_API_KEY','API key','password'),field('TRUENAS_API_MODE','API protocol','select',true,{options:['current','legacy']}),field('TRUENAS_CA_PEM','Trusted CA certificate (PEM)','textarea',false)]},
  ai:{name:'AI Assistant',fields:[field('OPENAI_API_TYPE','OpenAI API type','select',true,{options:['responses','chat-completions'],defaultValue:'responses'}),field('OPENAI_API_KEY','OpenAI API key','password'),field('OPENAI_MODEL','Model','text',true,{defaultValue:'gpt-5-mini'})]}
 };
+Object.assign(configurationSchemas,{
+ slack:{name:'Slack',fields:[field('SLACK_WEBHOOK_URL','Slack incoming webhook URL','password')]},
+ teams:{name:'Microsoft Teams',fields:[field('TEAMS_WEBHOOK_URL','Teams Workflows webhook URL','password')]},
+ pushover:{name:'Pushover',fields:[field('PUSHOVER_APP_TOKEN','Application token','password'),field('PUSHOVER_USER_KEY','User or group key','password'),field('PUSHOVER_DEVICE','Device name','text',false)]},
+ gotify:{name:'Gotify',fields:[field('GOTIFY_URL','Gotify HTTPS URL','url'),field('GOTIFY_APP_TOKEN','Application token','password'),field('GOTIFY_CA_PEM','Trusted CA certificate (PEM)','textarea',false)]},
+ webhook:{name:'Custom Webhook',fields:[field('WEBHOOK_URL','Webhook HTTPS URL','password'),field('WEBHOOK_BEARER_TOKEN','Bearer token','password',false),field('WEBHOOK_CA_PEM','Trusted CA certificate (PEM)','textarea',false)]},
+ ifttt:{name:'IFTTT',fields:[field('IFTTT_EVENT','Event name'),field('IFTTT_WEBHOOK_KEY','Webhooks key','password')]}
+});
+for(const id of notificationIds)configurationSchemas[id].fields.push(field(filterKey(id),'Send notifications for','select',true,{options:['all','critical','warning','info','resolved','unknown'],defaultValue:'all'}));
 const invalid=message=>{throw Object.assign(Error(message),{status:400})};
 function schemaFor(id){const schema=Object.hasOwn(configurationSchemas,id)&&configurationSchemas[id];if(!schema)invalid('Unsupported configuration service');return schema;}
 export function validateConfiguration(id,input,previous={}){
@@ -20,6 +30,13 @@ export function validateConfiguration(id,input,previous={}){
  if(id==='telegram'&&(!/^\d+:[A-Za-z0-9_-]+$/.test(values.TELEGRAM_BOT_TOKEN)||!/^(-?\d+|@[A-Za-z0-9_]+)$/.test(values.TELEGRAM_CHAT_ID)))invalid('Enter a valid Telegram bot token and chat ID');
  if(id==='email'){if(!/^[a-zA-Z0-9.:-]+$/.test(values.SMTP_HOST))invalid('Enter an SMTP hostname without a scheme or path');const p=Number(values.SMTP_PORT);if(!Number.isInteger(p)||p<1||p>65535)invalid('SMTP port must be between 1 and 65535');if(Boolean(values.SMTP_USER)!==Boolean(values.SMTP_PASSWORD))invalid('SMTP username and password must both be set, or both empty');for(const key of ['NOTIFICATION_EMAIL_FROM','NOTIFICATION_EMAIL_TO'])if(!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(values[key]))invalid('Enter one valid sender and recipient email address');}
  for(const key of ['TRUENAS_URL'])if(values[key]){let u;try{u=new URL(values[key])}catch{invalid('Enter a valid HTTPS endpoint')}if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash||u.pathname!=='/')invalid('Use an HTTPS origin without credentials, paths or query strings');values[key]=u.origin;}
+ for(const key of ['SLACK_WEBHOOK_URL','TEAMS_WEBHOOK_URL','GOTIFY_URL','WEBHOOK_URL'])if(values[key]){let url;try{url=httpsEndpoint(values[key])}catch{invalid('Enter a valid HTTPS endpoint without embedded credentials or a fragment')}
+  if(key==='SLACK_WEBHOOK_URL'&&(!['hooks.slack.com','hooks.slack-gov.com'].includes(url.hostname)||!/^\/services\/[A-Za-z0-9_/-]+$/.test(url.pathname)||url.search||url.port))invalid('Enter a Slack incoming webhook URL');
+  if(key==='TEAMS_WEBHOOK_URL'&&!['.logic.azure.com','.environment.api.powerplatform.com','.webhook.office.com'].some(s=>url.hostname.endsWith(s)))invalid('Enter a Microsoft Teams Workflows webhook URL');
+  if(key==='GOTIFY_URL'&&url.search)invalid('Use a Gotify base URL without a query string');
+ }
+ if(id==='pushover'&&['PUSHOVER_APP_TOKEN','PUSHOVER_USER_KEY'].some(k=>! /^[A-Za-z0-9]{30}$/.test(values[k])))invalid('Enter valid 30-character Pushover keys');
+ if(id==='ifttt'&&(!/^[A-Za-z0-9_-]{1,100}$/.test(values.IFTTT_EVENT)||! /^[A-Za-z0-9_-]{1,200}$/.test(values.IFTTT_WEBHOOK_KEY)))invalid('Enter a valid IFTTT event name and Webhooks key');
  if(id==='ai'&&(!/^[A-Za-z0-9._:-]{1,150}$/.test(values.OPENAI_MODEL)||/\s/.test(values.OPENAI_API_KEY)))invalid('Enter a valid model and API key');
  return values;
 }

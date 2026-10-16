@@ -6,7 +6,7 @@ export function configureRefresh(seconds:number){interval=Math.max(15,Math.min(3
 type Resource={path:string;scope:string;data:any;hasData:boolean;error:string;loading:boolean;updated:number;created:number;generation:number;listeners:Set<()=>void>;pending?:Promise<void>;controller?:AbortController};
 const resources=new Map<string,Resource>();
 let eventWindow:Window|undefined;
-const scope=()=>JSON.stringify([window.localStorage.getItem('homecloud_access_token')||'',window.localStorage.getItem('homecloud_docker_host')||'']);
+const scope=()=>JSON.stringify([window.sessionStorage.getItem('homecloud_access_token')||window.localStorage.getItem('homecloud_access_token')||'',window.localStorage.getItem('homecloud_docker_host')||'']);
 const emit=(entry:Resource)=>entry.listeners.forEach(notify=>notify());
 function invalidate(){for(const entry of resources.values()){entry.updated=0;entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;emit(entry);}}
 function clear(){for(const entry of resources.values()){entry.generation++;entry.controller?.abort();entry.hasData=false;entry.data=undefined;entry.error='';entry.updated=0;entry.pending=undefined;entry.loading=false;emit(entry);}resources.clear();}

@@ -45,3 +45,15 @@ Snapshots on a pool are not independent off-host backups. HomeCloud does not sup
 ## Validation boundaries
 
 Automated regression tests use isolated provider fixtures and exercise approvals, restore safeguards, monitoring gaps, TLS and token handling. They cannot validate every real provider release, ACL, guest OS or network. Verify compatibility and restore procedures on disposable resources before relying on them in production.
+
+## Connector maintenance through Connections
+
+Connector update status and actions require the owner role. The SSH popup uses
+fresh credentials without saving them, a pinned user-verified host fingerprint,
+and explicit consent. A fixed remote script verifies the selected connector's
+pairing ID and token hash locally before writing its own script. The raw pairing
+token is never returned. Only the connector bundled with the running HomeCloud
+release is eligible; arbitrary scripts, download URLs and service names cannot
+be supplied by the client. Backups stay root-only on the paired host. Completion
+requires a fresh matching code-revision heartbeat. SSH passwords and raw remote
+output are excluded from update status, notifications and audit details.

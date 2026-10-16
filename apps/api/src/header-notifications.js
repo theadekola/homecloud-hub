@@ -1,3 +1,5 @@
+import {agentNodes} from './node-agents.js';
+import {connectorUpdateInfo} from './connector-release.js';
 import crypto from 'node:crypto';
 import {get,mutate} from './store.js';
 const text=value=>String(value??'').replace(/[\u0000-\u001f]/g,' ').slice(0,160);
@@ -37,9 +39,10 @@ export function observeHeaderActivity(state,snapshot){
  // Missing/partial observations do not imply resources were deleted or recovered.
  state.headerObservations={...prior,...current};const keys=Object.keys(state.headerObservations);if(keys.length>10000)state.headerObservations=Object.fromEntries(keys.slice(-10000).map(key=>[key,state.headerObservations[key]]));
 }
-export function createHeaderNotifications(persistence={get,mutate}){
+export function createHeaderNotifications(persistence={get,mutate},connectors=agentNodes){
  return {capture(req,statusCode,status){const scratch={};captureRequestActivity(scratch,req,statusCode,status);if(scratch.headerActivities?.length){const {id,sequence,time,...row}=scratch.headerActivities[0];persistence.mutate(state=>append(state,row))}},read(user,update){const state=persistence.get(),cursor=own(state.headerNotificationReads,'u:'+user.sub)||0,visible=(state.headerActivities||[]).filter(row=>row.audience==='shared'||user.role==='owner'||row.userId===user.sub),attention=(state.alerts||[]).filter(a=>['active','acknowledged'].includes(a.status)).map(a=>({id:a.id,title:text(a.title),message:text(a.source),severity:a.severity||'warning',status:a.status,time:a.triggered,link:`/alerts?alert=${encodeURIComponent(a.id)}`,kind:'alert'}));
   if(user.role==='owner'&&update?.enabled&&(update.available||['error','failed'].includes(update.state)))attention.unshift({id:'software-update',title:update.available?'Software update available':'Software update needs attention',message:'Open About to review the updater status.',severity:update.available?'info':'warning',status:'active',time:update.checkedAt,link:'/settings?tab=About',kind:'update'});
+  if(user.role==='owner')for(const node of connectors()){const update=node.update||connectorUpdateInfo(node);if(update.available)attention.unshift({id:'connector-update:'+node.id,title:`Connector update available: ${text(node.name)}`,message:`Update the paired host to the connector bundled with HomeCloud (protocol ${update.version}).`,severity:'info',status:'active',time:node.lastSeen,link:'/settings?tab=Connections&connector='+encodeURIComponent(node.id),kind:'update'});}
   attention.sort((a,b)=>({critical:0,warning:1,info:2}[a.severity]??1)-({critical:0,warning:1,info:2}[b.severity]??1));
   const unread=visible.filter(row=>row.sequence>cursor).length;return {attention:attention.slice(0,50),attentionCount:attention.length,activity:visible.slice(0,50).map(({audience,userId,...row})=>({...row,unread:row.sequence>cursor})),unreadCount:unread,badgeCount:attention.length,latestSequence:state.headerActivitySequence||0,retainedLimit:500,sampledAt:new Date().toISOString()};},markRead(user,sequence){const state=persistence.get();if(!Number.isSafeInteger(sequence)||sequence<0||sequence>(state.headerActivitySequence||0))throw Object.assign(Error('Choose a valid activity cursor'),{status:400});persistence.mutate(s=>{s.headerNotificationReads??={};const key='u:'+user.sub;s.headerNotificationReads[key]=Math.max(own(s.headerNotificationReads,key)||0,sequence)});return {read:true}}};
 }

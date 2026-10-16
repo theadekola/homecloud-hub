@@ -2,6 +2,7 @@ import {notificationIds} from './notification-channels.js';
 import {buildInfo} from './build-info.js';
 import {publicDockerImage,publicDockerVolume} from './docker-public.js';
 import {queryAI,listAIModels} from './ai.js';
+import {connectorUpdater} from './connector-updates.js';
 import {headerNotifications} from './header-notifications.js';
 import {configurationStore,configurationSchemas,validateConfiguration} from './runtime-configuration.js';
 import {validateNotificationPreferences} from './notifications.js';
@@ -49,7 +50,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater}={}){
 
  const app=express(),readCache=createReadCache();
  app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
@@ -88,6 +89,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
  app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts().filter(h=>h.online||h.status==='connected'),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
+ app.get('/api/node-agents/:id/update',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({update:connectorUpdates.status(req.params.id)});});
+ app.post('/api/node-agents/:id/update',authorize('owner'),async(req,res)=>{const update=connectorUpdates.request(req.params.id,req.body);res.locals.activityStatus='queued';await audit(req,'connector.update',req.params.id,{version:update.version,revision:update.revision},'queued');res.status(202).json({update});});
  app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{const pairing=createPairing(req.body);await audit(req,'node-agent.pairing','nodes',{},'success');res.set('Cache-Control','no-store');res.json(pairing);});
  app.post('/api/node-agents/pairing/status',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(pairingStatus(req.body.code));});
  app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});

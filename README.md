@@ -110,7 +110,7 @@ For Proxmox pairing, install one connector per node. Linux CT access uses `pct e
 
 Use dedicated provider identities with only the privileges needed. Proxmox guest command execution needs a separate scoped privilege, not just the read role. See [connection recovery](docs/connections-and-health.md) and [warning recovery](docs/monitoring-warning-recovery.md).
 
-Connector **version 5** batches container statistics. After updating HomeCloud, use the connector update command shown in Guest Setup on each paired Proxmox node. It preserves pairing credentials. No per-guest Docker TCP port or per-guest HomeCloud agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
+Connector **version 5** batches container statistics. After updating HomeCloud, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest HomeCloud agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
 
 ## Monitoring and notifications
 

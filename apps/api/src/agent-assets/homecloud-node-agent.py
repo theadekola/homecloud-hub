@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
-import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
+import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
 VERSION=5
+REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
 HOSTS=[]
 RESCAN=threading.Event()
 LOCK=threading.Lock()
@@ -193,7 +194,7 @@ def poll_once(config,reads,writes,completed,ready):
   try:results.append(completed.get_nowait())
   except queue.Empty:break
  with LOCK:hosts=list(HOSTS);network=NETWORK
- try:response=post(config,'poll',{'version':VERSION,'hosts':hosts,'results':results,**({'network':network} if network else {})})
+ try:response=post(config,'poll',{'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,**({'network':network} if network else {})})
  except Exception:
   for result in results:completed.put(result)
   ready.set();raise

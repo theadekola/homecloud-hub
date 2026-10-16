@@ -32,7 +32,7 @@ Developed by **Adekola Kazeem Ayannuga** through [The Adekola Labs](https://thea
 | TrueNAS | Pools, disks, datasets, snapshots, jobs, periodic snapshot tasks and SMB/NFS share management; API compatibility depends on installed TrueNAS version |
 | Backups | Proxmox jobs/archives, backup schedules, retention preview/prune and restore into unused guest IDs; TrueNAS snapshot workflows |
 | Monitoring | Collected measurements, connection health, measured alert rules, unresolved alerts, recovery history and provider task outcomes |
-| Notifications | Header activity feed, persistent unresolved-alert badge and configured Discord, Telegram or SMTP delivery |
+| Notifications | Header activity feed, persistent unresolved-alert badge and configured Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, webhook and IFTTT delivery |
 | Tools | Administrator SSH shell with multiple tabs, copy/paste and SFTP file operations, using target authentication and verified host identity |
 | AI Assistant | Owner-configured OpenAI Responses or Chat Completions, model discovery and connection testing; read-only assistance |
 | Administration | Accounts/roles, audit records, encrypted supported integration configuration, browser appearance and session preferences |
@@ -118,7 +118,7 @@ Provider monitoring normally samples every 30 seconds; read caches and UI pollin
 
 The header bell counts **unresolved alerts only**, including acknowledged conditions that have not recovered. Recent activity stays in the popup without increasing the badge. Marking activity read does not resolve alerts.
 
-Configure Discord, Telegram or SMTP in **Settings → Notifications**, save, enable the channel and send an explicitly confirmed test. Saved credentials do not prove delivery. Failed deliveries retry with backoff; delivery is not guaranteed exactly once.
+Configure your channel in **Settings → Notifications**, choose its severity/recovery preference, save, enable it and send an explicitly confirmed test. Supported channels include Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, custom webhooks and IFTTT. Each automatic alert is sent separately; Discord displays a colour-coded card. See the [channel setup guide](docs/notification-channels.md). Saved credentials do not prove delivery. Failed deliveries retry with backoff; delivery is not guaranteed exactly once.
 
 AI configuration is under **Settings → Integrations** and on the Assistant page. You can load models and test an unsaved API-key/model/API-type draft before saving. AI tests and use can incur provider charges. Assistant requests send user text and selected infrastructure measurements to OpenAI; the assistant cannot execute infrastructure actions.
 

@@ -1,6 +1,6 @@
 # Runtime integration configuration
 
-Owners configure Discord, Telegram and SMTP under Settings → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Integrations.
+Owners configure Discord, Telegram, SMTP, Slack, Microsoft Teams, Pushover, Gotify, custom webhooks and IFTTT under Settings → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Integrations.
 
 1. Open Configure and enter the endpoint and required credentials.
 2. Click Save Configuration. Changes apply without restarting HomeCloud.
@@ -16,7 +16,7 @@ The popup retains entered values after a failed save. Closing a changed form ask
 - SMTP: hostname, port, optional username/password, sender, recipient and optional trusted PEM CA. Port 465 uses implicit TLS; all other ports require STARTTLS. TLS verification stays enabled.
 - TrueNAS: HTTPS origin, API key, current/legacy protocol and optional trusted PEM CA.
 
-The application still requires normal database, signing-key and deployment bootstrap configuration. This feature configures supported service connections rather than rewriting deployment files. Unsupported delivery adapters remain labelled unavailable.
+The application still requires normal database, signing-key and deployment bootstrap configuration. This feature configures supported service connections rather than rewriting deployment files. See [notification channels](notification-channels.md) for provider setup, individual alert cards and per-channel severity/recovery selectors. Browser push is not implemented.
 
 ## Storage and APIs
 
@@ -27,7 +27,7 @@ Owner-only authenticated endpoints:
 - GET /api/configuration/:service returns field metadata, nonsecret values and secret-presence flags.
 - PUT /api/configuration/:service validates and saves known fields; unknown fields and services are rejected.
 - DELETE /api/configuration/:service saves a disabled override.
-- POST /api/configuration/:service/test checks the saved connection, or accepts a configuration object to validate and test an unsaved draft for Discord, Telegram, SMTP, TrueNAS or AI. Notification and AI tests require confirm=true.
+- POST /api/configuration/:service/test checks the saved connection, or accepts a configuration object to validate and test an unsaved draft for any supported notification channel, TrueNAS or AI. Notification and AI tests require confirm=true.
 - POST /api/configuration/ai/models lists text-model IDs using the saved key or a configuration draft, without saving it or generating a completion.
 
 Mutations use the existing audit and cache-invalidation mechanisms. Audit results contain only masked configuration or sanitized test results. Tokens, passwords and webhook secrets are not written to audit records or returned in errors. Failed tests do not report success, restart guests or grant privileges. Test notifications are recorded in delivery history without connection secrets. Safe errors identify common SMTP authentication/TLS problems, Telegram chat/token failures and Discord webhook/rate-limit failures.

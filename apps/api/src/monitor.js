@@ -1,3 +1,4 @@
+import {observeHeaderActivity} from './header-notifications.js';
 import {notifier} from './notifications.js';
 import {dockerFleet,monitoredDocker} from './docker-fleet.js';
 import {agentContext} from './node-agents.js';
@@ -69,6 +70,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
           if(current){current.ruleId=condition.ruleId||current.ruleId;current.node=condition.node;current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
         }
         state.alerts=state.alerts.slice(0,1000);
+        observeHeaderActivity(state,snapshot);
       });
       snapshot.metrics=persistence.get().metrics;
       snapshot.alerts=persistence.get().alerts;

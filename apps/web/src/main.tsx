@@ -7,6 +7,7 @@ import './styles.css';
 import './sizing.css';
 import './appearance.css';
 import './themes.css';
+import './components/header-notifications.css';
 
 applyAppearance();
 

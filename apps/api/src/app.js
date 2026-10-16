@@ -1,3 +1,4 @@
+import {headerNotifications} from './header-notifications.js';
 import {configurationStore,configurationSchemas} from './runtime-configuration.js';
 import {validateNotificationPreferences} from './notifications.js';
 import {apiPolicy} from './api-policy.js';
@@ -43,10 +44,11 @@ import { monitor as liveMonitor,providers } from './monitor.js';
 import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxInstallationMedia,proxmoxCtTemplates,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications}={}){
 
  const app=express(),readCache=createReadCache();
- app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&!/^\/api\/(auth|ssh|node-agent)(?:\/|$)/.test(req.path))readCache.clear();});next();});
+ app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
+ app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&!/^\/api\/(auth|ssh|node-agent|header-notifications)(?:\/|$)/.test(req.path))readCache.clear();});next();});
 
  if(process.env.TRUST_PROXY)app.set('trust proxy',Number(process.env.TRUST_PROXY)||1);
  app.use(helmet());app.use(cors({origin:(process.env.WEB_ORIGIN||'http://localhost').split(',')}));app.use(express.json({limit:apiPolicy.jsonBodyBytes}));
@@ -69,7 +71,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
    const email=required(req.body.email,'Email'),password=req.body.password;
    if(typeof password!=='string'||!password.length)throw httpError('Password is required');
-   const user=await verifyPassword(email,password);if(!user)return res.status(401).json({error:'Invalid credentials'});
+   const user=await verifyPassword(email,password);if(user)req.activityUser={sub:user.id,role:user.role};if(!user)return res.status(401).json({error:'Invalid credentials'});
+
    await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);
    res.json({user:{id:user.id,email:user.email,name:user.name,role:user.role},...await issueTokens(user)});
  });
@@ -137,12 +140,13 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
    req.sshLabel=label;const legacyTarget=actionTarget(req),approval=needsConfirmation||legacyTarget?await resolveActionApproval(req.path.replace(/^\/api/,''),req.body,req.method,{dockerHost:selectedAgentHost(),query:pve}):null,sshTarget=approval?.target||legacyTarget;
-   if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase)return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase,sshTarget,approvalDescription:approval?.description});
+   if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase){req.activityChallenge=true;return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase,sshTarget,approvalDescription:approval?.description});}
    if(sshTarget&&!consumeGrant(req.headers['x-homecloud-ssh-grant'],req.user.sub,req.method,req.path.replace(/^\/api/,''),req.body,approval?.scope||sshTarget))return res.status(428).json({error:'Target SSH authentication required',sshTarget,approvalDescription:approval?.description});
    let result;
    try{result=await handler(req);}catch(error){await audit(req,label,resource,{error:error.message},'failed');throw error;}
    monitor.invalidate();
-   const status=result?.task||result?.jobId?'queued':'success';
+   const status=result?.task||result?.jobId?'queued':'success';res.locals.activityStatus=status;
+
    await audit(req,label,resource,{result:result??null},status);
    res.json({ok:true,result,message:status==='queued'?'Task accepted. Check task history for completion.':'Operation completed.'});
  });
@@ -348,6 +352,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/vpn/device/:id/authorize','admin','tailscale.device.authorize',req=>tailscale(`device/${encode(req.params.id)}/authorized`,'POST',{authorized:req.body.authorized===true}),true);
  action('delete','/vpn/device/:id','admin','tailscale.device.delete',req=>tailscale(`device/${encode(req.params.id)}`,'DELETE'),true);
  action('post','/vpn/device/:id/routes','admin','tailscale.device.routes',req=>{if(!Array.isArray(req.body.routes)||req.body.routes.some(r=>typeof r!=='string'))throw httpError('Routes must be an array of CIDRs');return tailscale(`device/${encode(req.params.id)}/routes`,'POST',{routes:req.body.routes});},true);
+ read('/header-notifications',req=>activity.read(req.user,req.user.role==='owner'?updates.status():null));
+ app.post('/api/header-notifications/read',authorize('viewer'),(req,res)=>{res.set('Cache-Control','no-store');res.json(activity.markRead(req.user,req.body.sequence));});
  read('/alerts',async()=>{void monitor.sample().catch(()=>{});return {alerts:get().alerts,rules:get().rules};});
 
  action('post','/alerts/rules','admin','alert.rule.create',async req=>{const {name,metric,provider='all',severity='warning'}=req.body;if(!['cpu','memory','storage'].includes(metric)||!['all',...Object.keys(providers)].includes(provider)||!['critical','warning'].includes(severity))throw httpError('Invalid alert rule');const rule={id:crypto.randomUUID(),name:required(name,'Name'),metric,provider,severity,threshold:integer(req.body.threshold,'Threshold',1,100),enabled:true};mutate(s=>s.rules.push(rule));return rule;});

@@ -1,7 +1,7 @@
 import {publicDockerImage,publicDockerVolume} from './docker-public.js';
-import {queryAI} from './ai.js';
+import {queryAI,listAIModels} from './ai.js';
 import {headerNotifications} from './header-notifications.js';
-import {configurationStore,configurationSchemas} from './runtime-configuration.js';
+import {configurationStore,configurationSchemas,validateConfiguration} from './runtime-configuration.js';
 import {validateNotificationPreferences} from './notifications.js';
 import {apiPolicy} from './api-policy.js';
 import {connectionHealth} from './connection-health.js';
@@ -390,10 +390,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  },true);
  read('/audit',async()=>({logs:(await db.query(`SELECT id::text,created_at AS time,COALESCE(user_email,'system') AS "user",action,resource,details,status,COALESCE(ip,'-') ip FROM audit_logs ORDER BY created_at DESC LIMIT 500`)).rows}),'auditor');
  read('/diagnostics',()=>providerDiagnostics(),'owner');
+ action('post','/configuration/ai/models','owner','configuration.models',async req=>({models:await listAIModels(validateConfiguration('ai',req.body.configuration??{},configuration.resolve('ai')))}));
  read('/configuration/:service',req=>configuration.publicConfig(req.params.service),'owner');
  action('put','/configuration/:service','owner','configuration.save',req=>configuration.save(req.params.service,req.body));
  action('delete','/configuration/:service','owner','configuration.disable',req=>configuration.disable(req.params.service));
- action('post','/configuration/:service/test','owner','configuration.test',async req=>{const id=req.params.service;if(!Object.hasOwn(configurationSchemas,id))throw httpError('Unsupported configuration service');try{if(['discord','telegram','email'].includes(id)){if(req.body.confirm!==true)throw httpError('Confirm sending an external test notification');return await notifier.test(id);}if(id==='ai'){if(req.body.confirm!==true)throw httpError('Confirm sending a test request to OpenAI');await queryAI(configuration.resolve('ai'),'Reply with OK.',true);return {service:id,verified:true,message:'AI connection verified.'};}const result=await truenas('system.info');if(!result||typeof result!=='object')throw Error('Invalid provider response');return {service:id,verified:true,message:'Read-only connection check passed. Write permissions were not tested.'};}catch(error){if(error.status===400)throw error;throw httpError('Connection test failed. Check the endpoint, credentials, permissions, network and trusted CA certificate.',502);}});
+ action('post','/configuration/:service/test','owner','configuration.test',async req=>{const id=req.params.service;if(!Object.hasOwn(configurationSchemas,id))throw httpError('Unsupported configuration service');try{if(['discord','telegram','email'].includes(id)){if(req.body.confirm!==true)throw httpError('Confirm sending an external test notification');return await notifier.test(id);}if(id==='ai'){if(req.body.confirm!==true)throw httpError('Confirm sending a test request to OpenAI');const config=validateConfiguration('ai',req.body.configuration??{},configuration.resolve('ai'));await queryAI(config,'Reply with OK.',true);return {service:id,verified:true,model:config.OPENAI_MODEL,apiType:config.OPENAI_API_TYPE,message:req.body.configuration?'AI connection verified for the entered settings. Save Configuration to apply them.':'AI connection verified.'};}const result=await truenas('system.info');if(!result||typeof result!=='object')throw Error('Invalid provider response');return {service:id,verified:true,message:'Read-only connection check passed. Write permissions were not tested.'};}catch(error){if(error.status===400||id==='ai'&&error.aiError)throw error;throw httpError('Connection test failed. Check the endpoint, credentials, permissions, network and trusted CA certificate.',502);}});
 
  read('/notifications',()=>notifier.status(),'owner');
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);mutate(s=>s.notificationPreferences=preferences);return preferences;});

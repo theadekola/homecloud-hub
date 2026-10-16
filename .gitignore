@@ -18,3 +18,5 @@ secrets/ca/*
 !secrets/ca/.gitkeep
 
 __pycache__/
+
+apps/api/src/build-info.json

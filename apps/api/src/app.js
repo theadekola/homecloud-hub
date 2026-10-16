@@ -1,3 +1,4 @@
+import {buildInfo} from './build-info.js';
 import {publicDockerImage,publicDockerVolume} from './docker-public.js';
 import {queryAI,listAIModels} from './ai.js';
 import {headerNotifications} from './header-notifications.js';
@@ -70,7 +71,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/auth/register',loginLimiter,async(req,res)=>{
    const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
  });
- app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:'3.0.0',time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
+ app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:buildInfo.version,time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
    const email=required(req.body.email,'Email'),password=req.body.password;
    if(typeof password!=='string'||!password.length)throw httpError('Password is required');
@@ -400,7 +401,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);mutate(s=>s.notificationPreferences=preferences);return preferences;});
  action('post','/notifications/test','owner','notification.test',req=>notifier.test(required(req.body.channel,'Channel')));
  read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:false,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:false,apiKeys:false,networkManagement:false}));
- read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,version:'3.0.0'},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
+ read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and configured Discord, Telegram or SMTP channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
 
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};

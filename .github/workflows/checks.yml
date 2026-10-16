@@ -18,6 +18,7 @@ jobs:
           bash -n deployment/setup-updater.sh
           bash deployment/test-updater.sh
           bash -n deployment/homecloud
+          bash -n deployment/build-env.sh
           bash -n deployment/network.sh
           bash deployment/test-network.sh
           sh -n deployment/generate-secrets.sh
@@ -42,6 +43,7 @@ jobs:
       - name: Build and start the deployment
         run: |
           sh deployment/generate-secrets.sh > /dev/null
+          source deployment/build-env.sh
           docker compose up -d --build --wait --wait-timeout 180
           docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/homecloud-ci-root.crt
           curl --fail --show-error --cacert /tmp/homecloud-ci-root.crt https://localhost:6002/api/health

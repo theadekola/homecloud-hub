@@ -13,8 +13,7 @@ connectors; it does not create the sample connections shown in the design.
   when applicable, removal. Removing a connection never deletes a guest or host.
 - Add Connection keeps Proxmox pairing, standalone Docker pairing and Advanced
   Direct Docker API setup. Only one active Proxmox API and one direct Docker
-  endpoint are supported. Other service integrations remain environment-defined;
-  the page provides the existing configuration names rather than unsupported forms.
+  endpoint are supported. TrueNAS, OPNsense and Tailscale have encrypted configuration forms under Other Services, with explicit connection tests and disconnect controls.
 
 ## Automatic checks and recovery
 

@@ -1,3 +1,4 @@
+import {runtimeEnvironment} from './runtime-configuration.js';
 import {validateBackupSelection} from './backup-validation.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -75,7 +76,7 @@ export async function restoreArchive(id,body,{query=pve,archives=backupArchives,
   if(point.type!=='qemu')throw httpError('Unknown backup type');
   return {node,task:await write(`/nodes/${encode(node)}/qemu`,'POST',{vmid,archive:point.volid,storage,force:0})};
 }
-export function truenasConfigured(){return Boolean(process.env.TRUENAS_URL&&process.env.TRUENAS_API_KEY);}
+export function truenasConfigured(){const env=runtimeEnvironment();return Boolean(env.TRUENAS_URL&&env.TRUENAS_API_KEY);}
 export async function truenas(method,params=[]){
   try{return await truenasCall(method,params);}catch(error){
     if(method.startsWith('pool.snapshot.')&&(error.code===-32601||/method.*not found|method.*does not exist/i.test(error.message)))return truenasCall(method.replace('pool.snapshot.','zfs.snapshot.'),params);
@@ -83,26 +84,27 @@ export async function truenas(method,params=[]){
   }
 }
 async function truenasCall(method,params=[]){
+  const env=runtimeEnvironment();
   if(!truenasConfigured())throw httpError('TrueNAS is not configured',503);
-  const base=new URL(process.env.TRUENAS_URL);
+  const base=new URL(env.TRUENAS_URL);
   if(base.protocol!=='https:')throw httpError('TrueNAS requires an HTTPS URL');
-  const legacy=process.env.TRUENAS_API_MODE==='legacy';
-  const target=new URL(process.env.TRUENAS_WS_PATH||(legacy?'/websocket':'/api/current'),base);target.protocol='wss:';
+  const legacy=env.TRUENAS_API_MODE==='legacy';
+  const target=new URL(env.TRUENAS_WS_PATH||(legacy?'/websocket':'/api/current'),base);target.protocol='wss:';
   return new Promise((resolve,reject)=>{
-    const ws=new WebSocket(target,{ca:process.env.TRUENAS_TLS_CA?fs.readFileSync(process.env.TRUENAS_TLS_CA):undefined,rejectUnauthorized:true,maxPayload:32*1024*1024});
+    const ws=new WebSocket(target,{ca:env.TRUENAS_CA_PEM|| (env.TRUENAS_TLS_CA?fs.readFileSync(env.TRUENAS_TLS_CA):undefined),rejectUnauthorized:true,maxPayload:32*1024*1024});
     let finished=false;
     const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);ws.close();error?reject(error):resolve(result);};
     const timer=setTimeout(()=>{finish(new Error('TrueNAS request timed out'));ws.terminate();},Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);
     ws.on('error',error=>finish(error));ws.on('close',()=>{if(!finished)finish(new Error('TrueNAS closed the connection'));});
     const send=(id,method,params)=>ws.send(JSON.stringify(legacy?{msg:'method',id:String(id),method,params}:{jsonrpc:'2.0',id,method,params}));
-    ws.on('open',()=>legacy?ws.send(JSON.stringify({msg:'connect',version:'1',support:['1']})):send(1,'auth.login_with_api_key',[process.env.TRUENAS_API_KEY]));
+    ws.on('open',()=>legacy?ws.send(JSON.stringify({msg:'connect',version:'1',support:['1']})):send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]));
     ws.on('message',raw=>{
       let message;try{message=JSON.parse(raw.toString())}catch{return finish(new Error('Invalid TrueNAS response'));}
       if(legacy&&message.msg==='ping'){ws.send(JSON.stringify({msg:'pong',id:message.id}));return;}
-      if(legacy&&message.msg==='connected'){send(1,'auth.login_with_api_key',[process.env.TRUENAS_API_KEY]);return;}
+      if(legacy&&message.msg==='connected'){send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]);return;}
       if(legacy&&message.msg==='failed')return finish(new Error('TrueNAS legacy protocol rejected'));
       if(Number(message.id)!==1&&Number(message.id)!==2)return;
-      if(message.error)return finish(Object.assign(new Error(message.error.data?.reason||message.error.reason||message.error.message||'TrueNAS API error'),{code:message.error.code}));
+      if(message.error)return finish(Object.assign(new Error(Number(message.id)===1?'TrueNAS authentication rejected':message.error.data?.reason||message.error.reason||message.error.message||'TrueNAS API error'),{code:message.error.code}));
       if(Number(message.id)===1){if(message.result!==true)return finish(new Error('TrueNAS authentication rejected'));send(2,legacy?method.replace('pool.snapshot.','zfs.snapshot.'):method,params);}
       else finish(null,message.result);
     });
@@ -119,12 +121,13 @@ export async function truenasSnapshot(){
     snapshots:snapshots.map(s=>({id:s.id,name:s.name||s.id,dataset:s.dataset,created:s.properties?.creation?.value??null,provider:'truenas',type:'snapshot'})),
     disks:disks.map(d=>({id:d.identifier||d.name,name:d.name,model:d.model,serial:d.serial,size:d.size,type:d.type})),alerts,jobs,schedules,errors};
 }
-export function opnsenseConfigured(){return Boolean(process.env.OPNSENSE_URL&&process.env.OPNSENSE_API_KEY&&process.env.OPNSENSE_API_SECRET);}
+export function opnsenseConfigured(){const env=runtimeEnvironment();return Boolean(env.OPNSENSE_URL&&env.OPNSENSE_API_KEY&&env.OPNSENSE_API_SECRET);}
 export async function opnsense(path,method='GET',body){
+  const env=runtimeEnvironment();
   if(!opnsenseConfigured())throw httpError('OPNsense is not configured',503);
-  if(new URL(process.env.OPNSENSE_URL).protocol!=='https:')throw httpError('OPNsense requires HTTPS');
-  if(process.env.OPNSENSE_API_STYLE==='legacy')path=path.replace(/interfaces_info/g,'interfacesInfo').replace(/reload_interface/g,'reloadInterface').replace(/search_item/g,'searchItem');
-  const res=await request(`${process.env.OPNSENSE_URL.replace(/\/$/,'')}/api/${path}`,{method,headers:{Authorization:`Basic ${Buffer.from(`${process.env.OPNSENSE_API_KEY}:${process.env.OPNSENSE_API_SECRET}`).toString('base64')}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:process.env.OPNSENSE_TLS_CA?fs.readFileSync(process.env.OPNSENSE_TLS_CA):undefined,rejectUnauthorized:true});
+  if(new URL(env.OPNSENSE_URL).protocol!=='https:')throw httpError('OPNsense requires HTTPS');
+  if(env.OPNSENSE_API_STYLE==='legacy')path=path.replace(/interfaces_info/g,'interfacesInfo').replace(/reload_interface/g,'reloadInterface').replace(/search_item/g,'searchItem');
+  const res=await request(`${env.OPNSENSE_URL.replace(/\/$/,'')}/api/${path}`,{method,headers:{Authorization:`Basic ${Buffer.from(`${env.OPNSENSE_API_KEY}:${env.OPNSENSE_API_SECRET}`).toString('base64')}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:env.OPNSENSE_CA_PEM|| (env.OPNSENSE_TLS_CA?fs.readFileSync(env.OPNSENSE_TLS_CA):undefined),rejectUnauthorized:true});
   if(!res.ok)throw new Error(`OPNsense HTTP ${res.status}`);
   const data=await res.json();
   if(data.result==='failed'||data.status==='failed'||data.status==='error')throw new Error('OPNsense rejected the operation');
@@ -134,17 +137,18 @@ export async function opnsenseSnapshot(){
   const [system,interfaces,services]=await Promise.all([opnsense('core/system/status'),opnsense('interfaces/overview/interfaces_info'),opnsense('core/service/search')]);
   return {system,interfaces:Array.isArray(interfaces)?interfaces:Object.entries(interfaces).map(([id,data])=>({id,...data})),services:services.rows||[]};
 }
-export function tailscaleConfigured(){return Boolean(process.env.TAILSCALE_API_KEY&&process.env.TAILSCALE_TAILNET);}
+export function tailscaleConfigured(){const env=runtimeEnvironment();return Boolean(env.TAILSCALE_API_KEY&&env.TAILSCALE_TAILNET);}
 export async function tailscale(path,method='GET',body){
+  const env=runtimeEnvironment();
   if(!tailscaleConfigured())throw httpError('Tailscale is not configured',503);
-  const apiBase=(process.env.TAILSCALE_API_BASE||'https://api.tailscale.com/api/v2').replace(/\/$/,'');
+  const apiBase=(env.TAILSCALE_API_BASE||'https://api.tailscale.com/api/v2').replace(/\/$/,'');
   if(new URL(apiBase).protocol!=='https:')throw httpError('Tailscale API requires HTTPS');
-  const res=await request(`${apiBase}/${path}`,{method,headers:{Authorization:`Bearer ${process.env.TAILSCALE_API_KEY}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:process.env.TAILSCALE_TLS_CA?fs.readFileSync(process.env.TAILSCALE_TLS_CA):undefined});
+  const res=await request(`${apiBase}/${path}`,{method,headers:{Authorization:`Bearer ${env.TAILSCALE_API_KEY}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:env.TAILSCALE_TLS_CA?fs.readFileSync(env.TAILSCALE_TLS_CA):undefined});
   if(!res.ok)throw new Error(`Tailscale HTTP ${res.status}`);
   const text=await res.text();return text?JSON.parse(text):{};
 }
 export async function tailscaleSnapshot(){
-  const result=await tailscale(`tailnet/${encode(process.env.TAILSCALE_TAILNET)}/devices?fields=all`);
+  const result=await tailscale(`tailnet/${encode(runtimeEnvironment().TAILSCALE_TAILNET)}/devices?fields=all`);
   return {devices:(result.devices||[]).map(d=>({id:d.id,name:d.hostname||d.name,user:d.user,addresses:d.addresses?.join(', ')||'',os:d.os,lastSeen:d.lastSeen,authorized:d.authorized,expires:d.expires,routes:d.enabledRoutes||[],advertisedRoutes:d.advertisedRoutes||[]}))};
 }
 export async function extraServices(){

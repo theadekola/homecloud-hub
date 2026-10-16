@@ -7,7 +7,7 @@ function fixture(state={alerts:[]}){return {state,feed:createHeaderNotifications
 const request=(route='/api/actions/:provider/:resourceType/:resourceId/:action',extra={})=>({method:'POST',route:{path:route},params:{provider:'proxmox',resourceType:'vm',resourceId:'106',action:'start'},user,...extra});
 test('reading is per user, monotonic and never resolves active or acknowledged alerts',()=>{
  const {state,feed}=fixture({alerts:[{id:'a',title:'CPU high',status:'active'},{id:'b',title:'Offline',status:'acknowledged'}]});feed.capture(request(),200,'queued');
- assert.equal(feed.read(user).badgeCount,3);feed.markRead(user,1);assert.equal(feed.read(user).badgeCount,2);assert.equal(feed.read(user).attention[1].status,'acknowledged');assert.equal(feed.read({sub:'two',role:'viewer'}).unreadCount,1);feed.markRead(user,0);assert.equal(feed.read(user).unreadCount,0);assert.deepEqual(state.alerts.map(a=>a.status),['active','acknowledged']);
+ assert.equal(feed.read(user).badgeCount,2);feed.markRead(user,1);assert.equal(feed.read(user).badgeCount,2);assert.equal(feed.read(user).attention[1].status,'acknowledged');assert.equal(feed.read({sub:'two',role:'viewer'}).unreadCount,1);feed.markRead(user,0);assert.equal(feed.read(user).unreadCount,0);assert.deepEqual(state.alerts.map(a=>a.status),['active','acknowledged']);
  state.alerts[0].status='resolved';assert.equal(feed.read(user).attentionCount,1);for(const cursor of [-1,2,1.5,'1',null])assert.throws(()=>feed.markRead(user,cursor),{status:400});
 });
 test('activity excludes credential bodies and private actions from unrelated users',()=>{
@@ -31,5 +31,13 @@ test('only owners receive updater attention and persisted read cursors survive r
 test('authenticated feed and read marker use no provider requests and never acknowledge alerts',async()=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-header-'));process.env.DATA_DIR=directory;process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);const {createApp}=await import('../src/app.js');const {feed,state}=fixture({alerts:[{id:'a',status:'active',title:'CPU high'}]});feed.capture(request(),200);let scans=0;
  const server=createApp({activity:feed,authenticate:(req,res,next)=>{if(!req.headers.authorization)return res.status(401).json({error:'Authentication required'});req.user=user;next()},audit:async()=>{},monitor:{invalidate(){},sample:async()=>{scans++;throw Error('Unexpected provider scan')}}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}/api/header-notifications`,headers={Authorization:'Bearer test','Content-Type':'application/json'};
- try{assert.equal((await fetch(base)).status,401);const response=await fetch(base,{headers});assert.match(response.headers.get('cache-control'),/no-store/);assert.equal((await response.json()).badgeCount,2);assert.equal((await fetch(base+'/read',{method:'POST',headers,body:JSON.stringify({sequence:1})})).status,200);assert.equal((await (await fetch(base,{headers})).json()).badgeCount,1);assert.equal(state.alerts[0].status,'active');assert.equal(scans,0);assert.equal((await fetch(base+'/read',{method:'POST',headers,body:'{"sequence":999}'})).status,400);assert.equal(state.headerActivities.length,1);}finally{server.closeAllConnections();await new Promise(r=>server.close(r));fs.rmSync(directory,{recursive:true,force:true})}
+ try{assert.equal((await fetch(base)).status,401);const response=await fetch(base,{headers});assert.match(response.headers.get('cache-control'),/no-store/);assert.equal((await response.json()).badgeCount,1);assert.equal((await fetch(base+'/read',{method:'POST',headers,body:JSON.stringify({sequence:1})})).status,200);assert.equal((await (await fetch(base,{headers})).json()).badgeCount,1);assert.equal(state.alerts[0].status,'active');assert.equal(scans,0);assert.equal((await fetch(base+'/read',{method:'POST',headers,body:'{"sequence":999}'})).status,400);assert.equal(state.headerActivities.length,1);}finally{server.closeAllConnections();await new Promise(r=>server.close(r));fs.rmSync(directory,{recursive:true,force:true})}
+});
+
+test('unread recent activity never contributes to the bell badge',()=>{
+ const {state,feed}=fixture();feed.capture(request(),200);
+ assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).unreadCount,1);assert.equal(feed.read(user).activity.length,1);
+ state.alerts.push({id:'a',title:'Offline',status:'active'});assert.equal(feed.read(user).badgeCount,1);
+ state.alerts[0].status='acknowledged';assert.equal(feed.read(user).badgeCount,1);
+ state.alerts[0].status='resolved';assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).unreadCount,1);
 });

@@ -1,0 +1,1 @@
+export default function EmptyStateArtwork({kind='data'}:{kind?:'connections'|'data'|'search'|'error'}){return <img className="empty-state-artwork" src={`/assets/empty/${kind}.svg`} alt="" aria-hidden="true" width="180" height="105" loading="lazy"/>}

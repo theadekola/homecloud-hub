@@ -1,0 +1,15 @@
+HomeCloud third-party logo assets
+
+These marks identify reported operating systems, services and technologies. Inclusion does not imply endorsement or add support for managing a service.
+
+Most SVGs: Simple Icons, CC0 1.0 Universal.
+Source snapshot: https://github.com/simple-icons/simple-icons/tree/4d29a35c954699b389a834aacc97dd6e7e74143c
+OpenAI SVG: historical Simple Icons snapshot 5664507081ffb65b5a2a0ed2bf2ee2b3b327cb4e.
+Windows and Microsoft SQL Server SVGs: Devicon, MIT License, copyright (c) 2015 konpa.
+Source snapshot: https://github.com/devicons/devicon/tree/6a37858047b0e8d9c9c0e68f4a071fc410652e89
+
+See manifest.json for each asset's exact source and license identifier. License texts are included alongside this notice: simple-icons-CC0.txt and devicon-MIT.txt. Single-colour Simple Icons SVGs have been given display fills. Devicon SVG colours are unchanged.
+
+Brand names and trademarks remain the property of their respective owners. The icon collection license does not grant trademark rights.
+
+HomeCloud product logo and empty-state illustrations are original project artwork. Interface action icons continue to use the existing Lucide dependency.

@@ -1,0 +1,490 @@
+[
+  {
+    "id": "proxmox",
+    "name": "Proxmox VE",
+    "category": "service",
+    "file": "/assets/brands/proxmox.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/proxmox.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "docker",
+    "name": "Docker",
+    "category": "service",
+    "file": "/assets/brands/docker.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/docker.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "truenas",
+    "name": "TrueNAS",
+    "category": "service",
+    "file": "/assets/brands/truenas.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/truenas.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "discord",
+    "name": "Discord",
+    "category": "service",
+    "file": "/assets/brands/discord.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/discord.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "telegram",
+    "name": "Telegram",
+    "category": "service",
+    "file": "/assets/brands/telegram.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/telegram.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "ubuntu",
+    "name": "Ubuntu",
+    "category": "os",
+    "file": "/assets/brands/ubuntu.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/ubuntu.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "debian",
+    "name": "Debian",
+    "category": "os",
+    "file": "/assets/brands/debian.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/debian.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "linux",
+    "name": "Linux",
+    "category": "os",
+    "file": "/assets/brands/linux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/linux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "alpinelinux",
+    "name": "Alpine Linux",
+    "category": "os",
+    "file": "/assets/brands/alpinelinux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/alpinelinux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "archlinux",
+    "name": "Arch Linux",
+    "category": "os",
+    "file": "/assets/brands/archlinux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/archlinux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "fedora",
+    "name": "Fedora",
+    "category": "os",
+    "file": "/assets/brands/fedora.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/fedora.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "redhat",
+    "name": "Red Hat",
+    "category": "os",
+    "file": "/assets/brands/redhat.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/redhat.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "centos",
+    "name": "Centos",
+    "category": "os",
+    "file": "/assets/brands/centos.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/centos.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "rockylinux",
+    "name": "Rocky Linux",
+    "category": "os",
+    "file": "/assets/brands/rockylinux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/rockylinux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "almalinux",
+    "name": "AlmaLinux",
+    "category": "os",
+    "file": "/assets/brands/almalinux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/almalinux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "opensuse",
+    "name": "openSUSE",
+    "category": "os",
+    "file": "/assets/brands/opensuse.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/opensuse.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "freebsd",
+    "name": "FreeBSD",
+    "category": "os",
+    "file": "/assets/brands/freebsd.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/freebsd.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "openbsd",
+    "name": "OpenBSD",
+    "category": "os",
+    "file": "/assets/brands/openbsd.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/openbsd.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "android",
+    "name": "Android",
+    "category": "os",
+    "file": "/assets/brands/android.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/android.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "apple",
+    "name": "macOS",
+    "category": "os",
+    "file": "/assets/brands/apple.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/apple.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "linuxmint",
+    "name": "Linux Mint",
+    "category": "os",
+    "file": "/assets/brands/linuxmint.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/linuxmint.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "kalilinux",
+    "name": "Kali Linux",
+    "category": "os",
+    "file": "/assets/brands/kalilinux.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/kalilinux.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "raspberrypi",
+    "name": "Raspberry Pi OS",
+    "category": "os",
+    "file": "/assets/brands/raspberrypi.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/raspberrypi.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "nixos",
+    "name": "NixOS",
+    "category": "os",
+    "file": "/assets/brands/nixos.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/nixos.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "gentoo",
+    "name": "Gentoo",
+    "category": "os",
+    "file": "/assets/brands/gentoo.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/gentoo.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "react",
+    "name": "React",
+    "category": "service",
+    "file": "/assets/brands/react.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/react.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "nodedotjs",
+    "name": "Node.js",
+    "category": "service",
+    "file": "/assets/brands/nodedotjs.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/nodedotjs.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "express",
+    "name": "Express",
+    "category": "service",
+    "file": "/assets/brands/express.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/express.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "typescript",
+    "name": "TypeScript",
+    "category": "service",
+    "file": "/assets/brands/typescript.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/typescript.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "postgresql",
+    "name": "PostgreSQL",
+    "category": "service",
+    "file": "/assets/brands/postgresql.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/postgresql.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "vite",
+    "name": "Vite",
+    "category": "service",
+    "file": "/assets/brands/vite.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/vite.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "github",
+    "name": "GitHub",
+    "category": "service",
+    "file": "/assets/brands/github.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/github.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "homeassistant",
+    "name": "Home Assistant",
+    "category": "service",
+    "file": "/assets/brands/homeassistant.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/homeassistant.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "jellyfin",
+    "name": "Jellyfin",
+    "category": "service",
+    "file": "/assets/brands/jellyfin.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/jellyfin.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "plex",
+    "name": "Plex",
+    "category": "service",
+    "file": "/assets/brands/plex.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/plex.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "sonarr",
+    "name": "Sonarr",
+    "category": "service",
+    "file": "/assets/brands/sonarr.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/sonarr.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "radarr",
+    "name": "Radarr",
+    "category": "service",
+    "file": "/assets/brands/radarr.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/radarr.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "qbittorrent",
+    "name": "qBittorrent",
+    "category": "service",
+    "file": "/assets/brands/qbittorrent.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/qbittorrent.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "portainer",
+    "name": "Portainer",
+    "category": "service",
+    "file": "/assets/brands/portainer.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/portainer.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "nginx",
+    "name": "Nginx",
+    "category": "service",
+    "file": "/assets/brands/nginx.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/nginx.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "apache",
+    "name": "Apache",
+    "category": "service",
+    "file": "/assets/brands/apache.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/apache.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "mariadb",
+    "name": "Mariadb",
+    "category": "service",
+    "file": "/assets/brands/mariadb.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/mariadb.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "mysql",
+    "name": "Mysql",
+    "category": "service",
+    "file": "/assets/brands/mysql.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/mysql.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "redis",
+    "name": "Redis",
+    "category": "service",
+    "file": "/assets/brands/redis.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/redis.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "mongodb",
+    "name": "Mongodb",
+    "category": "service",
+    "file": "/assets/brands/mongodb.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/mongodb.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "nextcloud",
+    "name": "Nextcloud",
+    "category": "service",
+    "file": "/assets/brands/nextcloud.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/nextcloud.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "immich",
+    "name": "Immich",
+    "category": "service",
+    "file": "/assets/brands/immich.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/immich.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "grafana",
+    "name": "Grafana",
+    "category": "service",
+    "file": "/assets/brands/grafana.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/grafana.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "prometheus",
+    "name": "Prometheus",
+    "category": "service",
+    "file": "/assets/brands/prometheus.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/prometheus.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "uptimekuma",
+    "name": "Uptime Kuma",
+    "category": "service",
+    "file": "/assets/brands/uptimekuma.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/uptimekuma.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "adguard",
+    "name": "Adguard",
+    "category": "service",
+    "file": "/assets/brands/adguard.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/adguard.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "pihole",
+    "name": "Pi-hole",
+    "category": "service",
+    "file": "/assets/brands/pihole.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/pihole.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "traefikproxy",
+    "name": "Traefik",
+    "category": "service",
+    "file": "/assets/brands/traefikproxy.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/traefikproxy.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "caddy",
+    "name": "Caddy",
+    "category": "service",
+    "file": "/assets/brands/caddy.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/caddy.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "cloudflare",
+    "name": "Cloudflare",
+    "category": "service",
+    "file": "/assets/brands/cloudflare.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/cloudflare.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "gitlab",
+    "name": "Gitlab",
+    "category": "service",
+    "file": "/assets/brands/gitlab.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/gitlab.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "gitea",
+    "name": "Gitea",
+    "category": "service",
+    "file": "/assets/brands/gitea.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/gitea.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "wordpress",
+    "name": "Wordpress",
+    "category": "service",
+    "file": "/assets/brands/wordpress.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/4d29a35c954699b389a834aacc97dd6e7e74143c/icons/wordpress.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "category": "service",
+    "file": "/assets/brands/openai.svg",
+    "source": "https://github.com/simple-icons/simple-icons/blob/5664507081ffb65b5a2a0ed2bf2ee2b3b327cb4e/icons/openai.svg",
+    "license": "CC0-1.0"
+  },
+  {
+    "id": "windows",
+    "name": "Windows",
+    "category": "os",
+    "file": "/assets/brands/windows.svg",
+    "source": "https://github.com/devicons/devicon/blob/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/windows11/windows11-original.svg",
+    "license": "MIT"
+  },
+  {
+    "id": "mssql",
+    "name": "Microsoft SQL Server",
+    "category": "service",
+    "file": "/assets/brands/mssql.svg",
+    "source": "https://github.com/devicons/devicon/blob/6a37858047b0e8d9c9c0e68f4a071fc410652e89/icons/microsoftsqlserver/microsoftsqlserver-original.svg",
+    "license": "MIT"
+  }
+]

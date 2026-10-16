@@ -1,3 +1,4 @@
+import BrandIcon from './BrandIcon';
 import HeaderNotifications from './HeaderNotifications';
 import {canAccessPage} from '../permissions';
 import {applyAppearance,watchSystemTheme} from '../appearance';
@@ -67,12 +68,12 @@ export default function Layout() {
   return <div className="app-shell">
     {mobile&&menuOpen&&<button className="nav-backdrop" aria-label="Close navigation" onClick={closeMenu}/>}
     <aside id="primary-navigation" ref={menuRef} className={`sidebar${!mobile&&collapsed?' collapsed':''}${mobile&&menuOpen?' mobile-open':''}`} inert={mobile&&!menuOpen} role={mobile&&menuOpen?'dialog':undefined} aria-modal={mobile&&menuOpen?true:undefined} aria-label="Main navigation">
-      <div className="brand"><div className="brand-icon"><Cloud size={22}/></div>{showLabels && <b>{configuration?.settings?.siteName||'HomeCloud Hub'}</b>}{mobile&&<button className="icon-btn nav-close" aria-label="Close navigation" onClick={closeMenu}><X size={20}/></button>}</div>
+      <div className="brand"><div className="brand-icon"><img className="homecloud-product-logo" src="/assets/homecloud.svg" alt=""/></div>{showLabels && <b>{configuration?.settings?.siteName||'HomeCloud'}</b>}{mobile&&<button className="icon-btn nav-close" aria-label="Close navigation" onClick={closeMenu}><X size={20}/></button>}</div>
       <nav className="nav-scroll" aria-label="Pages">
         {sections.map(sec => <div className="nav-section" key={sec.title}>
           {showLabels && <div className="nav-title">{sec.title}</div>}
           {sec.items.filter(([,path]:any)=>canAccessPage(path,session?.user?.role)).map(([label,path,Icon]: any) => <NavLink key={path} to={path} end={path === '/'} className={({isActive}) => `nav-item ${isActive?'active':''}`}>
-            <Icon size={18}/>{showLabels && <span>{label}</span>}
+            {path==='/proxmox'||path==='/docker'?<BrandIcon brand={path.slice(1)} size={18}/>:<Icon size={18}/>}{showLabels && <span>{label}</span>}
           </NavLink>)}
         </div>)}
       </nav>

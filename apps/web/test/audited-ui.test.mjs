@@ -119,7 +119,7 @@ test('Docker exposes all six resource tabs and preserves summary navigation',asy
 test('Storage Pools skips offline history and filtering selects an online visible pool',async()=>{
  const calls=[],GiB=1024**3;const pools=[{id:'a/off',name:'off',node:'a',provider:'proxmox',status:'offline',type:'dir'},{id:'b/local',name:'local',node:'b',provider:'proxmox',status:'online',type:'dir',capacity:GiB,used:GiB/2,available:GiB/2,usage:50}];
  const page=await mounted('pages/Storage.tsx',{},async p=>{calls.push(p);if(p==='/auth/me')return {user:{role:'viewer'}};if(p==='/storage')return {pools,summary:{pools:2,online:1,capacity:GiB,used:GiB/2,available:GiB/2,distribution:[{...pools[1],key:'proxmox:b/local'}]},snapshots:[],alerts:[],services:[],errors:[]};if(p.startsWith('/proxmox/tasks'))return {tasks:[]};return {history:[],content:[],hosts:[]}});
- try{assert.ok(calls.some(p=>p.startsWith('/proxmox/storage/b/local')));assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));const node=page.container.querySelector('[aria-label="Storage node"]');await act(async()=>{node.value='a';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));await page.click(button(page.container,'Inspect'));assert.ok(page.container.querySelector('.storage-inline-inspect').textContent.includes('Live history and contents are unavailable'))}finally{await page.close()}
+ try{assert.ok(calls.some(p=>p.startsWith('/proxmox/storage/b/local')));assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));const node=page.container.querySelector('[aria-label="Storage node"]');await act(async()=>{node.value='a';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));await page.click(page.container.querySelector('button[aria-label^="Inspect "]'));assert.ok(page.container.querySelector('.storage-inline-inspect').textContent.includes('Live history and contents are unavailable'))}finally{await page.close()}
 });
 
 test('Disk host filter switches details and SMART request to the visible host',async()=>{
@@ -157,7 +157,7 @@ test('Device filters switch visible details and normalize unknown Docker availab
 
 test('Routing node filters select the visible gateway and edits include configuration precondition',async()=>{
  const writes=[];const interfaces=['a','b'].map(node=>({id:node+'/vmbr0',node,name:'vmbr0',type:'bridge',gateway:node==='a'?'192.0.2.1':'198.51.100.1',status:'up'}));const page=await mounted('pages/NetworkRouting.tsx',{onMap(){}},async(p,init)=>{if(init?.method==='PUT'){writes.push({p,body:JSON.parse(init.body)});return {}}return p==='/auth/me'?{user:{role:'owner'}}:{interfaces,nodes:[{node:'a'},{node:'b'}]}});
- try{const node=page.container.querySelector('[aria-label="Route node"]');await act(async()=>{node.value='b';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.route-detail').textContent.includes('198.51.100.1'));await page.click(button(page.container,'Edit'));const form=page.container.querySelector('.modal form');await act(async()=>{form.dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0))});assert.equal(writes[0].p,'/proxmox/network/b/vmbr0');assert.ok(writes[0].body.expectedConfig)}finally{await page.close()}
+ try{const node=page.container.querySelector('[aria-label="Route node"]');await act(async()=>{node.value='b';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(page.container.querySelector('.route-detail').textContent.includes('198.51.100.1'));await page.click(page.container.querySelector('.network-routing button[aria-label^="Edit "]'));const form=page.container.querySelector('.modal form');await act(async()=>{form.dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0))});assert.equal(writes[0].p,'/proxmox/network/b/vmbr0');assert.ok(writes[0].body.expectedConfig)}finally{await page.close()}
 });
 
 test('Firewall normalizes disabled configuration and rule toggle uses selected node digest',async()=>{
@@ -507,5 +507,68 @@ test('Archive API errors remain explicit while task reports and source coverage 
 test('Reports paginate and clamp results when outcome cards filter the table',async()=>{
  const tasks=Array.from({length:15},(_,i)=>({upid:'backup-'+i,node:'n1',type:'vzdump',id:100+i,status:i===14?'error':'OK',starttime:1900000000+i*100,endtime:1900000060+i*100}));const page=await mounted('pages/BackupReports.tsx',{hours:'24',setHours(){}},async p=>p.startsWith('/proxmox/tasks')?{tasks,errors:[]}:reportApi(p));try{
   assert.equal(page.container.querySelectorAll('.backup-report-table tbody tr').length,6);await page.click(page.container.querySelector('[aria-label="Next reports page"]'));assert.ok(page.container.querySelector('.report-pagination').textContent.includes('2 / 3'));await page.click(page.container.querySelector('[aria-label="Inspect Failed"]'));assert.equal(page.container.querySelectorAll('.backup-report-table tbody tr').length,1);assert.ok(page.container.querySelector('.report-pagination').textContent.includes('1 / 1'));assert.ok(page.container.querySelector('.report-details').textContent.includes('backup-14'));
+ }finally{await page.close()}
+});
+
+
+test('storage, network and event rows inspect from cells and keyboard while action controls stay icons',async()=>{
+ const stamp=new Date().toISOString();
+ const alerts=['first','second'].map(id=>({id,title:id,severity:'warning',status:'active',source:id,triggered:stamp}));
+ const resources=['first','second'].map(id=>({id,name:id,node:id,provider:'proxmox',size:100,health:'PASSED'}));
+ const interfaces=['first','second'].map(id=>({id,name:'vmbr0',node:id,type:'bridge',status:'up',gateway:id==='first'?'192.0.2.1':'192.0.2.2'}));
+ const data={nodes:resources.map(r=>({...r,node:r.id,status:'online'})),guests:[],hosts:[],interfaces,resolvers:resources.map(r=>({node:r.node,search:'local',dns1:r.id==='first'?'192.0.2.1':'192.0.2.2'})),pools:resources.map(r=>({...r,type:'dir',status:'offline'})),resources,summary:{},snapshots:[],alerts:[],services:[],errors:[],history:[],content:[],logs:resources.map(r=>({id:r.id,time:stamp,user:r.name,resource:r.name,action:'read',status:'success',details:{}}))};
+ for(const file of ['Storage','StorageDisks','NetworkDevices','NetworkRouting','NetworkDNS','ProxmoxNetworks','ActiveAlerts','AlertHistory','Audit']){
+  const details=[];
+  const props=file==='ProxmoxNetworks'?{interfaceView:true}:['ActiveAlerts','AlertHistory'].includes(file)?{alerts,operator:true,onDetails:r=>details.push(r.id),acknowledge(){},onNotifications(){}}:{};
+  const page=await mounted('pages/'+file+'.tsx',props,async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/docker/hosts'?{hosts:[]}:data);
+  try{
+   const rows=[...page.container.querySelectorAll('tbody .inspectable-row')];assert.equal(rows.length,2,file);
+   assert.equal(rows[0].tabIndex,0,file);
+   await page.click(rows[1].querySelectorAll('td')[1]);
+   if(['ActiveAlerts','AlertHistory'].includes(file))assert.deepEqual(details,['second'],file);
+   else assert.ok(rows[1].className.includes('selected'),file+' selects second row');
+   await act(async()=>{rows[0].dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))});
+   if(['ActiveAlerts','AlertHistory'].includes(file))assert.deepEqual(details,['second','first'],file);
+   else assert.ok(rows[0].className.includes('selected'),file+' selects first row with Enter');
+   const actions=rows[0].lastElementChild.querySelectorAll('button');
+   for(const action of actions){assert.equal(action.textContent.trim(),'',file+' action is icon only');assert.ok(action.getAttribute('aria-label'),file+' action has accessible name');assert.ok(action.title,file+' action has tooltip')}
+  }finally{await page.close()}
+ }
+});
+
+test('alert acknowledgement and history checkboxes do not bubble into row inspection',async()=>{
+ const alert={id:'fixture',title:'Fixture',severity:'warning',status:'active',source:'Host',triggered:new Date().toISOString()};
+ for(const file of ['ActiveAlerts','AlertHistory']){
+  const details=[],ack=[];const page=await mounted('pages/'+file+'.tsx',{alerts:[alert],operator:true,onDetails:r=>details.push(r.id),acknowledge:r=>ack.push(r.id),onNotifications(){}},async()=>({}));
+  try{
+   if(file==='ActiveAlerts'){
+    await page.click(page.container.querySelector('button[aria-label="Acknowledge alert fixture"] svg'));
+    assert.deepEqual(ack,['fixture']);
+   }else{
+    await page.click(page.container.querySelector('input[aria-label="Select alert history fixture"]'));
+    assert.equal(page.container.querySelector('input[aria-label="Select alert history fixture"]').checked,true);
+   }
+   assert.deepEqual(details,[]);
+   const row=page.container.querySelector('tbody .inspectable-row');
+   await act(async()=>row.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true})));
+   assert.deepEqual(details,['fixture']);
+   const inspect=row.lastElementChild.querySelector('button');await page.click(inspect.querySelector('svg'));assert.deepEqual(details,['fixture','fixture']);
+  }finally{await page.close()}
+ }
+});
+
+
+test('storage power icons preserve the target without opening inspection',async()=>{
+ const writes=[];const page=await mounted('pages/Storage.tsx',{},async(p,init)=>{
+  if(init?.method){writes.push({path:p,body:JSON.parse(init.body)});return {}}
+  if(p==='/auth/me')return {user:{role:'owner'}};
+  if(p==='/storage')return {pools:[{id:'node/store',node:'node',name:'store',provider:'proxmox',status:'disabled',type:'dir'}],summary:{},errors:[]};
+  return {tasks:[],history:[],content:[]};
+ });
+ try{
+  const power=page.container.querySelector('button[aria-label="Enable store on node"]');
+  assert.equal(power.textContent.trim(),'');await page.click(power.querySelector('svg'));
+  assert.deepEqual(writes,[{path:'/proxmox/storage/store/enabled',body:{enabled:true}}]);
+  assert.ok(page.container.querySelector('.storage-inline-inspect').textContent.includes('Select a pool row'));
  }finally{await page.close()}
 });

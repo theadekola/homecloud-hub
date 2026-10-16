@@ -1,3 +1,4 @@
+import {runtimeEnvironment} from './runtime-configuration.js';
 import crypto from 'node:crypto';
 import nodemailer from 'nodemailer';
 import {get,mutate} from './store.js';
@@ -16,7 +17,7 @@ export async function sendNotification(channel,text,{env=process.env,fetcher=fet
   if(Boolean(env.SMTP_USER)!==Boolean(env.SMTP_PASSWORD))throw Error('Incomplete SMTP authentication');
   const mail=transport({host:env.SMTP_HOST,port,secure:port===465,requireTLS:port!==465,
    auth:env.SMTP_USER?{user:env.SMTP_USER,pass:env.SMTP_PASSWORD}:undefined,
-   connectionTimeout:10000,greetingTimeout:10000,socketTimeout:15000,tls:{rejectUnauthorized:true}});
+   connectionTimeout:10000,greetingTimeout:10000,socketTimeout:15000,tls:{rejectUnauthorized:true,...(env.SMTP_CA_PEM?{ca:env.SMTP_CA_PEM}:{})}});
   try{const r=await mail.sendMail({from:env.NOTIFICATION_EMAIL_FROM,to:env.NOTIFICATION_EMAIL_TO,subject:text.split('\n')[0].slice(0,150),text});
    if(r.rejected?.length)throw Error('Email recipient rejected');return;
   }finally{mail.close?.();}
@@ -40,10 +41,11 @@ export function validateNotificationPreferences(input){
  if(!input||typeof input.enabled!=='boolean'||typeof input.notifyResolved!=='boolean'||!['info','warning','critical'].includes(input.minimumSeverity)||!input.channels||['discord','telegram','email'].some(c=>typeof input.channels[c]!=='boolean')||Object.keys(input).some(k=>!['enabled','notifyResolved','minimumSeverity','channels'].includes(k))||Object.keys(input.channels).some(k=>!['discord','telegram','email'].includes(k)))throw Object.assign(Error('Choose valid notification delivery preferences'),{status:400});
  return {enabled:input.enabled,channels:{discord:input.channels.discord,telegram:input.channels.telegram,email:input.channels.email},minimumSeverity:input.minimumSeverity,notifyResolved:input.notifyResolved};
 }
-export function createNotifier({persistence={get,mutate},env=process.env,send=sendNotification,now=()=>Date.now()}={}){
+export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,send=sendNotification,now=()=>Date.now()}={}){
  let inFlight=null;
- const configured=()=>notificationChannels(env);
- const status=()=>{const queue=persistence.get().notificationQueue||[];return {channels:configured(),preferences:notificationPreferences(persistence.get()),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
+ const environment=()=>typeof env==='function'?env():env;
+ const configured=()=>notificationChannels(environment());
+ const status=()=>{const env=environment(),queue=persistence.get().notificationQueue||[];return {channels:configured(),preferences:notificationPreferences(persistence.get()),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
   failures:queue.filter(r=>!r.sentAt&&r.error).map(r=>({channel:r.channel,error:r.error,nextAttempt:r.nextAttempt})).slice(-20),
   history:queue.slice(-200).map(r=>{const current=(persistence.get().alerts||[]).find(a=>a.id===r.alertId),alert=r.alert||current;return {id:r.id,channel:r.channel,event:r.event,alertId:r.alertId||null,createdAt:r.createdAt||null,sentAt:r.sentAt||null,error:r.error||null,nextAttempt:r.nextAttempt||null,alert:alert?{title:alert.title||null,severity:alert.severity||null,source:alert.source||null,details:alert.details||null}:null,metadataSource:r.alert?'delivery-snapshot':current?'current-alert':null}}),
   lastSent:queue.filter(r=>r.sentAt).at(-1)?.sentAt||null};};
@@ -65,7 +67,7 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
     const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId));
    });
    const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&(r.event==='resolved'?preferences.notifyResolved:eligible(r.alert||(alerts.find(a=>a.id===r.alertId)||{})))&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
-   for(const item of pending){let error=null;try{await send(item.channel,item.text,{env});}catch{error=`${item.channel} delivery failed. Check its server configuration and service availability.`;}
+   for(const item of pending){let error=null;try{await send(item.channel,item.text,{env:environment()});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}
     persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.attempts++;
      if(error){row.error=error;row.nextAttempt=now()+Math.min(3600000,30000*2**Math.min(row.attempts-1,7));}
      else{row.sentAt=new Date(now()).toISOString();delete row.error;delete row.text;}
@@ -75,8 +77,8 @@ export function createNotifier({persistence={get,mutate},env=process.env,send=se
  }
  return {deliver,status,async test(channel){if(!configured().includes(channel))throw Object.assign(Error('Notification channel is not configured'),{status:400});
   const record={id:crypto.randomUUID(),channel,event:'test',createdAt:new Date(now()).toISOString(),attempts:1};
-  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
-  catch{record.error=`${channel} test failed. Check server configuration and service availability.`;throw Object.assign(Error(record.error),{status:502});}
+  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env:environment()});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
+  catch{record.error=`${channel} test failed. Check the saved configuration and service availability.`;throw Object.assign(Error(record.error),{status:502});}
   finally{persistence.mutate(s=>{s.notificationQueue??=[];s.notificationQueue.push(record);const keep=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event!=='test'||keep.has(r.id));});}}};
 }
 export const notifier=createNotifier();

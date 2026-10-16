@@ -1,3 +1,4 @@
+import {runtimeEnvironment} from './runtime-configuration.js';
 import {providers} from './monitor.js';
 import {pve,docker} from './connectors.js';
 import {truenas,opnsense,tailscale} from './infrastructure.js';
@@ -28,7 +29,7 @@ export async function providerDiagnostics({sources=providers,query=pve,tn=truena
    await check('opnsense','core/service/search',()=>firewall('core/service/search'),r=>Array.isArray(r?.rows));
   })(),
   (async()=>{if(!sources.tailscale.configured())return;
-   await check('tailscale','devices',()=>vpn(`tailnet/${encodeURIComponent(process.env.TAILSCALE_TAILNET)}/devices?fields=all`),r=>Array.isArray(r?.devices));
+   await check('tailscale','devices',()=>vpn(`tailnet/${encodeURIComponent(runtimeEnvironment().TAILSCALE_TAILNET)}/devices?fields=all`),r=>Array.isArray(r?.devices));
   })(),
   (async()=>{
    const engines=[...(sources.docker.configured()?[{id:'direct',online:true}]:[]),...hosts().filter(h=>h.online||h.status==='connected')];

@@ -1,3 +1,4 @@
+import {configurationStore,configurationSchemas} from './runtime-configuration.js';
 import {validateNotificationPreferences} from './notifications.js';
 import {apiPolicy} from './api-policy.js';
 import {connectionHealth} from './connection-health.js';
@@ -42,7 +43,8 @@ import { monitor as liveMonitor,providers } from './monitor.js';
 import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,proxmoxCreateVm,proxmoxInstallationMedia,proxmoxCtTemplates,proxmoxCreateCt,proxmoxBackup,dockerAction,dockerCreateContainer,dockerLogs,dockerPrune,dockerBuildImage } from './connectors.js';
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas,opnsense,tailscale } from './infrastructure.js';
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore}={}){
+
  const app=express(),readCache=createReadCache();
  app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&!/^\/api\/(auth|ssh|node-agent)(?:\/|$)/.test(req.path))readCache.clear();});next();});
 
@@ -85,7 +87,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
- app.get('/api/connections/health',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');if(req.query.refresh==='1')void monitor.sample(true).catch(()=>{});const snapshot=await monitor.sample();res.json(connectionHealth({snapshot,cluster:publicCluster(clusterConfig()),direct:publicDocker(),nodes:agentNodes(),refreshing:!!monitor.isRefreshing?.()}));});
+ app.get('/api/connections/health',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');if(req.query.refresh==='1')void monitor.sample(true).catch(()=>{});const snapshot=await monitor.sample();res.json(connectionHealth({snapshot,cluster:publicCluster(clusterConfig()),direct:publicDocker(),nodes:agentNodes(),refreshing:!!monitor.isRefreshing?.(),configurations:Object.fromEntries(['truenas','opnsense','tailscale'].map(id=>{const c=configuration.resolve(id);return [id,{source:configuration.publicConfig(id).source,endpoint:c.TRUENAS_URL||c.OPNSENSE_URL||(c.TAILSCALE_TAILNET?`Tailnet: ${c.TAILSCALE_TAILNET}`:null)}]}))}));});
  app.get('/api/connections/docker/verify',authorize('owner'),async(req,res)=>{const config=dockerConfig();if(!config.url)return res.json({configured:false,status:'not-configured',message:'No direct Docker endpoint is configured. Paired-node connections do not require one.'});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();res.json({configured:true,status:'reachable',host:{hostname:info.Name,version:info.ServerVersion}});}catch{res.json({configured:true,status:'error',message:'Direct Engine verification failed. Check endpoint reachability, TLS trust and client certificates. No settings were changed.'});}});
  app.get('/api/docker/hosts/:id/verify',authorize('viewer'),async(req,res)=>{const info=await agentContext.run({host:req.params.id},async()=>{const response=await agentRequest('/info');if(!response.ok)throw httpError('Selected Docker host verification failed',502);return response.json();});if(!info.ServerVersion)throw httpError('Selected host did not report a Docker Engine version',502);res.json({id:req.params.id,host:{hostname:info.Name,version:info.ServerVersion}});});
  app.get('/api/connections/docker',authorize('owner'),(req,res)=>res.json({connection:publicDocker()}));
@@ -112,7 +114,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    clusterStore.remove();await monitor.invalidate();await audit(req,'connection.proxmox.remove','proxmox',{},'success');
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
- const connectionScope=()=>crypto.createHash('sha256').update(JSON.stringify([clusterConfig(),dockerConfig(),Object.entries(process.env).filter(([key])=>/^(TRUENAS_|OPNSENSE_|TAILSCALE_)/.test(key))])).digest('hex');
+ const connectionScope=()=>crypto.createHash('sha256').update(JSON.stringify([clusterConfig(),dockerConfig(),['truenas','opnsense','tailscale'].map(id=>configuration.resolve(id))])).digest('hex');
  const cachedReads=new Set(['/docker','/storage','/network','/backups','/schedules','/retention','/proxmox/storage','/storage/disks','/storage/datasets','/storage/snapshots']);
  const forceRead=req=>req?.query?.refresh==='1'||req?.get?.('X-HomeCloud-Refresh')==='1';
  const sampleView=async req=>{if(!monitor.isRefreshing)return monitor.sample(forceRead(req));if(forceRead(req))void monitor.sample(true).catch(()=>{});const s=await monitor.sample();return {...s,refreshing:!!s.refreshing||monitor.isRefreshing()};};
@@ -374,6 +376,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  },true);
  read('/audit',async()=>({logs:(await db.query(`SELECT id::text,created_at AS time,COALESCE(user_email,'system') AS "user",action,resource,details,status,COALESCE(ip,'-') ip FROM audit_logs ORDER BY created_at DESC LIMIT 500`)).rows}),'auditor');
  read('/diagnostics',()=>providerDiagnostics(),'owner');
+ read('/configuration/:service',req=>configuration.publicConfig(req.params.service),'owner');
+ action('put','/configuration/:service','owner','configuration.save',req=>configuration.save(req.params.service,req.body));
+ action('delete','/configuration/:service','owner','configuration.disable',req=>configuration.disable(req.params.service));
+ action('post','/configuration/:service/test','owner','configuration.test',async req=>{const id=req.params.service;if(!Object.hasOwn(configurationSchemas,id))throw httpError('Unsupported configuration service');try{if(['discord','telegram','email'].includes(id)){if(req.body.confirm!==true)throw httpError('Confirm sending an external test notification');return await notifier.test(id);}const result=id==='truenas'?await truenas('system.info'):id==='opnsense'?await opnsense('core/system/status'):await tailscale(`tailnet/${encode(configuration.resolve(id).TAILSCALE_TAILNET)}/devices?fields=all`);if(!result||typeof result!=='object')throw Error('Invalid provider response');return {service:id,verified:true,message:'Read-only connection check passed. Write permissions were not tested.'};}catch(error){if(error.status===400)throw error;throw httpError('Connection test failed. Check the endpoint, credentials, permissions, network and trusted CA certificate.',502);}});
+
  read('/notifications',()=>notifier.status(),'owner');
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);mutate(s=>s.notificationPreferences=preferences);return preferences;});
  action('post','/notifications/test','owner','notification.test',req=>notifier.test(required(req.body.channel,'Channel')));

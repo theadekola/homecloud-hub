@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
 import argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
-VERSION=4
+VERSION=5
 HOSTS=[]
 RESCAN=threading.Event()
 LOCK=threading.Lock()
@@ -39,6 +39,29 @@ def docker_request(host,path,method='GET',body='',timeout=300):
  if len(payload)>1300000:raise RuntimeError('Response too large for node bridge')
  return {'status':int(status),'body':base64.b64encode(payload).decode()}
 
+def docker_stats(host,body,timeout=15):
+ # One QEMU/pct round trip for up to sixteen independent, bounded local reads.
+ ids=json.loads(base64.b64decode(body,validate=True))
+ if not isinstance(ids,list) or not 1<=len(ids)<=16 or any(not isinstance(i,str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}',i) for i in ids):raise RuntimeError('Invalid container statistics request')
+ ids=list(dict.fromkeys(ids));seconds=max(1,min(8,timeout-2));quoted=' '.join(shlex.quote(i) for i in ids)
+ script='command -v curl >/dev/null && test -S /var/run/docker.sock || { echo "Docker socket or guest curl unavailable" >&2; exit 1; }; umask 077; work=$(mktemp -d) || exit 1; trap \'rm -rf "$work"\' EXIT HUP INT TERM; '
+ script+='for id in '+quoted+'; do (code=$(curl --silent --show-error --max-time '+str(seconds)+' --max-filesize 32768 --unix-socket /var/run/docker.sock -o "$work/$id.body" -w "%{http_code}" "http://localhost/containers/$id/stats?stream=false" 2>/dev/null) || code=000; printf "%s" "$code" > "$work/$id.code") & done; wait; '
+ script+='for id in '+quoted+'; do printf "%s " "$id"; cat "$work/$id.code"; printf " "; base64 < "$work/$id.body" 2>/dev/null | tr -d "\n"; printf "\n"; done'
+ output=guest_run(host,script,timeout=max(11,timeout+10))
+ if len(output.encode())>1300000:raise RuntimeError('Statistics response exceeds bridge size limit')
+ result={i:{'error':'Container statistics not reported'} for i in ids}
+ for line in output.splitlines():
+  fields=line.split(' ',2)
+  if len(fields)!=3 or fields[0] not in result:continue
+  identity,status,payload=fields
+  if status!='200':result[identity]={'error':'Container statistics request timed out or Docker socket unavailable' if status=='000' else 'Docker HTTP '+status};continue
+  try:
+   data=json.loads(base64.b64decode(payload,validate=True))
+   if not isinstance(data,dict) or not isinstance(data.get('cpu_stats'),dict) or not isinstance(data.get('memory_stats'),dict):raise ValueError('Invalid statistics')
+   result[identity]={'stats':data}
+  except (ValueError,TypeError):result[identity]={'error':'Docker returned invalid container statistics'}
+ return {'status':200,'body':base64.b64encode(json.dumps(result,separators=(',',':')).encode()).decode()}
+
 def setup_guest(identity):
  if not re.fullmatch(r'(?:lxc|qemu)/[0-9]+',identity):raise RuntimeError('Setup is allowed only inside guests')
  os_id=guest_run(identity,'. /etc/os-release; printf "%s" "$ID"',timeout=30).strip()
@@ -60,7 +83,7 @@ def setup_guest(identity):
 def scan():
  global HOSTS
  while True:
-  found=[]
+  failed_kinds=set()
   candidates=[('node',socket.gethostname())]
   for tool,kind in ([] if globals().get('CONFIG',{}).get('kind')=='docker' else [('qm','qemu'),('pct','lxc')]):
    try:
@@ -70,21 +93,28 @@ def scan():
       # qm: VMID NAME STATUS; pct: VMID STATUS LOCK NAME
       running=fields[2]=='running' if tool=='qm' else fields[1]=='running'
       if running:candidates.append((kind+'/'+fields[0],fields[1] if tool=='qm' else fields[-1]))
-   except Exception as e:print('Guest list unavailable: '+str(e),flush=True)
+   except Exception as e:
+    failed_kinds.add(kind);print('Guest list unavailable: '+str(e),flush=True)
+  identities={identity for identity,name in candidates}
+  with LOCK:
+   reports={h['id']:dict(h) for h in HOSTS if h['id'] in identities or h['id'].split('/')[0] in failed_kinds}
+   for identity,row in reports.items():
+    if identity.split('/')[0] in failed_kinds:row.update(online=False,setup=False,status='guest_access_required',error='Proxmox guest list unavailable; check the paired node')
+   HOSTS=list(reports.values())
   for identity,name in candidates:
    try:
     r=docker_request(identity,'/info',timeout=8)
     if r['status']!=200:raise RuntimeError('Docker Engine returned HTTP '+str(r['status']))
     info=json.loads(base64.b64decode(r['body']))
     if r['status']!=200 or not info.get('ServerVersion'):raise RuntimeError('Docker Engine not available')
-    found.append({'id':identity,'name':name,'online':True,'status':'connected','setup':False})
+    reports[identity]={'id':identity,'name':name,'online':True,'status':'connected','setup':False}
    except Exception as e:
     error=str(e)[:400];supported=False
     if identity!='node':
      try:supported=guest_run(identity,'. /etc/os-release; printf "%s" "$ID"',timeout=30).strip() in ('debian','ubuntu')
      except Exception:pass
-    found.append({'id':identity,'name':name,'online':False,'error':error,'setup':supported,'status':'setup_available' if supported else 'guest_access_required'})
-   with LOCK:HOSTS=list(found)
+    reports[identity]={'id':identity,'name':name,'online':False,'error':error,'setup':supported,'status':'setup_available' if supported else 'guest_access_required'}
+   with LOCK:HOSTS=list(reports.values())
   RESCAN.wait(60);RESCAN.clear()
 
 # Local read-only network collection is separate from guest Docker discovery.
@@ -133,7 +163,7 @@ def post(config,path,body):
 
 def read_job(job):
  # Mutations, installations and streaming event reads keep their own serial lane.
- return job.get('operation','docker')=='docker' and job.get('method')=='GET' and job.get('path','').split('?')[0]!='/events'
+ return job.get('operation','docker') in ('docker','stats') and job.get('method')=='GET' and job.get('path','').split('?')[0]!='/events'
 
 def execute_job(job):
  if job.get('expiresAt',time.time()*1000+1)<=time.time()*1000:return {'id':job['id'],'error':'Request expired before execution'}
@@ -141,7 +171,7 @@ def execute_job(job):
   if job.get('operation')=='setup':result=setup_guest(job['host'])
   else:
    remaining=max(1,min(300,int((job.get('expiresAt',time.time()*1000+300000)-time.time()*1000)/1000)))
-   result=docker_request(job['host'],job['path'],job['method'],job['body'],timeout=remaining)
+   result=docker_stats(job['host'],job['body'],timeout=remaining) if job.get('operation')=='stats' else docker_request(job['host'],job['path'],job['method'],job['body'],timeout=remaining)
  except Exception as e:result={'error':str(e)[:400]}
  return {'id':job['id'],**result}
 

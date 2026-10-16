@@ -11,7 +11,7 @@ if [[ ${1:-} == --update ]]; then
   backup=$(mktemp /usr/local/sbin/.homecloud-node-agent-backup.XXXXXX)
   trap 'rm -f "$next" "$backup"' EXIT
   curl --fail --silent --show-error --max-time 30 "$hub/api/node-agent/download" -o "$next"
-  python3 -c 'import ast,pathlib,sys; text=pathlib.Path(sys.argv[1]).read_text(); tree=ast.parse(text); compile(tree,sys.argv[1],"exec"); assert any(isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="VERSION" for t in n.targets) and isinstance(n.value,ast.Constant) and n.value.value==4 for n in tree.body), "Update HomeCloud before updating the connector"' "$next"
+  python3 -c 'import ast,pathlib,sys; text=pathlib.Path(sys.argv[1]).read_text(); tree=ast.parse(text); compile(tree,sys.argv[1],"exec"); assert any(isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="VERSION" for t in n.targets) and isinstance(n.value,ast.Constant) and n.value.value==5 for n in tree.body), "Update HomeCloud before updating the connector"' "$next"
   cp -p /usr/local/sbin/homecloud-node-agent.py "$backup"
   mv -f "$next" /usr/local/sbin/homecloud-node-agent.py
   if ! systemctl restart homecloud-node-agent.service; then

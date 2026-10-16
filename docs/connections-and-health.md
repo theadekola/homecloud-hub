@@ -31,7 +31,7 @@ Health rows distinguish offline, unverified, partial and setup-required states.
 Counts refer to connection entries, including an API, paired nodes and discovered
 Docker hosts; they are not a count of unique physical machines.
 
-Manage gives scoped instructions for guest ACLs, connector version 4 updates,
+Manage gives scoped instructions for guest ACLs, connector version 5 updates,
 offline agents, guest-agent setup and Docker checks. Copy commands does not
 execute them. Connector updates and service starts are manual commands run by
 an administrator on the named node/host; no new unauthenticated repair channel

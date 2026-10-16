@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {guestNetwork,ctExtra,guestGeneral,allocateGuestId} from './guest-create-options.js';
 import {assertGuestPlacement} from './ssh-target.js';
 import {validateBackupSelection} from './backup-validation.js';
-import {selectedAgentHost,agentRequest} from './node-agents.js';
+import {selectedAgentHost,selectedAgentVersion,agentRequest,agentContainerStats} from './node-agents.js';
 import {dockerConfig,dockerTlsConfig} from './docker-config.js';
 import {mergeNodeStorage} from './proxmox-inventory.js';
 import {backgroundGuestInventory} from './guest-discovery.js';
@@ -215,7 +215,21 @@ export async function docker(path,init={}){
   }
   return JSON.parse(text);
 }
-export async function dockerSnapshot({timeoutMs,metrics=true}={}){
+const dockerSnapshotsInFlight=new Map();
+export function dockerSnapshot(options={}){
+ const key=createHash('sha256').update(JSON.stringify([selectedAgentHost(),selectedAgentHost()?null:dockerConfig(),options.metrics!==false])).digest('hex');
+ if(dockerSnapshotsInFlight.has(key))return dockerSnapshotsInFlight.get(key);
+ const pending=collectDockerSnapshot(options).finally(()=>{if(dockerSnapshotsInFlight.get(key)===pending)dockerSnapshotsInFlight.delete(key)});dockerSnapshotsInFlight.set(key,pending);return pending;
+}
+export function dockerMetrics(stats){
+ const finite=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
+ const current=stats?.cpu_stats,previous=stats?.precpu_stats,total=current?.cpu_usage?.total_usage,prior=previous?.cpu_usage?.total_usage,system=current?.system_cpu_usage,priorSystem=previous?.system_cpu_usage;
+ const cpu=finite(total)&&finite(prior)&&finite(system)&&finite(priorSystem)&&total>=prior&&system>priorSystem?Math.round((total-prior)/(system-priorSystem)*(current.online_cpus||current.cpu_usage?.percpu_usage?.length||1)*1000)/10:null;
+ const usage=stats?.memory_stats?.usage,limit=stats?.memory_stats?.limit,cache=stats?.memory_stats?.stats?.total_inactive_file??stats?.memory_stats?.stats?.inactive_file??stats?.memory_stats?.stats?.cache;
+ const memory=finite(usage)?Math.max(0,usage-(finite(cache)?Math.min(cache,usage):0)):null;
+ return {cpu,memory,memoryPercent:memory!==null&&finite(limit)&&limit>0?Math.round(memory/limit*100):null};
+}
+async function collectDockerSnapshot({timeoutMs,metrics=true}={}){
   const deadline=Date.now()+(timeoutMs||15000);
   const read=path=>{
     const remaining=deadline-Date.now();
@@ -223,17 +237,13 @@ export async function dockerSnapshot({timeoutMs,metrics=true}={}){
     return docker(path,{timeoutMs:remaining});
   };
   const [containers,images,info,networks,volumes]=await Promise.all([read('/containers/json?all=1'),read('/images/json'),read('/info'),read('/networks'),read('/volumes')]);
-  const measured=[];
-  for(let i=0;i<containers.length;i+=5){
-    measured.push(...await Promise.all(containers.slice(i,i+5).map(async c=>{
-      let stats=null,statsError=null;
-      if(metrics&&c.State==='running'){try{stats=await read(`/containers/${encodeURIComponent(c.Id)}/stats?stream=false`)}catch(e){statsError=e.message;}}
-      const cpuDelta=stats?stats.cpu_stats.cpu_usage.total_usage-(stats.precpu_stats?.cpu_usage?.total_usage||0):0;
-      const systemDelta=stats?stats.cpu_stats.system_cpu_usage-(stats.precpu_stats?.system_cpu_usage||0):0;
-      const cpu=stats&&systemDelta>0?Math.round(cpuDelta/systemDelta*(stats.cpu_stats.online_cpus||stats.cpu_stats.cpu_usage.percpu_usage?.length||1)*1000)/10:null;
-      return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,imageId:c.ImageID,mounts:c.Mounts||[],networks:c.NetworkSettings?.Networks||{},status:c.State,ports:(c.Ports||[]).map(p=>p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort)).join(', '),cpu,memory:stats?.memory_stats?.usage??null,memoryPercent:stats?.memory_stats?.limit?Math.round(stats.memory_stats.usage/stats.memory_stats.limit*100):null,statsError,labels:publicComposeLabels(c.Labels)};
-    })));
+  const samples=new Map(),running=containers.filter(c=>c.State==='running'),batch=selectedAgentVersion()>=5;
+  if(metrics&&batch){
+   for(let i=0;i<running.length;i+=16){const group=running.slice(i,i+16);try{const remaining=deadline-Date.now();if(remaining<=0)throw Error('Docker measurement time budget exceeded');const result=await agentContainerStats(group.map(c=>c.Id),{timeoutMs:remaining});for(const c of group)samples.set(c.Id,Object.hasOwn(result,c.Id)?result[c.Id]:{error:'Container statistics not reported'});}catch(error){for(const c of group)samples.set(c.Id,{error:error.message})}}
+  }else if(metrics){
+   for(let i=0;i<running.length;i+=5)await Promise.all(running.slice(i,i+5).map(async c=>{try{samples.set(c.Id,{stats:await read(`/containers/${encodeURIComponent(c.Id)}/stats?stream=false`)})}catch(error){samples.set(c.Id,{error:error.message})}}));
   }
+  const measured=containers.map(c=>{const sample=samples.get(c.Id);return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Image,imageId:c.ImageID,mounts:c.Mounts||[],networks:c.NetworkSettings?.Networks||{},status:c.State,ports:[...new Set((c.Ports||[]).map(p=>(p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort))+(p.Type&&p.Type!=='tcp'?`/${p.Type}`:'')))].join(', '),...dockerMetrics(sample?.stats),statsError:sample?.error?String(sample.error).slice(0,400):null,labels:publicComposeLabels(c.Labels)}});
   return {
     errors:measured.filter(c=>c.statsError).map(c=>`${c.name}: statistics unavailable${/timed out|timeout|time budget/i.test(c.statsError)?' (measurement deadline exceeded)':/Docker HTTP (401|403)/.test(c.statsError)?' (Docker Engine access rejected)':''}`),
     host:{engineId:info.ID||null,hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,

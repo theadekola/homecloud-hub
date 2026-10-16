@@ -18,9 +18,20 @@ export function revokeAgent(id){mutate(s=>{s.nodeAgents=(s.nodeAgents||[]).filte
 export function pollAgent(agent,input){
  if(!Array.isArray(input.hosts)||input.hosts.length>500)fail('Invalid host report');
  const hosts=input.hosts.map(h=>{if((agent.kind==='docker'&&h.id!=='node')||!/^(node|qemu\/\d+|lxc\/\d+)$/.test(h.id))fail('Invalid guest identity');return {id:h.id,name:String(h.name||h.id).slice(0,100),online:h.online===true,error:String(h.error||'').slice(0,400),setup:h.setup===true,status:String(h.status||'unavailable').slice(0,40)}});
- nodes.set(agent.id,{version:input.version===4?4:input.version===3?3:input.version===2?2:1,time:Date.now(),lastSeen:new Date().toISOString(),hosts,network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
+ nodes.set(agent.id,{version:input.version===5?5:input.version===4?4:input.version===3?3:input.version===2?2:1,time:Date.now(),lastSeen:new Date().toISOString(),hosts,network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
  for(const r of (input.results||[]).slice(0,20)){const j=jobs.get(r.id);if(!j||j.agent!==agent.id)continue;jobs.delete(r.id);if(r.error)j.reject(new Error(String(r.error).slice(0,400)));else if(typeof r.body==='string'&&r.body.length<=2500000&&Number.isInteger(r.status))j.resolve(r);else j.reject(new Error('Invalid agent response'));}
  const pending=[];for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt});if(pending.length===5)break}return {jobs:pending};
+}
+export function selectedAgentVersion(){const host=agentHosts().find(h=>h.id===selectedAgentHost());return agentNodes().find(n=>n.id===host?.agent)?.version||0;}
+function queueAgentRead(host,payload,duration){return new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Node agent request timed out'))},duration);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),...payload,expiresAt:Date.now()+duration,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});}
+export async function agentContainerStats(ids,{timeoutMs=15000}={}){
+ const host=agentHosts().find(h=>h.id===selectedAgentHost());if(!host?.online)fail('Selected Docker host is offline or unavailable',503);
+ if(selectedAgentVersion()<5)fail('Update the paired connector to version 5 for batched statistics',409);
+ if(!Array.isArray(ids)||!ids.length||ids.length>16||ids.some(id=>typeof id!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(id)))fail('Invalid container statistics request');
+ const body=Buffer.from(JSON.stringify(ids)).toString('base64'),duration=Math.max(1000,Math.min(timeoutMs,30000));
+ const result=await queueAgentRead(host,{operation:'stats',path:'',method:'GET',body},duration);
+ if(result.status!==200)fail('Connector statistics collection failed',502);
+ const data=JSON.parse(Buffer.from(result.body,'base64').toString('utf8'));if(!data||typeof data!=='object'||Array.isArray(data))fail('Invalid connector statistics response',502);return data;
 }
 export async function agentRequest(path,init={}){
  const identity=selectedAgentHost(),host=agentHosts().find(h=>h.id===identity);if(!host?.online)fail('Selected Docker host is offline or unavailable',503);
@@ -28,7 +39,7 @@ export async function agentRequest(path,init={}){
  const method=init.method||'GET';if(!['GET','POST','DELETE'].includes(method))fail('Unsupported method');
  const body=init.body==null?'':(Buffer.isBuffer(init.body)?init.body:Buffer.from(String(init.body),'utf8')).toString('base64');if(body.length>1500000)fail('Request exceeds agent size limit');
  const duration=Math.max(1000,Math.min(Number(init.timeoutMs)||(method==='GET'?15000:330000),330000));
- const result=await new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Node agent request timed out'))},duration);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),path,method,body,expiresAt:Date.now()+duration,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});
+ const result=await queueAgentRead(host,{path,method,body},duration);
  const buffer=Buffer.from(result.body,'base64');return {ok:result.status>=200&&result.status<300,status:result.status,buffer,text:async()=>buffer.toString('utf8'),json:async()=>JSON.parse(buffer.toString('utf8'))};
 }
 

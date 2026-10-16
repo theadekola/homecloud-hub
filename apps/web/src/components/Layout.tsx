@@ -1,3 +1,4 @@
+import PageIcon, {pageIconForPath} from './PageIcon';
 import BrandIcon from './BrandIcon';
 import HeaderNotifications from './HeaderNotifications';
 import {canAccessPage} from '../permissions';
@@ -73,7 +74,7 @@ export default function Layout() {
         {sections.map(sec => <div className="nav-section" key={sec.title}>
           {showLabels && <div className="nav-title">{sec.title}</div>}
           {sec.items.filter(([,path]:any)=>canAccessPage(path,session?.user?.role)).map(([label,path,Icon]: any) => <NavLink key={path} to={path} end={path === '/'} className={({isActive}) => `nav-item ${isActive?'active':''}`}>
-            {path==='/proxmox'||path==='/docker'?<BrandIcon brand={path.slice(1)} size={18}/>:<Icon size={18}/>}{showLabels && <span>{label}</span>}
+            {path==='/proxmox'||path==='/docker'?<BrandIcon brand={path.slice(1)} size={18}/>:<PageIcon name={pageIconForPath(path)} size={20}/>}{showLabels && <span>{label}</span>}
           </NavLink>)}
         </div>)}
       </nav>

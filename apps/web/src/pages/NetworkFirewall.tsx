@@ -1,3 +1,4 @@
+import PageIcon from '../components/PageIcon';
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Shield,Layers,RefreshCw,Eye,Plus,FileText,Search,CheckCircle,ShieldX,Settings} from 'lucide-react';
@@ -8,7 +9,7 @@ export default function NetworkFirewall({navigation}:{navigation?:import('react'
  const inventory=useApi<any>('/proxmox/network',null),session=useApi<any>('/auth/me',null),nodes=inventory.data?.nodes||[];
  const [node,setNode]=useState('');useEffect(()=>{if(!nodes.some((n:any)=>n.node===node))setNode(nodes[0]?.node||'')},[nodes,node]);
  const selector=<select aria-label="Firewall node" value={node} onChange={e=>setNode(e.target.value)}><option value="">Select Node</option>{nodes.map((n:any)=><option key={n.node}>{n.node}</option>)}</select>;
- return <>{inventory.error&&<p className="error">{inventory.error}</p>}{node?<FirewallNode key={node} node={node} navigation={navigation} selector={selector} admin={['admin','owner'].includes(session.data?.user?.role)}/>:<section className="network-firewall"><h2>Firewall</h2>{selector}{navigation}<Card><p>Select a connected Proxmox node.</p></Card></section>}</>;
+ return <>{inventory.error&&<p className="error">{inventory.error}</p>}{node?<FirewallNode key={node} node={node} navigation={navigation} selector={selector} admin={['admin','owner'].includes(session.data?.user?.role)}/>:<section className="network-firewall"><h2><PageIcon name="network" className="page-title-icon"/>Firewall</h2>{selector}{navigation}<Card><p>Select a connected Proxmox node.</p></Card></section>}</>;
 }
 function FirewallNode({node,admin,navigation,selector}:{node:string;admin:boolean;navigation?:import('react').ReactNode;selector:import('react').ReactNode}){
  const live=useApi<any>(`/network/firewall/${encodeURIComponent(node)}`,null);

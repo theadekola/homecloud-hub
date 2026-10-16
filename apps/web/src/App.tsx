@@ -1,3 +1,4 @@
+import {startSessionActivity} from './session';
 import Shell from './pages/Shell';
 import {useApi} from './hooks';
 import {SSHApproval} from './components/SSHAccess';
@@ -11,8 +12,8 @@ import Dashboard from './pages/Dashboard'; import Proxmox from './pages/Proxmox'
 export default function App(){
  const [connectionError,setConnectionError]=useState('');
  const[authenticated,setAuthenticated]=useState<boolean|null>(null);
- const check=async()=>{setConnectionError('');if(!getAccessToken()){setAuthenticated(false);return}try{await api('/auth/me');setAuthenticated(true)}catch(e:any){if(e.status===401){clearTokens();setAuthenticated(false)}else setConnectionError(e.message||'Cannot reach HomeCloud.')}};
- useEffect(()=>{check();const expired=()=>{setConnectionError('');setAuthenticated(false)};const unavailable=(e:any)=>setConnectionError(e.detail);window.addEventListener('homecloud-session-unavailable',unavailable);window.addEventListener('homecloud-session-expired',expired);return()=>{window.removeEventListener('homecloud-session-expired',expired);window.removeEventListener('homecloud-session-unavailable',unavailable)}},[]);
+ const check=async()=>{setConnectionError('');if(!getAccessToken()){setAuthenticated(false);return}try{await api('/auth/me');setAuthenticated(!!getAccessToken())}catch(e:any){if(e.status===401){clearTokens();setAuthenticated(false)}else setConnectionError(e.message||'Cannot reach HomeCloud.')}};
+ useEffect(()=>{const stopActivity=startSessionActivity();check();const expired=()=>{setConnectionError('');setAuthenticated(false)};const unavailable=(e:any)=>setConnectionError(e.detail);window.addEventListener('homecloud-session-unavailable',unavailable);window.addEventListener('homecloud-session-expired',expired);return()=>{stopActivity();window.removeEventListener('homecloud-session-expired',expired);window.removeEventListener('homecloud-session-unavailable',unavailable)}},[]);
  if(connectionError)return <div className="login-page"><div><p role="alert">{connectionError}</p><button className="btn primary" onClick={check}>Retry connection</button></div></div>;
  if(authenticated===null)return <div className="login-page"><div className="muted">Loading HomeCloud Hub…</div></div>;
  if(!authenticated)return <Login onLogin={()=>setAuthenticated(true)}/>;

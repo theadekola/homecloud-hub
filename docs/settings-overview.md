@@ -139,3 +139,11 @@ The header retains Edit → Save Changes / Cancel. Only administrators can edit 
 Version, hostname, OS/platform, kernel, architecture, Node.js runtime and API uptime come from the existing settings response. Uptime describes the API process, which may run inside a container. The actual account/audit database is PostgreSQL and persisted monitoring/settings state uses JSON. Build numbers/dates are not invented. Owner-only updates reuse the existing verified updater control and show unavailability or errors; the page never assumes the installed version is current. Other roles do not request updater status.
 
 Project documentation, repository, Issues, settings guide and SECURITY.md links point to existing public resources. GitHub repository metadata verified Issues enabled and Discussions disabled during implementation, so no unsupported Discussions link is offered. Developer information follows the supplied reference and provided portfolio/social details; no LinkedIn/YouTube/contact destinations are guessed. The checkout contains no application license file or privacy/terms document, so the page does not copy the reference's MIT or published-policy claims. Technology credits reflect the actual stack rather than the reference's SQLite/Tailwind examples.
+
+
+### Immediate controls
+System, Security, Notifications, Integrations, Appearance and About have no Edit, Cancel or Save Changes header actions. System, Security and About display information; shared instance fields remain editable under General, and imports are reviewed under Backup & Restore.
+
+Owners can change supported configured notification channels and delivery preferences directly. Each action saves through the existing owner-only preferences API, disables controls while saving and restores the previous setting on failure. Setup guidance is available without an edit mode. Unconfigured channels and unsupported services cannot be enabled. Explicit notification tests still require confirmation.
+
+Supported Appearance controls save and apply in this browser immediately, including sidebar display. Storage failures preserve previous values. Dark is the only supported theme; unavailable capabilities remain labelled.

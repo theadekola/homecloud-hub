@@ -121,36 +121,6 @@ export async function truenasSnapshot(){
     snapshots:snapshots.map(s=>({id:s.id,name:s.name||s.id,dataset:s.dataset,created:s.properties?.creation?.value??null,provider:'truenas',type:'snapshot'})),
     disks:disks.map(d=>({id:d.identifier||d.name,name:d.name,model:d.model,serial:d.serial,size:d.size,type:d.type})),alerts,jobs,schedules,errors};
 }
-export function opnsenseConfigured(){const env=runtimeEnvironment();return Boolean(env.OPNSENSE_URL&&env.OPNSENSE_API_KEY&&env.OPNSENSE_API_SECRET);}
-export async function opnsense(path,method='GET',body){
-  const env=runtimeEnvironment();
-  if(!opnsenseConfigured())throw httpError('OPNsense is not configured',503);
-  if(new URL(env.OPNSENSE_URL).protocol!=='https:')throw httpError('OPNsense requires HTTPS');
-  if(env.OPNSENSE_API_STYLE==='legacy')path=path.replace(/interfaces_info/g,'interfacesInfo').replace(/reload_interface/g,'reloadInterface').replace(/search_item/g,'searchItem');
-  const res=await request(`${env.OPNSENSE_URL.replace(/\/$/,'')}/api/${path}`,{method,headers:{Authorization:`Basic ${Buffer.from(`${env.OPNSENSE_API_KEY}:${env.OPNSENSE_API_SECRET}`).toString('base64')}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:env.OPNSENSE_CA_PEM|| (env.OPNSENSE_TLS_CA?fs.readFileSync(env.OPNSENSE_TLS_CA):undefined),rejectUnauthorized:true});
-  if(!res.ok)throw new Error(`OPNsense HTTP ${res.status}`);
-  const data=await res.json();
-  if(data.result==='failed'||data.status==='failed'||data.status==='error')throw new Error('OPNsense rejected the operation');
-  return data;
-}
-export async function opnsenseSnapshot(){
-  const [system,interfaces,services]=await Promise.all([opnsense('core/system/status'),opnsense('interfaces/overview/interfaces_info'),opnsense('core/service/search')]);
-  return {system,interfaces:Array.isArray(interfaces)?interfaces:Object.entries(interfaces).map(([id,data])=>({id,...data})),services:services.rows||[]};
-}
-export function tailscaleConfigured(){const env=runtimeEnvironment();return Boolean(env.TAILSCALE_API_KEY&&env.TAILSCALE_TAILNET);}
-export async function tailscale(path,method='GET',body){
-  const env=runtimeEnvironment();
-  if(!tailscaleConfigured())throw httpError('Tailscale is not configured',503);
-  const apiBase=(env.TAILSCALE_API_BASE||'https://api.tailscale.com/api/v2').replace(/\/$/,'');
-  if(new URL(apiBase).protocol!=='https:')throw httpError('Tailscale API requires HTTPS');
-  const res=await request(`${apiBase}/${path}`,{method,headers:{Authorization:`Bearer ${env.TAILSCALE_API_KEY}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined},{ca:env.TAILSCALE_TLS_CA?fs.readFileSync(env.TAILSCALE_TLS_CA):undefined});
-  if(!res.ok)throw new Error(`Tailscale HTTP ${res.status}`);
-  const text=await res.text();return text?JSON.parse(text):{};
-}
-export async function tailscaleSnapshot(){
-  const result=await tailscale(`tailnet/${encode(runtimeEnvironment().TAILSCALE_TAILNET)}/devices?fields=all`);
-  return {devices:(result.devices||[]).map(d=>({id:d.id,name:d.hostname||d.name,user:d.user,addresses:d.addresses?.join(', ')||'',os:d.os,lastSeen:d.lastSeen,authorized:d.authorized,expires:d.expires,routes:d.enabledRoutes||[],advertisedRoutes:d.advertisedRoutes||[]}))};
-}
 export async function extraServices(){
   const configured=JSON.parse(process.env.SERVICE_CHECKS_JSON||'[]');
   if(!Array.isArray(configured))throw new Error('SERVICE_CHECKS_JSON must be an array');

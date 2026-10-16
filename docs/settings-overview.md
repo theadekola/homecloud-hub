@@ -45,7 +45,6 @@ All-channel tests and individual-channel tests have distinct scopes. Test action
 
 Integrations no longer repeats notification switches, secret forms, provider status lists or compatibility runners. It shows supported adapter/automation scope and existing alert-rule observations, with links to Notifications and Connections. It does not claim that unimplemented Slack, Teams, Pushover, custom webhooks, IFTTT or Gotify adapters are connected.
 
-Connections retains the encrypted TrueNAS, OPNsense and Tailscale configuration forms as well as the existing Proxmox and Direct Docker API flows. See [runtime configuration](runtime-configuration.md) and [connection health](connections-and-health.md). Configuration credentials remain owner-only, encrypted and masked. Existing authentication, TLS verification and action confirmations are preserved.
 
 ## Backup and product information
 
@@ -54,3 +53,5 @@ General-settings exports contain site name, description and refresh interval. Im
 About uses reported version facts and verified project links. Build number/date and an edition label are not fabricated. License/privacy/terms availability is stated accurately. Shared instance-name/description inputs stay in General. Project documentation and issue links are consolidated into Quick Links rather than repeated in a Support card.
 
 All tabs retain responsive layouts, search where applicable and the existing permission checks. Removing duplicate sections does not add new provider capabilities or change live infrastructure.
+
+AI configuration lives under Integrations, with the same owner-only popup linked from Assistant. Proxmox storage registration uses one shared form across storage and backup destinations. Backup and snapshot schedule shortcuts open the canonical Schedules editor.

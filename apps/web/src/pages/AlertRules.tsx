@@ -1,3 +1,4 @@
+import {useSearchParams} from 'react-router-dom';
 import {useEffect,useRef,useState} from 'react';
 import {Settings,CheckCircle,PauseCircle,AlertTriangle,Bell,Search,RotateCcw,Pencil,Copy,Trash2,Plus,FileText,Cpu,Database,MemoryStick,Mail,ArrowRight,Info} from 'lucide-react';
 import {confirmedApi} from '../api';
@@ -7,12 +8,14 @@ const enabled=(r:any)=>r.enabled===true||r.enabled===1||r.enabled==='1';
 const metricName=(v:string)=>v==='cpu'?'CPU':v==='memory'?'Memory':v==='storage'?'Storage':v;
 const metricIcon=(v:string)=>v==='cpu'?Cpu:v==='memory'?MemoryStick:Database;
 export default function AlertRules({rules,alerts,admin,owner=false,refresh,onHistory,onNotifications=()=>{},navigation,loading=false,unavailable=false}:{rules:any[];alerts:any[];admin:boolean;owner?:boolean;refresh:()=>Promise<any>;onHistory:()=>void;onNotifications?:()=>void;navigation?:import('react').ReactNode;loading?:boolean;unavailable?:boolean}){
+ const [params,setParams]=useSearchParams();
  const [search,setSearch]=useState(''),[status,setStatus]=useState('all'),[metric,setMetric]=useState('all'),[target,setTarget]=useState('all'),[edit,setEdit]=useState<any>(null),[version,setVersion]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[page,setPage]=useState(0),[size,setSize]=useState(10),[deleteRow,setDeleteRow]=useState<any>(null);
  const nameInput=useRef<HTMLInputElement>(null),filtered=rules.filter(r=>(status==='all'||(enabled(r)?'enabled':'disabled')===status)&&(metric==='all'||r.metric===metric)&&(target==='all'||r.provider===target)&&JSON.stringify(r).toLowerCase().includes(search.toLowerCase())),pages=Math.max(1,Math.ceil(filtered.length/size)),actual=Math.min(page,pages-1),shown=filtered.slice(actual*size,actual*size+size);
  useEffect(()=>setPage(0),[search,status,metric,target,size]);
  const latest=edit?rules.find(r=>r.id===edit.id):null,stale=!!edit&&(!latest||['name','provider','metric','threshold','severity'].some(key=>latest[key]!==edit[key]));
  const reset=()=>{setEdit(null);setVersion(v=>v+1);setError('')};
  const create=()=>{reset();window.setTimeout(()=>nameInput.current?.focus(),0)};
+ useEffect(()=>{if(params.get('action')==='create'){create();const next=new URLSearchParams(params);next.delete('action');setParams(next,{replace:true});}},[params.get('action')]);
  const run=async(path:string,method:string,body:any,message:string,clear=false)=>{setBusy(true);setError('');try{await confirmedApi(path,{method,...(body!==undefined?{body:JSON.stringify(body)}:{})});setMessage(message);if(clear)reset();setDeleteRow(null);await refresh()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  const submit=(e:any)=>{e.preventDefault();if(stale||!admin||unavailable)return;run(edit?`/alerts/rules/${encodeURIComponent(edit.id)}`:'/alerts/rules',edit?'PUT':'POST',Object.fromEntries(new FormData(e.currentTarget)),edit?'Rule updated.':'Rule created.',true)};
  const counts=rules.map(r=>({id:r.id,name:r.name,count:alerts.filter(a=>a.ruleId===r.id||(!a.ruleId&&a.key?.startsWith(`rule:${r.id}:`))).length})).sort((a,b)=>b.count-a.count).slice(0,5),on=rules.filter(enabled).length,off=rules.length-on;

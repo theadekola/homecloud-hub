@@ -5,11 +5,11 @@ import {agentContext} from './node-agents.js';
 import crypto from 'node:crypto';
 import { get,mutate } from './store.js';
 import { proxmoxConfigured,proxmoxSnapshot,dockerConfigured,dockerSnapshot } from './connectors.js';
-import { truenasConfigured,truenasSnapshot,opnsenseConfigured,opnsenseSnapshot,tailscaleConfigured,tailscaleSnapshot,extraServices } from './infrastructure.js';
+import { truenasConfigured,truenasSnapshot,extraServices } from './infrastructure.js';
 
 export const providers={
   proxmox:{configured:proxmoxConfigured,read:proxmoxSnapshot},docker:{configured:dockerConfigured,read:dockerSnapshot},
-  truenas:{configured:truenasConfigured,read:truenasSnapshot},opnsense:{configured:opnsenseConfigured,read:opnsenseSnapshot},tailscale:{configured:tailscaleConfigured,read:tailscaleSnapshot}
+  truenas:{configured:truenasConfigured,read:truenasSnapshot}
 };
 export function alertConditions(snapshot,rules){
   const conditions=[];
@@ -64,7 +64,14 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           if(service?.status==='reachable'){
-            if(existing.provider==='docker'&&existing.metric){const row=monitoredDocker(snapshot).find(c=>c.monitorId===existing.resourceId);const value=existing.metric==='memory'?row?.memoryPercent:row?.cpu;if(row&&typeof value!=='number')continue;}existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
+            if(existing.metric){
+              let row,value;
+              if(existing.provider==='docker'){row=monitoredDocker(snapshot).find(c=>c.monitorId===existing.resourceId);value=existing.metric==='memory'?row?.memoryPercent:row?.cpu;}
+              else if(existing.provider==='proxmox'){row=(existing.metric==='storage'?snapshot.proxmox?.storage:snapshot.proxmox?.nodes)?.find(r=>r.id===existing.resourceId);value=existing.metric==='storage'?row?.usage:row?.[existing.metric];}
+              else if(existing.provider==='truenas'){row=snapshot.truenas?.pools?.find(r=>r.id===existing.resourceId);value=row?.usage;}
+              const rule=state.rules.find(r=>r.id===(existing.ruleId||existing.key?.split(':')[1]));
+              if(rule&&rule.enabled!==false&&(!row||!Number.isFinite(value)||(row.status!=null&&!['online','running','healthy','available'].includes(String(row.status).toLowerCase()))))continue;
+            }existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
         }
         for(const condition of conditions){const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
           if(current){current.ruleId=condition.ruleId||current.ruleId;current.node=condition.node;current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});

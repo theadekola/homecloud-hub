@@ -37,7 +37,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
     const err:any=new Error(body.error || `Request failed: ${res.status}`);
     err.status=res.status; err.body=body; throw err;
   }
-  if(options.method&&!['GET','HEAD'].includes(options.method.toUpperCase())&&!/^\/(auth|ssh)(?:\/|$)/.test(path))window.dispatchEvent?.(new Event('homecloud-api-write'));
+  if(options.method&&!['GET','HEAD'].includes(options.method.toUpperCase())&&path!=='/node-agents/pairing/status'&&!/^\/(auth|ssh)(?:\/|$)/.test(path))window.dispatchEvent?.(new Event('homecloud-api-write'));
   return body;
 }
 

@@ -1,6 +1,5 @@
 # HomeCloud Hub 3
 
-A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense API connections. The application has no demo mode, seeded infrastructure records, random charts or simulated successful operations.
 
 ## Implemented integrations
 
@@ -9,7 +8,6 @@ A self-hosted web interface for real Proxmox, Docker, TrueNAS, OPNsense API conn
 | Proxmox | Nodes, VMs, LXC, storage, networks, backup jobs, archives and tasks | Create an empty VM; guest lifecycle; VM snapshot; backups; create/toggle/delete backup schedules; retention update/preview/prune; restore archives into unused guest IDs |
 | Docker | Engine information, container measurements/logs, images, volumes, networks and existing Compose projects | Create/lifecycle/remove containers; create/remove volumes and networks; prune unused resources; start/stop/restart existing Compose project containers |
 | TrueNAS | Pools, datasets, disks, snapshots, alerts, snapshot schedules and jobs | Create datasets and snapshots; create/update/toggle/delete SMB and NFS shares; inspect share paths and permissions; delete/roll back snapshots; start pool scrubs; create/toggle periodic snapshot tasks with retention lifetimes |
-| OPNsense | System status, interfaces and services | Start/stop/restart services; reload an interface |
 | Other services | Server-configured HTTP health endpoints | Monitoring only |
 
 Monitoring samples every 30 seconds, with bounded reads for all paired Docker hosts and the optional direct Engine. Host-qualified container identities prevent collisions; Engine IDs deduplicate the same Engine reached through multiple connections. Slow or unavailable hosts appear as errors or partial readings rather than being replaced. Charts contain collected Proxmox node averages, including gaps for unavailable measurements. Alert rules evaluate actual CPU, memory and storage measurements. Connection errors and TrueNAS alerts are also tracked. Acknowledgment does not repair a condition.
@@ -26,7 +24,7 @@ less /tmp/homecloud-install.sh
 sudo bash /tmp/homecloud-install.sh
 ```
 
-The installer detects the VM IP automatically and prints `https://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Use `sudo homecloud config` for integration credentials, `sudo homecloud restart` to apply them, and `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
+The installer detects the VM IP automatically and prints `https://DETECTED-IP:6002`. The web port defaults to 6002; the API uses port 6000 inside Docker and is accessed through the web proxy. No IP input is required. Register your owner account using the setup code printed by the installer. Choose your own name, email and password. Registration closes after the first account. The installer sets up Docker when absent, installs under `/opt/homecloud-hub`, and starts at boot. Configure supported integrations in Settings using the encrypted configuration popups. Use `sudo homecloud update` to pull updates from GitHub. See [PRODUCTION.md](PRODUCTION.md) for HTTPS, pinned releases, recovery and backups.
 
 ### Get your setup code and register
 
@@ -69,9 +67,8 @@ On Windows, if your environment prevents npm workspace links, run `npm install -
 
 ## Boundaries
 
-Provider API versions and token permissions affect functionality. TrueNAS supports JSON-RPC and an explicit legacy WebSocket mode; incompatible methods surface errors. OPNsense interface fields vary by release. This is one connection per provider, not a multi-cluster inventory.
 
-No Compose file deployment, generic Docker-volume/database backup runner, network discovery, firewall-rule editor, app two-factor login, automatic software updates, security scanner or invented health score is provided. Restore, prune and other sensitive actions require typed confirmation. Asynchronous tasks are reported as queued; provider task history shows their outcome.
+No Compose file deployment, generic Docker-volume/database backup runner, app two-factor login or security scanner is provided. Supported Proxmox firewall editing is available under Network. Sensitive actions require resource-bound approval and target SSH authentication where available. Asynchronous tasks are reported as queued; provider task history shows their outcome.
 
 ### Updates from the dashboard
 
@@ -111,14 +108,14 @@ The bridge bounds request/response sizes; large image builds or truncated QEMU-a
 
 Storage and Network now share the Docker host selection with the Docker page. Use their host selector to switch between the direct Engine and paired hosts. An unavailable selection returns an explicit limitation and no substituted Docker inventory. Proxmox and TrueNAS resources remain independent of that choice.
 
-The owner can open **Settings → Notifications** to configure Discord, Telegram and SMTP using secure forms, inspect delivery records and send an explicit test. Save Configuration encrypts credentials and applies them without a restart. Saved passwords and tokens are masked; blank secret fields retain existing credentials. SMTP verifies certificates and requires STARTTLS or implicit TLS on port 465. TrueNAS, OPNsense and Tailscale have equivalent forms under **Settings → Connections → Other Services**. See [runtime configuration](docs/runtime-configuration.md) for fields, permissions and storage details.
 
 Active alerts and recovery events are queued separately per channel. Successful deliveries are deduplicated across restarts; failures retry with bounded exponential backoff. Acknowledgment does not send a recovery notification. A network failure after a provider accepted a message can produce a duplicate on retry; delivery is not guaranteed exactly once. Historical events older than seven days are not newly queued.
 
-Open **Settings → Provider Compatibility Checks** to run read-only checks against configured Proxmox, Docker, TrueNAS, OPNsense APIs. Versions and individual failures are shown without changing guests, exports or files. Passing reads do not certify write compatibility, client access to shares or restore outcomes. Use disposable staging resources for those tests.
 
 ### Automatic LAN HTTPS on port 6002
 
 New installations detect the VM address and configure HTTPS at `https://VM-IP:6002`. Existing LAN installations migrate during a software update, preserving passwords and tokens and saving `.env.before-https-6002`. Caddy keeps its certificate authority in the existing Docker volume. Public domain configurations retain their chosen ports and certificate settings. No environment-file or Caddyfile edits are required. HTTP uses auxiliary port 6003; open the HTTPS address explicitly after migration.
 
 Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo docker compose --project-directory /opt/homecloud-hub -f /opt/homecloud-hub/docker-compose.yml exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`. Install the certificate in the client’s trusted root store. HomeCloud cannot automatically alter trust stores on users’ computers. Existing paired agents using an old address need to reconnect using the new HTTPS address.
+
+AI API keys and model settings are configured by an owner under Settings → Integrations → Configure AI. The Assistant page provides the same popup. See [runtime configuration](docs/runtime-configuration.md). Provider Jobs in Monitoring reports TrueNAS job progress and errors.

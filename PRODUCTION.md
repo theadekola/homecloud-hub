@@ -119,26 +119,15 @@ JSON-RPC connects over WSS to `/api/current`. For CORE or older SCALE, set `TRUE
 
 Periodic snapshots have a provider-managed retention lifetime. Rollback does not force unmounts or automatically delete newer snapshots. Pool scrub submits a TrueNAS job; inspect Monitoring for job state. Snapshot listings are bounded to 1,000 results.
 
-## OPNsense
 
 ```env
-OPNSENSE_URL=https://YOUR-FIREWALL
-OPNSENSE_API_KEY=YOUR-KEY
-OPNSENSE_API_SECRET=YOUR-SECRET
-OPNSENSE_TLS_CA=/run/homecloud/ca/opnsense-ca.pem
-OPNSENSE_API_STYLE=current
 ```
 
-Use a dedicated API user with privileges for the system status, interface overview and service endpoints. `OPNSENSE_API_STYLE=legacy` uses older camel-case interface endpoint names. Service control and interface reload can affect your connection, so sensitive actions require confirmation.
 
-## Tailscale
 
 ```env
-TAILSCALE_TAILNET=YOUR-TAILNET
-TAILSCALE_API_KEY=YOUR-ADMIN-API-KEY
 ```
 
-Use a Tailscale admin API credential, not a device enrollment key. Device authorization, removal and route operations require appropriate API access. Expired credentials produce visible errors. Device last-seen timestamps are not a guarantee of current connectivity. A custom authenticated API gateway can be set with `TAILSCALE_API_BASE`; optional `TAILSCALE_TLS_CA` supplies its CA file.
 
 ## Other service health endpoints
 

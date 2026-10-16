@@ -15,7 +15,7 @@ test('guest ACL failures get the permission guide and pending scans are not perm
 });
 test('provider integrations expose health without returning server configuration secrets',()=>{
  const r=connectionHealth({direct:{url:'https://docker.test:2376',source:'saved',key:'DO_NOT_RETURN',cert:'DO_NOT_RETURN'},snapshot:{services:[{id:'docker',provider:'docker',status:'reachable'},{provider:'truenas',status:'error',error:'Unavailable'},{provider:'opnsense',status:'reachable'}]}});
- assert.equal(r.connections[0].status,'online');assert.equal(r.connections.find(r=>r.id==='truenas').manage,'/storage');assert.equal(r.connections.find(r=>r.id==='opnsense').manage,'/network');assert.ok(!JSON.stringify(r).includes('DO_NOT_RETURN'));
+ assert.equal(r.connections[0].status,'online');assert.equal(r.connections.find(r=>r.id==='truenas').manage,'/storage');assert.equal(r.connections.find(r=>r.id==='opnsense'),undefined);assert.ok(!JSON.stringify(r).includes('DO_NOT_RETURN'));
 });
 test('health endpoint enforces owner access and only reads injected monitor results',async()=>{
  process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');let scans=0,forced=0;

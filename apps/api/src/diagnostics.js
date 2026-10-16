@@ -1,10 +1,9 @@
-import {runtimeEnvironment} from './runtime-configuration.js';
 import {providers} from './monitor.js';
 import {pve,docker} from './connectors.js';
-import {truenas,opnsense,tailscale} from './infrastructure.js';
+import {truenas} from './infrastructure.js';
 import {agentHosts,agentContext} from './node-agents.js';
 
-export async function providerDiagnostics({sources=providers,query=pve,tn=truenas,engine=docker,firewall=opnsense,vpn=tailscale,hosts=agentHosts}={}){
+export async function providerDiagnostics({sources=providers,query=pve,tn=truenas,engine=docker,hosts=agentHosts}={}){
  const checks=[],versions={};
  const check=async(provider,method,read,valid)=>{
   try{const value=await read();if(!valid(value))throw Error('Unexpected response shape');checks.push({provider,method,status:'passed'});return value;}
@@ -22,14 +21,6 @@ export async function providerDiagnostics({sources=providers,query=pve,tn=truena
    for(const method of ['pool.query','pool.dataset.query','pool.snapshottask.query','sharing.smb.query','sharing.nfs.query','service.query'])
     await check('truenas',method,()=>tn(method),Array.isArray);
    await check('truenas','filesystem.stat (/mnt)',()=>tn('filesystem.stat',['/mnt']),r=>r?.type==='DIRECTORY');
-  })(),
-  (async()=>{if(!sources.opnsense.configured())return;
-   await check('opnsense','core/system/status',()=>firewall('core/system/status'),r=>r&&typeof r==='object');
-   await check('opnsense','interfaces/overview/interfaces_info',()=>firewall('interfaces/overview/interfaces_info'),r=>r&&typeof r==='object');
-   await check('opnsense','core/service/search',()=>firewall('core/service/search'),r=>Array.isArray(r?.rows));
-  })(),
-  (async()=>{if(!sources.tailscale.configured())return;
-   await check('tailscale','devices',()=>vpn(`tailnet/${encodeURIComponent(runtimeEnvironment().TAILSCALE_TAILNET)}/devices?fields=all`),r=>Array.isArray(r?.devices));
   })(),
   (async()=>{
    const engines=[...(sources.docker.configured()?[{id:'direct',online:true}]:[]),...hosts().filter(h=>h.online||h.status==='connected')];

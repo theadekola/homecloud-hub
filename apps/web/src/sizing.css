@@ -1,18 +1,18 @@
 /* Shared sizing comes after the page themes. Keep metric dimensions here so
    page-specific colors and charts can change without changing the card scale. */
 :root {
-  --space-panel: 16px;
-  --space-grid: 12px;
-  --metric-height: 144px;
-  --metric-icon: 44px;
-  --metric-glyph: 22px;
-  --metric-value: 24px;
+  --space-panel: 12px;
+  --space-grid: 8px;
+  --metric-height: 0px;
+  --metric-icon: 36px;
+  --metric-glyph: 20px;
+  --metric-value: 22px;
 }
-:root[data-density="compact"] { --space-panel: 12px; --metric-height: 128px; --metric-icon: 40px; --metric-value: 22px; }
+:root[data-density="compact"] { --space-panel: 10px; --space-grid: 6px; --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
 .brand-icon { flex-shrink: 0; }
 .brand b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-.content { font-size: 14px; line-height: 1.5; }
+.content { box-sizing: border-box; width: 100%; padding: 16px; font-size: 14px; line-height: 1.5; }
 .content > *, .content .card { min-width: 0; }
 .content .pve-heading { flex-wrap: wrap; align-items: flex-start; }
 .content .pve-heading > div:first-child { flex: 1 1 360px; min-width: 0; }
@@ -48,24 +48,24 @@
   font-size: 12px;
 }
 .content.content .report-unified .report-middle > .card {
-  height: auto; min-height: 220px; overflow: visible;
+  height: auto; min-height: 0; overflow: visible;
 }
 .content.content .report-unified :is(.report-source-note, .report-pagination small, .report-pagination span) { font-size: 11px; }
 
-/* These explicit classes identify metric collections, never detail panels or
-   chart legends. auto-fill keeps a three-card tab at the same scale as six
-   cards on another tab, and responds to sidebar width as well as viewport. */
+/* At most six metrics per row. auto-fit lets shorter collections fill the row;
+   the 148px minimum also reflows metrics inside narrow page columns. */
 .content .metric-grid.metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(148px, calc((100% - 5 * var(--space-grid)) / 6))), 1fr));
+  grid-auto-rows: auto;
   align-items: stretch;
   gap: var(--space-grid);
   min-width: 0;
 }
 .content .metric-grid.metric-grid > * {
   display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-  gap: 12px; min-width: 0; min-height: var(--metric-height);
+  gap: 8px; min-width: 0; min-height: var(--metric-height);
+  box-sizing: border-box; align-self: stretch;
   height: auto; max-height: none; grid-column: auto;
   /* Older page themes used !important for these two properties. */
   padding: var(--space-panel) !important;
@@ -80,12 +80,12 @@
   display: block; min-width: 0; overflow-wrap: anywhere;
 }
 .content .metric-grid.metric-grid :is(strong, .stat-value) {
-  display: block; font-size: clamp(18px, 11cqi, var(--metric-value)) !important; line-height: 1.2;
-  font-weight: 700; letter-spacing: -.025em; margin: 6px 0;
+  display: block; font-size: clamp(18px, 13cqi, var(--metric-value)) !important; line-height: 1.2;
+  font-weight: 700; letter-spacing: -.025em; margin: 4px 0;
   min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
 }
 .content .metric-grid.metric-grid :is(small, .small) {
-  display: block; font-size: 12px; line-height: 1.45;
+  display: block; font-size: 11px; line-height: 1.4;
   white-space: normal; overflow-wrap: anywhere;
 }
 .content .metric-grid.metric-grid :is(small, .small) ~ :is(small, .small),
@@ -95,8 +95,7 @@
 }
 .content .metric-grid.metric-grid .overview-stat > div > span { font-size: 12px; }
 
-/* No flex shrinking: equal width and height prevent oval icon backgrounds.
-   Direct SVG variants include their padding inside the same 44px footprint. */
+/* Equal icon footprints stay square without taking space from the text. */
 .content .metric-grid.metric-grid :is([class$="-icon"], i):has(> svg),
 .content .metric-grid.metric-grid > * > span:has(> svg),
 .content .metric-grid.metric-grid .performance-stat-content > span {
@@ -111,13 +110,13 @@
 .content .metric-grid.metric-grid > * > svg {
   display: block; order: 1; box-sizing: border-box;
   width: var(--metric-icon); height: var(--metric-icon);
-  flex: 0 0 var(--metric-icon); padding: 11px;
-  border-radius: 12px; background: #3985ff20; color: #68a4ff;
+  flex: 0 0 var(--metric-icon); padding: 8px;
+  border-radius: 10px; background: #3985ff20; color: #68a4ff;
 }
 .content .metric-grid.metric-grid > .card:has(> button:only-child) { padding: 0 !important; }
 .content .metric-grid.metric-grid > .card > button:only-child {
-  min-width: 0; width: 100%; height: 100%; padding: var(--space-panel);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-width: 0; width: 100%; height: auto; min-height: 100%; padding: var(--space-panel);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   border-radius: inherit;
 }
 .content .metric-grid.metric-grid > .card > button:only-child > span:not(:has(> svg)) {
@@ -130,6 +129,60 @@
 .content .metric-grid .performance-stat-content > div { flex: 1; min-width: 0; }
 .content .metric-grid.performance-stats > .card > .recharts-responsive-container { flex: none; }
 
+
+/* Content-sized sections: tables and details follow their rows instead of
+   reserving several hundred pixels when only one record is available.
+   Chart canvases, topology diagrams and terminal viewports retain their sizes. */
+.content.content :is(
+  .users-list, .users-details, .audit-list, .audit-details,
+  .restore-list-card, .restore-detail-card, .schedule-list, .retention-list,
+  .destination-list, .destination-details, .destination-detail-body,
+  .report-list, .report-details, .detail-panel
+) { min-height: 0; height: auto; max-height: none; }
+.content.content :is(
+  .storage-overview-bottom, .disk-bottom, .dataset-bottom, .performance-bottom,
+  .device-summary, .network-lower, .firewall-bottom, .dns-bottom,
+  .backup-bottom, .backup-history, .schedule-charts, .retention-analytics,
+  .destination-bottom, .report-middle, .restore-analytics, .rule-bottom,
+  .monitor-upper, .monitor-lower
+) > .card { min-height: 0; height: auto; max-height: none; padding: var(--space-panel); align-self: start; }
+.content.content :is(
+  .storage-shares .dataset-layout, .network-firewall .device-workspace,
+  .network-traffic .traffic-workspace
+) > .card { min-height: 0; }
+.content.content :is(
+  .users-workspace, .audit-workspace, .restore-workspace, .retention-workspace,
+  .destination-workspace, .report-workspace, .storage-overview-grid,
+  .device-workspace, .dataset-layout, .volume-workspace, .image-workspace,
+  .network-layout, .backup-workspace, .vm-workspace, .pve-grid,
+  .restore-analytics, .retention-analytics, .destination-bottom,
+  .report-middle, .schedule-charts
+) { align-items: start; gap: 12px; }
+.content.content .pve-page .pve-grid > .card { align-self: start; }
+/* Nested resource pages render their own metrics, so the host summary stays hidden. */
+.content .docker-images-view > .docker-stats,
+.content .notification-embedded .notification-stats { display: none; }
+.content .connection-stats.metric-grid > .connection-stat > svg { display: none; }
+.content.content .settings-overview-grid { align-items: start; gap: 12px; }
+.content.content .settings-overview-card { padding: var(--space-panel) !important; }
+.content.content :is(.users-list, .audit-list, .restore-list-card,
+  .destination-list, .report-list) > .table-wrap { flex: initial; }
+.content.content :is(.restore-empty, .schedule-empty, .destination-empty,
+  .report-empty, .widget-empty, .empty-state) {
+  min-height: 0; flex: initial; padding: 20px 12px; gap: 8px;
+}
+.content.content .restore-detail-card > .restore-empty { min-height: 0; }
+.content.content .sftp-table-wrap { min-height: 0; }
+.content.content :is(.page-header, .pve-heading, .overview-toolbar) { margin-bottom: 12px; }
+.content.content :is(.tabs, .pve-tabbar) { margin-top: 12px; margin-bottom: 12px; }
+.content.content .metric-grid.metric-grid { margin-top: 0; margin-bottom: 12px; }
+.content.content .connections-page { gap: 12px; }
+.content.content :is(.docker-networks, .docker-events, .connections-page) > .metric-grid,
+.content.content :is(.docker-networks, .docker-events) > .tabs { margin: 0; }
+.content.content :is(.metric-grid small, .metric-grid .small) {
+  -webkit-line-clamp: unset; overflow: visible;
+}
+
 @media (min-width: 801px) and (max-width: 1200px) {
   .content .pve-page .pve-resource-summary .pve-storage-list button {
     grid-template-columns: 9px minmax(0, 1fr) !important;
@@ -139,27 +192,13 @@
   }
 }
 @media (max-width: 800px) {
-  :root { --space-panel: 14px; --space-grid: 10px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
+  :root { --space-panel: 12px; --space-grid: 8px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
   :root[data-density="compact"] { --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
   .content { padding: 16px; }
   .content .metric-grid.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .content .metric-grid.metric-grid > *,
   .content .metric-grid.metric-grid > .card > button:only-child {
-    display: block; position: relative;
-  }
-  .content .metric-grid.metric-grid :is([class$="-icon"], i):has(> svg),
-  .content .metric-grid.metric-grid > * > span:has(> svg),
-  .content .metric-grid.metric-grid > * > svg,
-  .content .metric-grid.metric-grid .performance-stat-content > span {
-    position: absolute; top: var(--space-panel); right: var(--space-panel);
-  }
-  .content .metric-grid.metric-grid > * > svg { padding: 8px; }
-  .content .metric-grid.metric-grid :is(div, span):has(> strong) > :first-child,
-  .content .metric-grid.metric-grid .stat > div:first-child > :first-child {
-    padding-right: calc(var(--metric-icon) + 8px); min-height: var(--metric-icon);
-  }
-  .content .metric-grid.metric-grid :is(strong, .stat-value) {
-    font-size: var(--metric-value) !important; overflow-wrap: break-word;
+    gap: 8px;
   }
   .content.content :is(.btn, .tab, .icon-btn) { min-height: 44px; }
   .content.content .icon-btn { min-width: 44px; }

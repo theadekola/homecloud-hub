@@ -26,6 +26,7 @@ await test('TLS connectors authenticate, surface provider errors and support bot
    if(data.msg==='connect')return ws.send(JSON.stringify({msg:'connected',session:'test'}));
    const legacy=data.msg==='method';
    if(data.method==='auth.login_with_api_key')return ws.send(JSON.stringify(legacy?{msg:'result',id:data.id,result:!rejected}:{jsonrpc:'2.0',id:data.id,result:!rejected}));
+   if(data.method==='system.info')return ws.send(JSON.stringify(legacy?{msg:'result',id:data.id,result:{hostname:'fixture-nas'}}:{jsonrpc:'2.0',id:data.id,result:{hostname:'fixture-nas'}}));
    if(data.method==='pool.snapshot.query')return ws.send(JSON.stringify({jsonrpc:'2.0',id:data.id,error:{code:-32601,message:'Method not found'}}));
    ws.send(JSON.stringify(legacy?{msg:'result',id:data.id,result:[{id:'pool/data@snapshot'}]}:{jsonrpc:'2.0',id:data.id,result:[{id:'pool/data@snapshot'}]}));
  }));
@@ -33,6 +34,11 @@ await test('TLS connectors authenticate, surface provider errors and support bot
  process.env.TRUENAS_URL=base;process.env.TRUENAS_API_KEY='test-key';process.env.TRUENAS_TLS_CA=cert;
  // The default Node CA set is extended only for this test process's HTTP connector.
  try{
+   const draft=await truenas('system.info',[],{TRUENAS_URL:process.env.TRUENAS_URL,TRUENAS_API_KEY:'draft-key',TRUENAS_API_MODE:'current',TRUENAS_CA_PEM:fs.readFileSync(cert,'utf8')});assert.ok(draft);assert.ok(seen.some(r=>r.method==='auth.login_with_api_key'&&r.params[0]==='draft-key'));assert.notEqual(process.env.TRUENAS_API_KEY,'draft-key');
+   process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);
+   const {createApp}=await import('../src/app.js'),{createConfigurationStore}=await import('../src/runtime-configuration.js'),configuration=createConfigurationStore(path.join(directory,'configuration'));configuration.disable('truenas');
+   const apiServer=createApp({configuration,authenticate:(req,res,next)=>{req.user={sub:'test',role:'owner'};next()},audit:async()=>{},monitor:{invalidate(){},sample:async()=>({services:[]})}}).listen(0,'127.0.0.1');await new Promise(r=>apiServer.once('listening',r));
+   try{const url=`http://127.0.0.1:${apiServer.address().port}/api/configuration/truenas/test`,configurationDraft={TRUENAS_URL:base,TRUENAS_API_KEY:'route-draft-key',TRUENAS_API_MODE:'current',TRUENAS_CA_PEM:fs.readFileSync(cert,'utf8')},response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({configuration:configurationDraft})});assert.equal(response.status,200);assert.match((await response.json()).result.message,/Save Configuration/);assert.equal(configuration.publicConfig('truenas').disabled,true);assert.ok(seen.some(r=>r.method==='auth.login_with_api_key'&&r.params[0]==='route-draft-key'));}finally{apiServer.closeAllConnections();await new Promise(r=>apiServer.close(r));}
    const result=await truenas('pool.snapshot.query');assert.equal(result[0].id,'pool/data@snapshot');assert.ok(seen.some(r=>r.method==='zfs.snapshot.query'));
    process.env.TRUENAS_API_MODE='legacy';const legacy=await truenas('pool.snapshot.query');assert.equal(legacy[0].id,'pool/data@snapshot');delete process.env.TRUENAS_API_MODE;
    rejected=true;await assert.rejects(truenas('pool.dataset.query'),/authentication rejected/);rejected=false;

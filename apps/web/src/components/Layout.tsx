@@ -1,5 +1,5 @@
 import {canAccessPage} from '../permissions';
-import {applyAppearance} from '../appearance';
+import {applyAppearance,watchSystemTheme} from '../appearance';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Boxes, Container, Database, Network, HardDriveDownload,
@@ -21,7 +21,7 @@ const sections = [
 ];
 
 export default function Layout() {
-  useEffect(()=>{applyAppearance();},[]);
+  useEffect(()=>{applyAppearance();return watchSystemTheme();},[]);
   const [collapsed, setCollapsed] = useState(()=>localStorage.getItem('homecloud_sidebar')==='collapsed');
   useEffect(()=>{const changed=()=>setCollapsed(localStorage.getItem('homecloud_sidebar')==='collapsed');window.addEventListener('homecloud-sidebar',changed);return()=>window.removeEventListener('homecloud-sidebar',changed);},[]);
   useEffect(()=>{localStorage.setItem('homecloud_sidebar',collapsed?'collapsed':'expanded');},[collapsed]);

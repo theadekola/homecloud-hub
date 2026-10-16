@@ -1,0 +1,34 @@
+/* Light palette overrides shared surfaces. Terminals, charts and semantic badges
+   retain their own palettes rather than being colour-inverted. */
+:root[data-theme="light"]{color:#182b43;background:#f3f6fb;color-scheme:light}
+:root[data-theme="light"] body{background:#f3f6fb;color:#182b43}
+:root[data-theme="light"][data-background="gradient"] body{background:radial-gradient(circle at 70% -10%,#e1edff 0,#f3f6fb 45%,#edf2f8 100%)}
+:root[data-theme="light"] :is(.sidebar,.topbar,.profile-dropdown,.storage-card,.modal,.card,.settings-overview-card){background:#fff!important;border-color:#cad5e3!important;color:#182b43}
+:root[data-theme="light"] :is(.nav-item,.icon-btn,.profile-trigger,.top-actions,.profile-dropdown button){color:#334b68}
+:root[data-theme="light"] :is(.nav-item:hover,.profile-trigger:hover,.profile-trigger[aria-expanded="true"],.profile-dropdown button:hover){background:#e8eff9}
+:root[data-theme="light"] .nav-item.active{background:var(--app-accent-fill,#4f46e5);color:var(--app-accent-text,#fff)}
+:root[data-theme="light"] :is(.search,.settings-search,.icon-btn,.btn.secondary,.btn.ghost,.appearance-choice,.appearance-font-sample,.appearance-range output,.integration-tile,.about-resource,.about-credit,.settings-card-link){background:#f5f8fd;border-color:#bdccde;color:#263f60}
+:root[data-theme="light"] :is(input:not([type=checkbox]):not([type=range]):not([type=color]),select,textarea){background:#fff!important;color:#182b43!important;border-color:#bdccde!important}
+:root[data-theme="light"] :is(input,textarea)::placeholder{color:#60738d;opacity:1}
+:root[data-theme="light"] :is(.search input,.settings-search input){background:transparent!important}
+:root[data-theme="light"] :is(.page-header p,.muted,.small,.nav-title,.profile span,.settings-note,.settings-card-heading p,.settings-overview-heading p,.settings-inline-field small,.settings-toggle small,.settings-fact span,.appearance-choice small,.settings-overview-footer,.integration-tile-heading p,.about-resource small,.about-introduction>p,.about-developer p,.about-credit small){color:#50647f}
+:root[data-theme="light"] :is(.settings-overview-tabs button,.tabs button){color:#425c7a}
+:root[data-theme="light"] :is(.settings-overview-tabs button.active,.tabs button.active,.appearance-choice.selected){background:#e5eeff;color:#224e9d;border-color:#638ee5}
+:root[data-theme="light"] :is(.settings-fact,.settings-toggle,.list-row,.settings-overview-tabs,td,th){border-color:#d4deeb}
+:root[data-theme="light"] th{background:#edf3fb;color:#425c7a}
+:root[data-theme="light"] :is(tbody tr:hover,.table-wrap,.table-container){background:#f4f7fc}
+:root[data-theme="light"] :is(.positive,.settings-save-message){color:#137344}
+:root[data-theme="light"] .error{color:#b42336}
+:root[data-theme="light"] :is(.settings-edit-mode,.system-settings-feedback){background:#eaf2ff;border-color:#b9cee9;color:#284b78}
+:root[data-theme="light"] .settings-overview-heading>svg{color:#315e9f}
+:root[data-theme="light"] .settings-switch-track{background:#b3c0d1;border-color:#8093ae}
+:root[data-theme="light"] .settings-toggle input:checked+.settings-switch-track{background:var(--app-accent,#4f46e5)}
+:root[data-theme="light"] :is(.settings-color-options button[aria-pressed=true],.appearance-colours button[aria-pressed=true]){outline-color:#335784}
+:root[data-theme="light"] :is(.modal-backdrop,.sidebar-backdrop){background:#12233a66}
+:root[data-theme="light"] :is(.badge.gray){background:#e4eaf2;color:#435b79}
+:root[data-theme="light"] :is(.notification-settings-record,.integrations-service-grid>div,.integrations-rule-list>div,.integrations-provider-list>div){border-color:#ccd9e8}
+/* The sample follows the selected draft, independently of the saved theme. */
+.appearance-preview[data-preview-theme="light"]{background:#f2f6fc!important;color:#182b43;border-color:#bdccde}
+.appearance-preview[data-preview-theme="light"] :is(p,.appearance-preview-top span,.appearance-preview-layout aside){color:#50647f}
+.appearance-preview[data-preview-theme="light"] :is(.appearance-preview-top,.appearance-preview-metrics>span){border-color:#c4d2e3}
+.appearance-preview[data-preview-theme="dark"]{color:#dce9f8}

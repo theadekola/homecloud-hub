@@ -47,7 +47,12 @@ services:
       - no-new-privileges:true
 
   api:
-    build: ./apps/api
+    build:
+      context: ./apps/api
+      args:
+        HOMECLOUD_BUILD_NUMBER: ${HOMECLOUD_BUILD_NUMBER:-}
+        HOMECLOUD_BUILD_DATE: ${HOMECLOUD_BUILD_DATE:-}
+        HOMECLOUD_BUILD_REVISION: ${HOMECLOUD_BUILD_REVISION:-}
     restart: unless-stopped
     env_file: .env
     expose:

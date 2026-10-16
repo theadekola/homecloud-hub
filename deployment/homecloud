@@ -22,6 +22,7 @@ case "$command" in
     fi
     python3 deployment/configure-https.py
     docker compose config --quiet
+    source deployment/build-env.sh
     docker compose build --pull
     docker compose up -d --wait --wait-timeout 180
     install -m 0755 deployment/homecloud /usr/local/bin/homecloud

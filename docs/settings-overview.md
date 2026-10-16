@@ -50,7 +50,7 @@ Integrations no longer repeats notification switches, secret forms, provider sta
 
 General-settings exports contain site name, description and refresh interval. Imports validate and stage only those fields for review before Save Changes. Credentials, user accounts, application data, browser preferences and infrastructure backups are excluded. Export/import lives under Backup & Restore; it is not repeated as System Backup.
 
-About uses reported version facts and verified project links. Build number/date and an edition label are not fabricated. License/privacy/terms availability is stated accurately. Shared instance-name/description inputs stay in General. Project documentation and issue links are consolidated into Quick Links rather than repeated in a Support card.
+About uses reported version facts and verified project links. Build number, UTC date and source revision come from build-time API metadata; development builds without metadata are labelled explicitly. About links to the MIT License, security guidance, privacy/data handling and terms of use, plus the full README and architecture diagrams. Shared instance-name/description inputs stay in General. Project documentation and issue links are consolidated into Quick Links rather than repeated in a Support card.
 
 All tabs retain responsive layouts, search where applicable and the existing permission checks. Removing duplicate sections does not add new provider capabilities or change live infrastructure.
 

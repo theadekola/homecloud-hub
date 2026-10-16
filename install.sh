@@ -83,10 +83,11 @@ cd /opt/homecloud-hub
 install -m 0755 deployment/homecloud /usr/local/bin/homecloud
 install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
 bash deployment/setup-updater.sh
+source deployment/build-env.sh
 docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now homecloud-hub.service
 echo "HomeCloud Hub installed at $url"
 echo 'Open this URL and register your owner account using the setup code shown above.'
 echo 'Choose your name, email and password in the browser. Registration closes after the first account.'
-echo 'Configure integrations with sudo homecloud config, then sudo homecloud restart.'
+echo 'Configure supported integrations in Settings: Connections, Notifications and Integrations.'

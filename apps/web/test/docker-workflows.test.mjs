@@ -61,3 +61,19 @@ test('closing or switching hosts invalidates pending container logs',async()=>{
 test('Docker deep links select supported tabs and invalid tabs fall back to Containers',async()=>{
  for(const [tab,expected] of [['Volumes','Volumes'],['removed-tab','Containers']]){const page=await mounted('pages/Docker.tsx',{},async p=>p==='/docker/volumes/usage'?{volumes:[]}:dockerFixture(p),true,['/docker?tab='+tab]);try{assert.equal(page.container.querySelector('[aria-selected=true]').textContent,expected)}finally{await page.close()}}
 });
+
+
+test('every Docker resource tab places its own heading before host selection, its own metrics and navigation',async()=>{
+ const cases=[['Containers','Docker Host: host-a',5],['Images','Docker Images',3],['Volumes','Docker Volumes',4],['Networks','Docker Networks',4],['Compose Stacks','Compose Stacks',4],['Events','Events',5]];
+ for(const [tab,title,count] of cases){
+  const page=await mounted('pages/Docker.tsx',{},dockerFixture,true,['/docker?tab='+encodeURIComponent(tab)]);
+  try{
+   const heading=page.container.querySelector('h1,h2'),picker=page.container.querySelector('.docker-host-picker'),metrics=page.container.querySelectorAll('.metric-grid'),nav=page.container.querySelector('[aria-label="Docker resources"]');
+   assert.ok(heading.textContent.startsWith(title),tab+' heading');assert.equal(metrics.length,1,tab+' has only its own metrics');assert.equal(metrics[0].children.length,count,tab+' metrics');
+   assert.ok(heading.compareDocumentPosition(picker)&4,tab+' heading precedes host selection');
+   assert.ok(picker.compareDocumentPosition(metrics[0])&4,tab+' host selection precedes metrics');
+   assert.ok(metrics[0].compareDocumentPosition(nav)&4,tab+' metrics precede tabs');
+   assert.equal(page.container.querySelectorAll('.docker-host-picker').length,1,tab+' has one host selector');
+  }finally{await page.close()}
+ }
+});

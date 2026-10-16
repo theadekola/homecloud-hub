@@ -4,7 +4,7 @@ import {useApi} from '../hooks';
 import {api,confirmedApi} from '../api';
 import {Card,Badge,Modal} from '../components/UI';
 const bytes=(n:any)=>n==null?'Unknown':`${(n/(n>=1024**3?1024**3:1024**2)).toFixed(1)} ${n>=1024**3?'GiB':'MiB'}`;
-export default function DockerVolumes({navigation,data,enabled,admin,refresh}:{navigation?:import('react').ReactNode;data:any;enabled:boolean;admin:boolean;refresh:()=>Promise<any>}){
+export default function DockerVolumes({navigation,hostSelector,data,enabled,admin,refresh}:{navigation?:import('react').ReactNode;hostSelector?:import('react').ReactNode;data:any;enabled:boolean;admin:boolean;refresh:()=>Promise<any>}){
  const usage=useApi<any>('/docker/volumes/usage',null),volumes=data?.volumes||[],containers=data?.containers||[];
  const [search,setSearch]=useState(''),[filter,setFilter]=useState('all'),[sort,setSort]=useState('name'),[page,setPage]=useState(0),[id,setId]=useState(''),[detail,setDetail]=useState<any>(null),[modal,setModal]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const refs=(v:any)=>containers.filter((c:any)=>c.mounts?.some((m:any)=>m.Type==='volume'&&m.Name===v.name));
@@ -23,6 +23,7 @@ export default function DockerVolumes({navigation,data,enabled,admin,refresh}:{n
  const submit=(e:any)=>{e.preventDefault();return run('/docker/volume','POST',Object.fromEntries(new FormData(e.currentTarget)));};
  return <div className="docker-volumes"><div className="volume-header"><div><small className="muted">Docker › {data?.host?.hostname||'Engine connection'} › Volumes</small><h2>Docker Volumes</h2><p className="muted">Manage persistent storage for your containers.</p></div><div className="header-actions"><button className="btn secondary" disabled={!enabled||!admin||busy} onClick={()=>run('/docker/prune/volumes')}><Trash2 size={14}/>Prune Unused Anonymous Volumes</button><button className="btn primary" disabled={!enabled||busy} onClick={()=>{setError('');setModal('Create Volume')}}><Plus size={14}/>Create Volume</button></div></div>
  {error&&<p className="error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+ {hostSelector}
  <div className="volume-summary metric-grid">{[[Database,'Total Volumes',data?.host?volumes.length:'Unknown','Engine inventory'],[HardDrive,'Used Space',bytes(total),`${known.length} measured volumes`],[Archive,'Unused Volumes',data?.host?unused.length:'Unknown','No container references'],[Trash2,'Unused Data Size',bytes(reclaimable),'Pruning may remove only a subset']].map(([Icon,label,value,sub]:any)=><Card className="volume-stat" key={label}><span className="volume-stat-icon"><Icon size={24}/></span><div><small>{label}</small><strong>{value}</strong><small className="muted">{sub}</small></div></Card>)}</div>
  {navigation}
  {usage.error&&data?.host&&<p className="muted">Volume sizes unavailable: {usage.error}. Inventory and container references remain available.</p>}

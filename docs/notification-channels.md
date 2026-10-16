@@ -18,26 +18,26 @@ All HTTPS connections verify certificates. Redirects are not followed, so a rece
 
 Newly added channel switches default off. After saving, enable a channel deliberately and verify it with Test. Existing Discord, Telegram and email switches retain their stored settings. A successful request means the receiving service accepted it; it does not prove that a device displayed it or that an IFTTT action finished.
 
-## Delivery preference selector
+## Delivery preference checkboxes
 
-Every channel's setup popup includes **Send notifications for**:
+Every channel's setup popup includes **Send notifications for** checkboxes. Select any combination, such as Critical, Warning and Recoveries. At least one category is required. Use All severities and recoveries to select or clear every category:
 
 | Selection | Automatic messages eligible for this channel |
 | --- | --- |
 | All severities and recoveries | All otherwise eligible measured alerts and recoveries |
-| Critical only | Active/acknowledged critical conditions |
-| Warning only | Active/acknowledged warning conditions |
-| Info only | Active/acknowledged information-level conditions |
-| Recoveries only | Conditions monitoring has resolved |
-| Unknown severity only | Conditions with an unrecognized or missing severity |
+| Critical | Active/acknowledged critical conditions |
+| Warning | Active/acknowledged warning conditions |
+| Info | Active/acknowledged information-level conditions |
+| Recoveries | Conditions monitoring has resolved |
+| Unknown severity | Conditions with an unrecognized or missing severity |
 
-These are exact categories, not minimum thresholds. The global master switch, channel switch, minimum severity and Send recovery notifications setting also apply. For example, Info only will not send information alerts if the global minimum is Warning; Recoveries only requires recovery delivery to be enabled. Tests intentionally bypass automatic-delivery filters.
+These are exact categories, not minimum thresholds. The global master switch, channel switch, minimum severity and Send recovery notifications setting also apply. For example, selecting Info will not send information alerts if the global minimum is Warning; selecting Recoveries requires recovery delivery to be enabled. Tests intentionally bypass automatic-delivery filters.
 
-The selection saves with the channel configuration when you press **Save Configuration**. Choosing it alone does not alter live settings. Old saved configurations without a selection use All severities and recoveries. Filters apply both when creating queue entries and before retrying pending entries. Changing a filter pauses ineligible retries; it does not resend messages already delivered.
+The selection saves with the channel configuration when you press **Save Configuration**. Choosing it alone does not alter live settings. Existing single-category selections are preserved. Old saved configurations without a selection use All severities and recoveries. The API stores a canonical comma-separated string, for example `critical,warning,resolved`, in the channel’s `*_NOTIFICATION_FILTER` field; legacy `all` and single-category strings remain valid. Empty, repeated and invalid categories are rejected. Filters apply both when creating queue entries and before retrying pending entries. Changing a filter pauses ineligible retries; it does not resend messages already delivered.
 
 ## Separate and readable alerts
 
-HomeCloud sends each alert/recovery separately, with its title, source, details and timestamp. Discord uses one embed per condition, with red critical, amber warning, blue information, grey unknown and green recovery cards. Slack uses separate structured blocks, Teams uses an Adaptive Card, SMTP includes an escaped HTML card plus plain text, and the other transports receive a clearly separated message for each event.
+HomeCloud sends each alert/recovery separately, with its title, source, details and timestamp. Discord uses one embed per condition, with red critical, amber warning, blue information, grey unknown and green recovery cards. Slack wraps structured blocks in a single attachment with a matching colour bar. Teams uses an Adaptive Card with a red, amber, blue or green title (unknown uses the host’s default colour). SMTP includes an escaped HTML card with a matching border plus plain text. Telegram, Pushover, Gotify and IFTTT do not offer arbitrary coloured card borders through these APIs, so every message has a matching coloured status marker and status text instead. Recoveries always use green regardless of the previous severity. Display and exact colours depend on the receiving app and theme.
 
 Recovery cards identify the previous condition as historical, rather than presenting its old error as a current failure. Existing already delivered messages are not rewritten. Long titles/details are bounded to provider payload limits. Discord mentions are disabled, Slack fields use plain-text blocks, and email HTML escapes alert content.
 
@@ -45,7 +45,7 @@ Delivery is queued and deduplicated per alert/event/channel. Failures use bounde
 
 ## Custom webhook payload
 
-The receiver gets JSON with `application`, `title`, `source`, `details`, `event`, `severity`, `timestamp` and a plain-text `message`. `event` is `active`, `resolved` or `test`. Timestamps are UTC ISO strings when known, otherwise null. An optional bearer token is sent in the Authorization header. The receiver should return a 2xx status to accept the event. Keep its URL and token private.
+The receiver gets JSON with `application`, `title`, `source`, `details`, `event`, `severity`, `timestamp` and a plain-text `message`. A `card` object also provides `title`, `source`, `details`, `status`, hex `color`, Unicode `marker` and `timestamp` for receivers that render their own cards. HomeCloud cannot control how a custom receiver or IFTTT downstream action displays it. `event` is `active`, `resolved` or `test`. Timestamps are UTC ISO strings when known, otherwise null. An optional bearer token is sent in the Authorization header. The receiver should return a 2xx status to accept the event. Keep its URL and token private.
 
 ## Provider references
 

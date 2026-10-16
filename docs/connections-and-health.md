@@ -107,3 +107,20 @@ After each host update, verify Docker discovery, switch between the intended
 hosts, compare running containers and CPU/memory readings, and watch for recurring
 timeouts. An updated connector heartbeat alone does not verify every guest or
 Docker operation. Automated fixture tests are separate from live deployment QA.
+
+## Successful connection feedback
+
+Connection popups show an accessible green success screen for two seconds, then
+close automatically. This applies to saved-and-verified Proxmox/direct Docker
+connections, verified pairing, SSH/SFTP login and password approval, verified
+integration connections and connector updates with a matching fresh heartbeat.
+Guest setup closes only after the selected Docker Engine is actually verified;
+package installation, a queued request or a required guest power cycle is not
+connection success. Failed, pending and unverified operations stay open.
+
+Tests using unsaved integration details keep the form open so the user can save
+those details. Saving that same tested draft shows success and closes. Saving
+untested integration configuration keeps the form open for Test Connection.
+Proxmox and direct Docker save operations already verify before saving. Closing
+a popup manually cancels its timer; a cancelled SSH login also releases a newly
+created session that was not handed to the shell or file browser.

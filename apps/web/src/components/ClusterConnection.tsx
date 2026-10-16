@@ -1,30 +1,32 @@
-import { useEffect,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { Server, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
 import { useApi } from '../hooks';
 import { Card, Modal } from './UI';
 
-export function ClusterConnection({compact=false,label='Cluster Settings',primary=false,autoOpen=false,onSaved}:{compact?:boolean;label?:string;primary?:boolean;autoOpen?:boolean;onSaved?:()=>void}) {
+export function ClusterConnection({compact=false,label='Cluster Settings',primary=false,autoOpen=false,onSaved,onConnected}:{compact?:boolean;label?:string;primary?:boolean;autoOpen?:boolean;onSaved?:()=>void;onConnected?:()=>void}) {
  const {data:session}=useApi<any>('/auth/me',null);
  const owner=session?.user?.role==='owner';
  const [copyMessage,setCopyMessage]=useState('');
  const copyCaCommand=async()=>{try{await navigator.clipboard.writeText('cat /etc/pve/pve-root-ca.pem');setCopyMessage('Command copied.');}catch{setCopyMessage('Select and copy the command below.');}};
- const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]);
- const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
- useEffect(()=>{if(autoOpen&&owner)load();},[autoOpen,owner]);
+ const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]),[success,setSuccess]=useState('');
+ const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('homecloud-connection'));onSaved?.()}};
+ const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setMessage('');setSuccess('');setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ const autoOpened=useRef(false);
+ useEffect(()=>{if(!autoOpen)autoOpened.current=false;if(autoOpen&&owner&&!autoOpened.current){autoOpened.current=true;void load()}},[autoOpen,owner]);
  const submit=async(event:any)=>{
   event.preventDefault();setBusy(true);setError('');setMessage('');setNodes([]);
   const form=event.currentTarget,values=new FormData(form),test=event.nativeEvent.submitter?.value==='test';
   const body={name:values.get('name'),host:values.get('host'),port:Number(values.get('port')),tokenId:values.get('tokenId'),tokenSecret:values.get('tokenSecret'),verifyTls:values.get('verifyTls')==='on',ca:values.get('ca')};
   try{const result:any=await api(`/connections/proxmox${test?'/test':''}`,{method:test?'POST':'PUT',body:JSON.stringify(body)});
    setNodes(result.nodes);setMessage(`${test?'Connection verified':'Cluster saved'}. ${result.nodes.length} node(s) discovered.`);
-   if(!test){form.reset();setOpen(false);window.dispatchEvent(new Event('homecloud-connection'));onSaved?.();}
+   if(!test){form.reset();setSuccess(`Proxmox connection successful. ${result.nodes.length} node(s) discovered.`);}
   }catch(e:any){setError(e.message);}finally{setBusy(false);}
  };
  if(!owner)return null;
  return <>{compact?<button className={`btn ${primary?'primary':'secondary'}`} disabled={busy} onClick={load}><Server size={15}/>{label}</button>:<Card className="cluster-connection"><div><h3><Server size={20}/> Cluster connection</h3><p>Connect a Proxmox cluster or standalone node. Its nodes and guests load automatically.</p><p className="muted">One active cluster is supported. Saving replaces the current Proxmox connection.</p></div><button className="btn primary" disabled={busy} onClick={load}>Add / Edit Cluster</button></Card>}
  {!open&&error&&<p role="alert" className="login-error">{error}</p>}{!open&&message&&<p role="status">{message}</p>}
- <Modal open={open} title={cluster?'Edit Cluster':'Add Cluster'} onClose={()=>!busy&&setOpen(false)}>
+ <Modal open={open} title={cluster?'Edit Cluster':'Add Cluster'} onClose={close} success={success}>
  <div className="cluster-provider"><Server size={22}/> Proxmox VE</div>
  <form className="form-grid cluster-form" onSubmit={submit}>
  <label>Cluster name<input name="name" required maxLength={100} defaultValue={cluster?.name||''} placeholder="Production Cluster"/></label>

@@ -1,10 +1,11 @@
 import {useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {ConnectionSuccess} from './UI';
 import {api,setDockerHost} from '../api';
 
-export default function PairConnector({kind,onPaired}:{kind:'proxmox'|'docker';onPaired?:()=>void}){
+export default function PairConnector({kind,onPaired,onComplete}:{kind:'proxmox'|'docker';onPaired?:()=>void;onComplete?:()=>void}){
  const navigate=useNavigate(),secure=window.location.protocol==='https:',origin=window.location.origin;
- const [name,setName]=useState(''),[pairing,setPairing]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const [name,setName]=useState(''),[pairing,setPairing]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[connected,setConnected]=useState('');
  const standalone=kind==='docker';
  const command=`curl --fail --show-error --proto '=https' '${origin}/api/${standalone?'docker-agent':'node-agent'}/install' -o /tmp/homecloud-connector-install.sh &&\n${standalone?"if [ \"$(id -u)\" -eq 0 ]; then bash /tmp/homecloud-connector-install.sh; else sudo bash /tmp/homecloud-connector-install.sh; fi":'bash /tmp/homecloud-connector-install.sh'}`;
  const generate=async(e:any)=>{e.preventDefault();setBusy(true);setError('');setMessage('');setPairing(null);try{setPairing(await api('/node-agents/pairing',{method:'POST',body:JSON.stringify({kind,name})}));}catch(e:any){setError(e.message)}finally{setBusy(false)}};
@@ -14,9 +15,10 @@ export default function PairConnector({kind,onPaired}:{kind:'proxmox'|'docker';o
   if(!result.paired)throw Error('Installation has not paired yet. Finish the installer, then retry verification.');
   const inventory=await api('/node-agents'),node=inventory.nodes.find((n:any)=>n.id===result.id);
   if(!node?.online)throw Error('Connector paired but is not online yet. Check its service, then retry.');
-  if(standalone){const id=node.id+':node';await api(`/docker/hosts/${encodeURIComponent(id)}/verify`);setDockerHost(id);navigate('/docker');}
-  else{setMessage('Proxmox node connector verified. Open Docker Hosts to select a guest or use Install & Connect.');onPaired?.();}
+  if(standalone){const id=node.id+':node';await api(`/docker/hosts/${encodeURIComponent(id)}/verify`);setConnected(id);}
+  else{setConnected(node.id);}
  }catch(e:any){setError(e.message)}finally{setBusy(false)}};
+ if(connected)return <ConnectionSuccess message={standalone?'Docker host paired and connection verified successfully.':'Proxmox node paired and connection verified successfully.'} onDone={()=>{onPaired?.();onComplete?.();if(standalone){setDockerHost(connected);navigate('/docker')}else if(!onComplete){setConnected('');setPairing(null)}}}/>;
  return <div className="node-pairing"><h3>{standalone?'Pair Docker Host':'Pair Proxmox Node'}</h3>
  <p>{standalone?'Run the installer on your Linux Docker server. It connects outward to HomeCloud and uses the local Docker socket. No Docker API port or client certificates are needed.':'Install once on each Proxmox node as root in its Shell. Do not run this node installer inside a VM or CT.'}</p>
  <p className="muted">The connector runs as root and permits authorized Docker management. Use a trusted HomeCloud server. Removing the connection revokes access; uninstall its service separately on the host.</p>

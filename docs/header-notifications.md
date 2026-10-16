@@ -1,6 +1,6 @@
 # Header notifications
 
-The bell is available throughout the signed-in application. Its badge combines unresolved alerts and unread activity visible to the current user. It refreshes from local persisted state every 10 seconds, after application writes and when the browser regains focus. It does not run a new provider scan each time.
+The bell is available throughout the signed-in application. Its badge counts only unresolved alerts visible to the current user, including acknowledged alerts that have not recovered. Recent activity remains in the popup with its own unread indicator and does not increase the bell badge. When no alerts remain unresolved, the bell has no numeric badge even if activity is unread. It refreshes from local persisted state every 10 seconds, after application writes and when the browser regains focus. It does not run a new provider scan each time.
 
 ## Alerts that need attention
 

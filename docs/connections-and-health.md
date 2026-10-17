@@ -22,6 +22,13 @@ link here instead of opening duplicate connection forms. Existing
 - Removing a saved connection or revoking a connector removes HomeCloud access,
   without deleting its hosts or guests. Connector service removal is separate.
 
+The workspace opens in Grid view. On desktop, source cards and VM guest-access
+cards use four columns; tablet layouts use two and phone layouts use one. The
+Grid/List switch applies to both inventories. Connection state sits beside the
+source title, and the node and last-check time share a line. Long source names
+and endpoints retain their full values in hover text. Check times use a compact
+date and time, with the complete timestamp available on hover.
+
 ## Add a connection
 
 **Add Connection** offers Proxmox API, Proxmox node pairing, standalone Docker,

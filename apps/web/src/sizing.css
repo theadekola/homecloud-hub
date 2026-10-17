@@ -256,3 +256,27 @@
   overflow-wrap: normal;
   word-break: normal;
 }
+
+/* Keep the permission repair reachable on phone screens and long VM lists. */
+.modal-backdrop > .modal:has(.guest-permission-form) {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.guest-permission-form fieldset {
+  min-width: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #294158;
+  border-radius: 8px;
+  padding: 12px;
+}
+.guest-permission-form fieldset label {
+  display: flex !important;
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+}
+.guest-permission-form input[type="checkbox"] {
+  width: auto !important;
+  flex: 0 0 auto;
+}

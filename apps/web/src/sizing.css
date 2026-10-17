@@ -122,12 +122,7 @@
 .content .metric-grid.metric-grid > .card > button:only-child > span:not(:has(> svg)) {
   flex: 1; min-width: 0;
 }
-.content .metric-grid.metric-grid.performance-stats > .card {
-  flex-direction: column; align-items: stretch; gap: 8px;
-}
-.content .metric-grid .performance-stat-content { display: flex; width: 100%; gap: 12px; }
-.content .metric-grid .performance-stat-content > div { flex: 1; min-width: 0; }
-.content .metric-grid.performance-stats > .card > .recharts-responsive-container { flex: none; }
+
 
 
 /* Content-sized sections: tables and details follow their rows instead of
@@ -225,4 +220,33 @@
 .content .table-action > svg { width: 16px; height: 16px; flex-shrink: 0; }
 @media(max-width:800px), (pointer:coarse) {
  .content.content .table-action { width: 44px; height: 44px; min-height: 44px; }
+}
+
+/* Resource tables retain readable one-line values; only their wrappers scroll. */
+.content.content .table-wrap > .single-line-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+.content.content .single-line-table :is(th, td) {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: none;
+}
+.content.content .single-line-table :is(.btn, .image-name, .image-name span, .volume-path, .notification-title, .notification-message, .notification-channel-pill) {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: none;
+}
+.content.content .single-line-table :is(.image-name span, .volume-path) {
+  overflow: visible;
+  text-overflow: clip;
+}
+.content.content .single-line-table .notification-message {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: none;
+  overflow: visible;
 }

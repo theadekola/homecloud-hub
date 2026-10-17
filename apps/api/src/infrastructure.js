@@ -43,9 +43,9 @@ export async function backupArchives(query=pve){
   if(!nodes.length)errors.push('No Proxmox nodes are visible to the backup inventory. Check the API token permissions.');
   try{configs=await query('/storage');if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
   await Promise.all(nodes.map(async n=>{
-    if(n.status!=='online'){errors.push(`${n.node}: node is ${n.status||'unavailable'}; its backup archives were not checked.`);return;}
+    if(n.status!=='online'){const message=`${n.node}: node is ${n.status||'unavailable'}; its backup archives were not checked.`;errors.push(message);coverage.issues.push({code:'node-unavailable',node:n.node,message});return;}
     let stores;
-    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
+    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){const message=`${n.node}: ${e.message}`;errors.push(message);coverage.issues.push({code:'node-inventory-failed',node:n.node,message});return;}
     coverage.visibleStorage+=stores.length;
     const applicableStores=stores.filter(store=>storageAppliesToNode(configs.find(config=>config.storage===store.storage)||{},n.node));
     coverage.visibleStorage-=stores.length-applicableStores.length;
@@ -55,7 +55,7 @@ export async function backupArchives(query=pve){
         if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');
         coverage.checkedStorage++;
         for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,shared:(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===1||(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===true,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});
-      }catch(e){errors.push(`${n.node}/${store.storage}: ${e.message}`);}
+      }catch(e){const message=`${n.node}/${store.storage}: ${e.message}`;errors.push(message);coverage.issues.push({code:'archive-read-failed',node:n.node,storage:store.storage,message});}
     }));
   }));
   return {points,errors,coverage:{...coverage,complete:errors.length===0}};

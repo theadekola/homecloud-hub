@@ -44,3 +44,16 @@ test('backup archives only treat storage as unavailable on nodes assigned to tha
  const calls=[];const result=await backupArchives(async path=>{calls.push(path);if(path==='/nodes')return [{node:'node01',status:'online'},{node:'node02',status:'online'}];if(path==='/storage')return [{storage:'backup-ssd',nodes:'node01'}];if(path.endsWith('/storage?content=backup'))return [{storage:'backup-ssd',active:path.includes('/node01/')?1:0,enabled:path.includes('/node01/')?1:0}];return [{volid:'backup-ssd:backup/one.vma.zst'}];});
  assert.equal(result.coverage.complete,true);assert.equal(result.coverage.visibleStorage,1);assert.equal(result.points.length,1);assert.deepEqual(result.errors,[]);assert.ok(!calls.some(path=>path.includes('/node02/storage/backup-ssd/content')));
 });
+
+test('node and archive failures identify the affected nodes for targeted backup actions',async()=>{
+ const result=await backupArchives(async path=>{
+  if(path==='/nodes')return [{node:'offline',status:'offline'},{node:'denied',status:'online'},{node:'archives',status:'online'}];
+  if(path==='/storage')return [];
+  if(path.includes('/denied/'))throw Error('Access denied');
+  if(path.endsWith('/storage?content=backup'))return [{storage:'local',active:1}];
+  throw Error('Archive access denied');
+ });
+ assert.deepEqual(result.coverage.issues.map(i=>[i.node,i.code]).sort(),[['archives','archive-read-failed'],['denied','node-inventory-failed'],['offline','node-unavailable']]);
+ for(const issue of result.coverage.issues)assert.ok(result.errors.includes(issue.message));
+ assert.equal(result.coverage.issues.find(i=>i.node==='archives').storage,'local');
+});

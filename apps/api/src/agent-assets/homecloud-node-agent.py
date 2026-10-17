@@ -23,7 +23,7 @@ def guest_run(identity,script,timeout=320):
  return result.get('out-data','')
 
 def docker_request(host,path,method='GET',body='',timeout=300):
- if not re.match(r'^/(info|version|containers|images|networks|volumes|system|events|build)([/?]|$)',path) or '\n' in path:raise RuntimeError('Invalid Docker path')
+ if not re.match(r'^/(info|version|containers|images|networks|volumes|system|events|build|distribution)([/?]|$)',path) or '\n' in path:raise RuntimeError('Invalid Docker path')
  if method not in ('GET','POST','DELETE'):raise RuntimeError('Invalid Docker method')
  decoded=base64.b64decode(body,validate=True) if body else b''
  if len(decoded)>1024*1024:raise RuntimeError('Request too large')

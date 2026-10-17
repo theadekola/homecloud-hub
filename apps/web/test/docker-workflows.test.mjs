@@ -4,7 +4,7 @@ function Location(){const location=useLocation(),navigate=useNavigate();return R
 const rootPath=fileURLToPath(new URL('../',import.meta.url));
 async function component(file){
  const directory=fs.mkdtempSync(path.join(rootPath,'node_modules','audit-ui-'));
- const result=await build({entryPoints:[path.join(rootPath,'src',file)],bundle:true,format:'esm',platform:'node',packages:'external',jsx:'automatic',write:false,plugins:[{name:'fixture-api',setup(b){b.onResolve({filter:/\/api$/},()=>({path:'fixture-api',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const clearTokens=()=>{};export const api=(...a)=>globalThis.__auditApi(...a);export const confirmedApi=(...a)=>globalThis.__auditConfirmed(...a);export function setDockerHost(id){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent(new Event('homecloud-connection'));}` }));}}]});
+ const result=await build({entryPoints:[path.join(rootPath,'src',file)],bundle:true,format:'esm',platform:'node',packages:'external',jsx:'automatic',loader:{'.css':'empty'},write:false,plugins:[{name:'fixture-api',setup(b){b.onResolve({filter:/\/api$/},()=>({path:'fixture-api',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const clearTokens=()=>{};export const api=(...a)=>globalThis.__auditApi(...a);export const confirmedApi=(...a)=>globalThis.__auditConfirmed(...a);export function setDockerHost(id){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent(new Event('homecloud-connection'));}` }));}}]});
  const modulePath=path.join(directory,'component.mjs');fs.writeFileSync(modulePath,result.outputFiles[0].text);const module=await import(pathToFileURL(modulePath));return {module,cleanup:()=>fs.rmSync(directory,{recursive:true,force:true})};
 }
 async function mounted(file,props,api,mobile=true,initialEntries=['/docker?filter=keep']){
@@ -76,4 +76,8 @@ test('every Docker resource tab places its own heading before host selection, it
    assert.equal(page.container.querySelectorAll('.docker-host-picker').length,1,tab+' has one host selector');
   }finally{await page.close()}
  }
+});
+test('update notification deep links verify the exact host before opening its update inventory',async()=>{
+ const calls=[];const page=await mounted('pages/Docker.tsx',{},async(p,init)=>{calls.push(p);if(p==='/docker/hosts/host-b/verify')return {host:{version:'29'}};if(p==='/docker/updates')return {rows:[],settings:{enabled:true,intervalHours:6}};return dockerFixture(p,init)},true,['/docker?tab=Updates&host=host-b']);
+ try{await act(async()=>new Promise(r=>setTimeout(r,10)));assert.ok(calls.includes('/docker/hosts/host-b/verify'));assert.equal(localStorage.getItem('homecloud_docker_host'),'host-b');assert.ok(page.container.querySelector('.docker-updates'));assert.equal(page.container.querySelector('[data-location]').getAttribute('data-location'),'/docker?tab=Updates')}finally{await page.close()}
 });

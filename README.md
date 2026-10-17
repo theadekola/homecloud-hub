@@ -112,6 +112,10 @@ Use dedicated provider identities with only the privileges needed. Proxmox guest
 
 Connector **version 5** batches container statistics. After updating HomeCloud, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest HomeCloud agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
 
+## Docker image update notifications
+
+Open **Docker → Updates** to check the registry tags used by containers, review new digests and explicitly **Pull & Install Update**. Automatic checks notify enabled channels but never install updates. Notification delivery is controlled under **Settings → Connections → Notifications**. Update paired connectors for registry-check support. See [Docker image updates](docs/docker-image-updates.md) for configuration preservation, supported containers and restoration limits.
+
 ## Monitoring and notifications
 
 Provider monitoring normally samples every 30 seconds; read caches and UI polling can have different intervals. Gaps, permission failures and partial readings are retained as limitations. Missing metric samples do not resolve metric alerts.

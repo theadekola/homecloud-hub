@@ -39,7 +39,7 @@ export async function agentContainerStats(ids,{timeoutMs=15000}={}){
 }
 export async function agentRequest(path,init={}){
  const identity=selectedAgentHost(),host=agentHosts().find(h=>h.id===identity);if(!host?.online)fail('Selected Docker host is offline or unavailable',503);
- if(!/^\/(info|version|containers|images|networks|volumes|system|events|build)([/?]|$)/.test(path)||/[\r\n]/.test(path)||path.length>4096)fail('Unsupported Docker request');
+ if(!/^\/(info|version|containers|images|networks|volumes|system|events|build|distribution)([/?]|$)/.test(path)||/[\r\n]/.test(path)||path.length>4096)fail('Unsupported Docker request');
  const method=init.method||'GET';if(method!=='GET'&&updating.has(host.agent))fail('Connector update is in progress. Retry management actions after verification.',409);if(!['GET','POST','DELETE'].includes(method))fail('Unsupported method');
  const body=init.body==null?'':(Buffer.isBuffer(init.body)?init.body:Buffer.from(String(init.body),'utf8')).toString('base64');if(body.length>1500000)fail('Request exceeds agent size limit');
  const duration=Math.max(1000,Math.min(Number(init.timeoutMs)||(method==='GET'?15000:330000),330000));

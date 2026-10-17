@@ -1831,3 +1831,12 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 
 .login-card{width:min(430px,100%);min-width:0}.login-card input{min-width:0}@media(max-width:480px){.login-page{padding:16px}.login-card{padding:22px}.login-card input{font-size:16px}}
 .connection-success{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 18px;text-align:center;color:#86efac;border:1px solid #22875c;border-radius:12px;background:rgba(16,185,129,.09);line-height:1.6;outline:none;overflow-wrap:anywhere}.connection-success small{color:var(--muted,#a8b7ca)}
+
+/* Align status with the charts while alerts share the summary row. */
+.monitor-layout{grid-template-areas:"stats alerts" "main sidebar"}
+.monitor-layout>.monitor-stats{grid-area:stats}
+.monitor-layout>.monitor-alerts-panel{grid-area:alerts}
+.monitor-layout>.monitor-main{grid-area:main}
+.monitor-layout>.monitor-sidebar{grid-area:sidebar}
+.monitor-layout.without-sidebar{grid-template-areas:"stats" "main"}
+@media(max-width:950px){.monitor-layout{grid-template-areas:"stats" "alerts" "main" "sidebar"}.monitor-layout.without-sidebar{grid-template-areas:"stats" "main"}}

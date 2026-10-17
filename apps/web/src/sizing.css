@@ -280,3 +280,29 @@
   width: auto !important;
   flex: 0 0 auto;
 }
+
+/* Live rows must not become document scroll anchors as polling replaces them. */
+.content .table-wrap, .content .task-log { overflow-anchor: none; }
+/* Reserve the task viewport so pagination and short/growing logs cannot resize
+   the workspace. The list still fills the paired detail column on desktop. */
+.content .task-manager .task-workspace > .vm-list-card > .table-wrap {
+  flex: 1 1 0;
+  height: clamp(280px, 50vh, 530px);
+  min-height: clamp(280px, 50vh, 530px);
+  max-height: none;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.content .task-log-card .task-log {
+  flex: 0 0 auto;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+@media (max-width: 700px) {
+  .content .task-log-card .task-log { height: 220px; min-height: 220px; max-height: 220px; }
+}
+/* Keep the task action's screen-reader label inside the horizontal viewport. */
+.content .task-table .icon-btn { position: relative; }

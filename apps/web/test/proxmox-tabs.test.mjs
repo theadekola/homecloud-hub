@@ -7,10 +7,10 @@ async function component(file){
  const modulePath=path.join(directory,'component.mjs');fs.writeFileSync(modulePath,result.outputFiles[0].text);const module=await import(pathToFileURL(modulePath));return {module,cleanup:()=>fs.rmSync(directory,{recursive:true,force:true})};
 }
 function Location(){const location=useLocation(),navigate=useNavigate();return React.createElement(React.Fragment,null,React.createElement('output',{'data-location':location.pathname+location.search}),React.createElement('button',{onClick:()=>navigate(-1)},'Audit Back'),React.createElement('button',{onClick:()=>navigate(1)},'Audit Forward'))}
-async function mounted(file,props,api,mobile=true,strict=false,entry='/proxmox'){
+async function mounted(file,props,api,mobile=true,strict=false,entry='/proxmox',exportName='default'){
  const dom=new JSDOM('<div id="root"></div>',{url:'https://homecloud.test'});const navigatorDescriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});const originals={};for(const k of ['window','document','localStorage','Event','CustomEvent','HTMLElement','FormData','ResizeObserver','requestAnimationFrame']){originals[k]=globalThis[k];globalThis[k]=dom.window[k];}
  dom.window.matchMedia=()=>({matches:mobile,addEventListener(){},removeEventListener(){}});globalThis.ResizeObserver=class {observe(){}disconnect(){}};globalThis.requestAnimationFrame=fn=>{fn();return 1};globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.__auditApi=api;globalThis.__auditConfirmed=api;dom.window.confirm=()=>true;
- const built=await component(file),container=dom.window.document.getElementById('root'),root=createRoot(container);const Component=built.module.default;
+ const built=await component(file),container=dom.window.document.getElementById('root'),root=createRoot(container);const Component=built.module[exportName];
  const render=async values=>{await act(async()=>{root.render(React.createElement(strict?React.StrictMode:React.Fragment,null,React.createElement(MemoryRouter,{initialEntries:[entry]},React.createElement(Location),React.createElement(Component,values))));await new Promise(r=>setTimeout(r,0));});};
  await render(props);
  return {dom,container,render,click:async button=>{assert.ok(button,'Expected control is rendered');await act(async()=>{button.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));});},close:async()=>{await act(async()=>root.unmount());await new Promise(r=>setTimeout(r,10));dom.window.close();built.cleanup();for(const k of Object.keys(originals)){if(originals[k]===undefined)delete globalThis[k];else globalThis[k]=originals[k];}if(navigatorDescriptor)Object.defineProperty(globalThis,'navigator',navigatorDescriptor);else delete globalThis.navigator;delete globalThis.__auditApi;delete globalThis.__auditConfirmed;}};
@@ -140,4 +140,24 @@ test('backup node filter scopes job summaries and tasks while retaining cluster-
  assert.ok(page.container.querySelector('.backup-table').textContent.includes('Cluster schedule'));assert.ok(!page.container.querySelector('.backup-table').textContent.includes('n1-job'));
  const upcoming=[...page.container.querySelectorAll('.backup-side .card')].find(e=>e.querySelector('h3')?.textContent==='Upcoming Backups');assert.ok(upcoming.textContent.includes('Cluster schedule'));assert.ok(upcoming.textContent.includes('n2-job'));assert.ok(!upcoming.textContent.includes('past'));assert.ok(!upcoming.textContent.includes('disabled'));
  }finally{await page.close();}
+});
+
+
+test('shared configuration dialogs focus and restore controls without scrolling the page',async()=>{
+ const props={open:false,onClose(){},title:'Connection settings',children:React.createElement('button',null,'Save')};
+ const page=await mounted('components/UI.tsx',props,async()=>({}),true,false,'/proxmox','Modal');
+ const trigger=page.dom.window.document.createElement('button');page.dom.window.document.body.append(trigger);trigger.focus();
+ const calls=[],focus=page.dom.window.HTMLElement.prototype.focus;
+ page.dom.window.HTMLElement.prototype.focus=function(options){calls.push({element:this,options});return focus.call(this,options)};
+ try{
+  await page.render({...props,open:true});
+  assert.equal(page.dom.window.document.activeElement,page.container.querySelector('[aria-label="Close dialog"]'));
+  assert.deepEqual(calls.at(-1).options,{preventScroll:true});
+  await page.render({...props,open:true,success:'Connected successfully.'});
+  assert.equal(page.dom.window.document.activeElement,page.container.querySelector('.connection-success'));
+  assert.deepEqual(calls.at(-1).options,{preventScroll:true});
+  await page.render(props);
+  assert.equal(page.dom.window.document.activeElement,trigger);
+  assert.deepEqual(calls.at(-1).options,{preventScroll:true});
+ }finally{page.dom.window.HTMLElement.prototype.focus=focus;await page.close();}
 });

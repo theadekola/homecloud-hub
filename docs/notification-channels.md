@@ -55,3 +55,20 @@ The receiver gets JSON with `application`, `title`, `source`, `details`, `event`
 - [Pushover API](https://pushover.net/api)
 - [Gotify push messages](https://gotify.net/docs/pushmsg)
 - [IFTTT Webhooks](https://ifttt.com/maker_webhooks)
+
+
+## Automatic connection recovery messages
+
+After monitoring confirms that an existing connection problem has recovered,
+HomeCloud queues a green **Connection restored** notification for each configured,
+enabled channel. It identifies the affected source, previous problem and recovery
+time. This includes paired node connectors, Docker hosts and provider connection
+failures. Acknowledging an alert does not mean its connection has recovered.
+
+Newly confirmed connection recoveries bypass minimum severity, per-channel event filters and the
+general recovery switch. The external-notification master switch and each channel's
+enabled switch still apply. Metric recoveries retain their existing preferences.
+Delivery is recorded separately per alert and channel, with bounded retries and
+persistent deduplication across restarts. Provider outages can delay delivery;
+monitoring never invents a recovery merely to send a message. Upgrading does not
+retroactively bypass filters for old recovery records.

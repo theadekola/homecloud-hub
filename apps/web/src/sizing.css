@@ -306,3 +306,7 @@
 }
 /* Keep the task action's screen-reader label inside the horizontal viewport. */
 .content .task-table .icon-btn { position: relative; }
+
+.backup-inventory-notice { padding:14px; margin:12px 0; border:1px solid #88652a; border-radius:10px; background:#392b13; color:#f5d28c; overflow-wrap:anywhere; }
+.backup-inventory-notice p { margin:8px 0; }
+.overview-stat.needs-attention small { color:#f5c66b; }

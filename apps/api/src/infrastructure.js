@@ -38,7 +38,7 @@ export async function toggleBackupJob(id){const job=await pve(`/cluster/backup/$
 export async function backupArchives(query=pve){
   const nodes=await query('/nodes');
   if(!Array.isArray(nodes)||nodes.some(n=>!n||typeof n.node!=='string'||!n.node))throw httpError('Unexpected backup node inventory',502);
-  const points=[],errors=[],coverage={nodes:nodes.length,checkedNodes:0,visibleStorage:0,checkedStorage:0};let configs=[];
+  const points=[],errors=[],coverage={nodes:nodes.length,checkedNodes:0,visibleStorage:0,checkedStorage:0,issues:[]};let configs=[];
   if(!nodes.length)errors.push('No Proxmox nodes are visible to the backup inventory. Check the API token permissions.');
   try{configs=await query('/storage');if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
   await Promise.all(nodes.map(async n=>{
@@ -47,7 +47,7 @@ export async function backupArchives(query=pve){
     try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
     coverage.visibleStorage+=stores.length;
     await Promise.all(stores.map(async store=>{
-      if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){errors.push(`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`);return;}
+      if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){const message=`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`,config=configs.find(c=>c.storage===store.storage),mount=config?.type==='dir'&&[1,true,'1'].includes(config.is_mountpoint);errors.push(message);coverage.issues.push({code:'storage-unavailable',node:n.node,storage:store.storage,message,help:mount?`Confirm ${config.path||'the configured directory'} is mounted on ${n.node}, then retry inventory. Do not disable the mount-point check or write backups into an unmounted directory.`:'Check that this storage is enabled, online and accessible on this node in Proxmox, then retry inventory.'});return;}
       try{const files=await query(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
         if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');
         coverage.checkedStorage++;

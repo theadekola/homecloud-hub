@@ -15,6 +15,7 @@ export const providers={
 export function alertConditions(snapshot,rules){
   const conditions=[];
   for(const service of snapshot.services)if(['error','partial'].includes(service.status))conditions.push({key:`connection:${service.id||service.name}`,connectorId:service.id||service.provider,title:service.status==='partial'?'Incomplete monitoring':'Connection failed',source:service.name,provider:service.provider,severity:service.status==='partial'?'warning':'critical',details:service.error});
+  for(const row of snapshot.proxmox?.storage||[])if(row.status==='offline'&&String(row.content||'').split(',').includes('backup'))conditions.push({key:`backup-storage:${row.node}:${row.id}`,title:'Backup storage unavailable',source:`${row.node} / ${row.name}`,node:row.node,resourceId:row.id,provider:'proxmox',severity:'warning',details:'Proxmox reports this backup storage offline. Its backup archives cannot be checked. Open Backups → Destinations to inspect its status.'});
   const resources=[...(snapshot.proxmox?.nodes||[]).map(n=>({...n,provider:'proxmox'})),...monitoredDocker(snapshot).map(c=>({...c,id:c.monitorId,provider:'docker',memory:c.memoryPercent})),...(snapshot.proxmox?.storage||[]).map(p=>({...p,provider:'proxmox',storage:p.usage})),...(snapshot.truenas?.pools||[]).map(p=>({...p,provider:'truenas',storage:p.usage}))];
   for(const rule of rules.filter(r=>r.enabled!==false))for(const resource of resources){
     if(rule.provider!=='all'&&rule.provider!==resource.provider)continue;
@@ -44,7 +45,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
   }));row.pending=work;readings.set(name,row);return work;
  }
  async function sample(force=false){
-  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});return latest;}
+  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});latest.alerts=persistence.get().alerts;return latest;}
   if(!inFlight){
    const ticket=generation,snapshot=empty();progress=snapshot;
    for(const [name,source] of Object.entries(sources))snapshot.services.push({id:name,name,provider:name,status:source.configured()?'pending':'not-configured',response:null});
@@ -64,6 +65,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           if(existing.key?.startsWith('docker-image:'))continue;
+          if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}continue;}
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           // A no-heartbeat placeholder disappears when real Docker hosts are discovered.
           // Resolve its exact connector alert only from a fresh online node report.

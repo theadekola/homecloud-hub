@@ -1,3 +1,4 @@
+import {connectionActions} from './connection-actions.js';
 import {dockerImageUpdates} from './docker-image-updates.js';
 import {installDockerImageUpdate,updatePlan,ensureNoContainerDependents} from './docker-install-update.js';
 import {createGuestConnectionReader} from './guest-connections.js';
@@ -56,7 +57,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker}={}){
 
  const app=express(),readCache=createReadCache();
  app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
@@ -98,6 +99,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/node-agents/:id/ssh-target',authorize('owner'),async(req,res)=>{const node=agentNodes().find(n=>n.id===req.params.id);if(!node)throw httpError('Paired connector not found',404);res.set('Cache-Control','no-store');res.json(await connectorAddress(node));});
  app.get('/api/node-agents/:id/update',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({update:connectorUpdates.status(req.params.id)});});
  app.post('/api/node-agents/:id/update',authorize('owner'),async(req,res)=>{const update=connectorUpdates.request(req.params.id,req.body);res.locals.activityStatus='queued';await audit(req,'connector.update',req.params.id,{version:update.version,revision:update.revision},'queued');res.status(202).json({update});});
+ app.post('/api/node-agents/:id/maintenance',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');const result=await connectionService.perform(req.params.id,req.body);await audit(req,'connection.'+result.action,req.params.id,{target:result.target,active:result.active},'success');res.json({result});});
  app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{const pairing=createPairing(req.body);await audit(req,'node-agent.pairing','nodes',{},'success');res.set('Cache-Control','no-store');res.json(pairing);});
  app.post('/api/node-agents/pairing/status',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(pairingStatus(req.body.code));});
  app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});

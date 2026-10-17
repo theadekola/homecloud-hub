@@ -1,4 +1,4 @@
-import {storagePlacement} from './storage-scope.js';
+import {storagePlacement,storageNodes} from './storage-scope.js';
 import {pve} from './connectors.js';
 import {required,httpError,pveWrite,encode} from './infrastructure.js';
 
@@ -56,4 +56,14 @@ export function createStorage(input,write=pveWrite){
  if(type==='dir'&&!String(body.path).startsWith('/'))throw httpError('Directory path must be absolute');
  if(input.nodes)body.nodes=String(input.nodes);
  return write('/storage','POST',body);
+}
+
+
+// Cluster configuration is independent of a node's current mount/active state.
+// Explicitly whitelist fields: some storage plugins include credentials.
+export async function storageConfiguration(query=pve){
+ const configs=await query('/storage');
+ if(!Array.isArray(configs)||configs.some(row=>!row||typeof row.storage!=='string'||!row.storage))throw httpError('Invalid storage configuration response',502);
+ const flag=value=>[1,true,'1'].includes(value)?true:[0,false,'0'].includes(value)?false:null;
+ return {resources:configs.map(config=>({id:config.storage,type:typeof config.type==='string'?config.type:'Unknown',content:typeof config.content==='string'?config.content.split(',').map(value=>value.trim()).filter(Boolean):[],nodes:storageNodes(config),shared:flag(config.shared),enabled:config.disable==null?true:flag(config.disable)===null?null:!flag(config.disable),...Object.fromEntries(['path','server','export','portal','vgname','thinpool','pool'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))})),sampledAt:new Date().toISOString()};
 }

@@ -320,3 +320,11 @@
 .storage-overview-toolbar { flex-wrap:wrap; }
 
 .content .storage-pool-table .single-line-table :is(.storage-availability-detail, .storage-resource-location) { white-space:normal; }
+
+.storage-configuration-card { min-width:0; }
+.configuration-table { min-width:950px; }
+.configuration-id { display:flex; gap:8px; align-items:center; }
+.configuration-id svg { color:#9f83ff; flex-shrink:0; }
+.configuration-tags { display:flex; flex-wrap:wrap; gap:5px; max-width:270px; }
+.configuration-path { display:block; max-width:260px; overflow:hidden; text-overflow:ellipsis; }
+.storage-configuration .storage-scope-note strong { display:block; margin-bottom:8px; }

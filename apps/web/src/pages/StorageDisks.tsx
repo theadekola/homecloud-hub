@@ -1,3 +1,4 @@
+import {storageTabs} from '../storage-navigation';
 import PageIcon from '../components/PageIcon';
 import {InspectableRow,TableAction} from '../components/TableActions';
 import {useState,useRef,useEffect} from 'react';
@@ -8,7 +9,7 @@ import {Card,Badge,Modal} from '../components/UI';
 const size=(n:any)=>typeof n==='number'&&Number.isFinite(n)?n>=1024**4?`${(n/1024**4).toFixed(1)} TiB`:`${(n/1024**3).toFixed(1)} GiB`:'Not reported';
 const knownHealth=(v:any)=>!!v&&!/^(unknown|n\/a)$/i.test(v);
 const healthy=(v:any)=>/^(PASSED|OK|HEALTHY)$/i.test(v||'');
-const tabs=['Storage Pools','Disks','Datasets / Volumes','Snapshots','Shares','Performance'];
+const tabs=storageTabs;
 export default function StorageDisks({onTab}:{onTab:(tab:string)=>void}){
  const live=useApi<any>('/storage/disks',null),[search,setSearch]=useState(''),[type,setType]=useState('all'),[host,setHost]=useState('all'),[selected,setSelected]=useState(''),[page,setPage]=useState(0),[report,setReport]=useState<any>(null),[reportDisk,setReportDisk]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[full,setFull]=useState(false);
  const disks=live.data?.resources||[],filtered=disks.filter((d:any)=>(type==='all'||d.type===type)&&(host==='all'||(d.node||d.provider)===host)&&`${d.name} ${d.model||''} ${d.serial||''} ${d.node||''}`.toLowerCase().includes(search.toLowerCase())),disk=filtered.find((d:any)=>d.id===selected)||filtered[0],pages=Math.max(1,Math.ceil(filtered.length/8)),active=Math.min(page,pages-1),shown=filtered.slice(active*8,active*8+8);

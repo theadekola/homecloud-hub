@@ -36,7 +36,7 @@ import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} fr
 import os from 'node:os';
 import {taskInventory,stopTask} from './tasks.js';
 import {discovered} from './discovery.js';
-import {storageInventory,storageDetails,createStorage,storageSummary} from './storage.js';
+import {storageInventory,storageDetails,createStorage,storageSummary,storageConfiguration} from './storage.js';
 import {networkInventory,networkDetails,networkWrite,networkDnsWrite,networkFirewall} from './network.js';
 import { updates } from './updates.js';
 import express from 'express';
@@ -213,7 +213,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
 
  read('/proxmox',async req=>{if(forceRead(req))void monitor.sample(true).catch(()=>{});const config=clusterConfig();return {...await snapshot('proxmox',forceRead(req)),cluster:config.url?{name:config.name,url:config.url}:null};});
 
- read('/proxmox/storage',()=>storageInventory());
+ read('/proxmox/storage',()=>storageInventory());
+ read('/proxmox/storage/configuration',()=>storageConfiguration());
  read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
  action('put','/network/dns/:node','admin','network.dns.configure',req=>networkDnsWrite(req.params.node,req.body),true);
  read('/network/firewall/:node',req=>networkFirewall(req.params.node));

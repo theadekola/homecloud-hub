@@ -8,7 +8,7 @@ import {Server,Monitor,Container,Bell,Archive,Plus,Activity,ShieldCheck,Network,
 import {AreaChart,Area,ResponsiveContainer,XAxis,YAxis,Tooltip} from 'recharts';
 import {useApi} from '../hooks';
 import {api} from '../api';
-import {Card,Modal} from '../components/UI';
+import {Card,Modal,usePopupSuccess} from '../components/UI';
 import {downloadReport} from '../components/Discovery';
 const percent=(value:any)=>typeof value==='number'?`${Math.round(value)}%`:'Unknown';
 const widgets=dashboardWidgets;
@@ -18,6 +18,7 @@ export default function Overview(){
  const {data:backup,error:backupError,refresh:refreshBackups}=useApi<any>('/backups',null);
  const navigate=useNavigate();const [overviewQuery]=useSearchParams();
  const [node,setNode]=useState(''),[hours,setHours]=useState('24'),[search,setSearch]=useState(''),[customize,setCustomize]=useState(()=>overviewQuery.get('customize')==='1'),[failure,setFailure]=useState(''),[checking,setChecking]=useState(false),[answer,setAnswer]=useState(''),[refreshing,setRefreshing]=useState(false);
+ const [success,setSuccess]=usePopupSuccess(customize);
  const [visible,setVisible]=useState<string[]>(loadDashboardWidgets);
  useEffect(()=>{localStorage.setItem('homecloud-widgets',JSON.stringify(visible));},[visible]);
  useEffect(()=>{const update=()=>setVisible(loadDashboardWidgets());window.addEventListener('homecloud-widgets',update);return()=>window.removeEventListener('homecloud-widgets',update);},[]);
@@ -59,6 +60,6 @@ export default function Overview(){
  {!!data.discoveryLimitations?.length&&<details className="permission-help"><summary>Guest discovery access ({data.discoveryLimitations.length})</summary>{data.discoveryLimitations.map((message:string)=><p key={message}>{message}</p>)}<div className="guest-repair"><h4>Restore guest discovery</h4><Link className="btn secondary small" to="/settings?tab=Connections#connection-health">Open Connection Health</Link><p><b>HTTP 403:</b> In Proxmox Datacenter → Permissions → Roles, create a role containing VM.GuestAgent.Unrestricted (Proxmox 9). Assign it at the affected /vms/ID paths to the connected user and API token. Keep the existing read role. Privilege-separated tokens need their own ACL entry. This privilege permits commands inside guests.</p><p><b>Agent not configured:</b> Enable QEMU Guest Agent in the affected VM’s Options.</p><p><b>Agent not running:</b> Install and start the service inside the affected VM. The Proxmox option alone does not start it. In a Debian/Ubuntu VM console:</p><pre>{'sudo apt-get update\nsudo apt-get install -y qemu-guest-agent\nsudo systemctl start qemu-guest-agent'}</pre><p>For Windows and appliance VMs, use the operating system’s supported guest agent. A full VM shutdown and start may be needed after enabling the agent channel; schedule this when convenient.</p><p><b>LXC:</b> Use the paired Proxmox node under Docker for supported guest access. QEMU Guest Agent applies to VMs.</p><div className="guest-repair-actions"><Link className="btn secondary" to="/proxmox">Cluster settings</Link><Link className="btn secondary" to="/docker">Docker guest setup</Link><button className="btn secondary" disabled={loading||refreshing} onClick={forceRefresh}><RefreshCw size={15}/>Recheck discovery</button></div><small>Failed checks retry every 30 seconds. HomeCloud cannot grant its own Proxmox permissions or access a VM through an unavailable guest agent.</small></div></details>}
  </Card>}
  </div><p className="overview-sample">Last sample: {new Date(data.sampledAt).toLocaleString()} · Counts include only resources visible to your credentials.</p>
- <Modal open={customize} title="Choose overview widgets" onClose={()=>setCustomize(false)}><div className="widget-options">{widgets.map(w=><label key={w}><input type="checkbox" checked={has(w)} onChange={()=>setVisible(v=>has(w)?v.filter(x=>x!==w):[...v,w])}/>{w.charAt(0).toUpperCase()+w.slice(1)}</label>)}</div><button className="btn primary" onClick={()=>setCustomize(false)}>Done</button></Modal>
+ <Modal success={success} open={customize} title="Choose overview widgets" onClose={()=>setCustomize(false)}><div className="widget-options">{widgets.map(w=><label key={w}><input type="checkbox" checked={has(w)} onChange={()=>setVisible(v=>has(w)?v.filter(x=>x!==w):[...v,w])}/>{w.charAt(0).toUpperCase()+w.slice(1)}</label>)}</div><button className="btn primary" onClick={()=>setSuccess('Overview preferences saved successfully.')}>Done</button></Modal>
  </div>;
 }

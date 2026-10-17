@@ -42,6 +42,12 @@ export function Modal({open,onClose,title,children,success}:{open:boolean;onClos
   </div></div>
 }
 
+export function usePopupSuccess(open:boolean){
+ const [success,setSuccess]=useState('');
+ useEffect(()=>{if(!open)setSuccess('')},[open]);
+ return [success,setSuccess] as const;
+}
+
 export const CONNECTION_SUCCESS_DELAY=2000;
 export function ConnectionSuccess({message,onDone}:{message:string;onDone:()=>void}){
  const done=useRef(onDone),notice=useRef<HTMLDivElement>(null);done.current=onDone;

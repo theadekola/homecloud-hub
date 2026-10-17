@@ -124,3 +124,14 @@ untested integration configuration keeps the form open for Test Connection.
 Proxmox and direct Docker save operations already verify before saving. Closing
 a popup manually cancels its timer; a cancelled SSH login also releases a newly
 created session that was not handed to the shell or file browser.
+
+Configuration saves also show the two-second success screen, including integration
+settings saved without a preceding connection test, DNS, staged network/gateway
+settings, firewall rules, Docker networks/volumes, storage registration, shares,
+retention policies and schedules. Overview and monitoring customization show the
+same feedback when Done is selected. Saving settings confirms the save only;
+network changes that need applying remain labelled as staged. Failed saves retain
+the editor and its draft. Draft-only connection tests keep unsaved settings open
+until Save Configuration is selected. Pending provider jobs are not labelled as
+completed configurations. Closing or reopening an editor clears its previous
+success state.

@@ -28,6 +28,17 @@ export function updatePlan(container,image){
  const name=String(container.Name||'').replace(/^\//,'');if(!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(name))throw fail('Container name cannot be preserved.');
  return {name,config,host,networks,running:state.Running===true,binding:fingerprint({id:container.Id,image:container.Image,config:container.Config,host:container.HostConfig,mounts:container.Mounts,networks:container.NetworkSettings?.Networks,state:state.Status})};
 }
+export async function ensureNoContainerDependents(container,query=docker){
+ const rows=await query('/containers/json?all=1',{timeoutMs:15000});
+ if(!Array.isArray(rows))throw fail('Container dependencies could not be verified. Retry before updating.');
+ const name=container.Name.replace(/^\//,''),matches=value=>{const ref=String(value||'').replace(/^container:/,'').replace(/^\//,'').split(':')[0];return ref===name||ref===container.Id||/^[a-f0-9]{4,64}$/.test(ref)&&container.Id.startsWith(ref)};
+ const others=rows.filter(c=>c.Id!==container.Id);
+ for(let i=0;i<others.length;i+=4)await Promise.all(others.slice(i,i+4).map(async c=>{
+  const inspect=await query('/containers/'+encodeURIComponent(c.Id)+'/json',{timeoutMs:15000}),h=inspect.HostConfig;
+  if(!h)throw fail('Container dependencies could not be verified. Retry before updating.');
+  if([h.NetworkMode,h.PidMode,h.IpcMode].some(v=>String(v||'').startsWith('container:')&&matches(v))||(h.VolumesFrom||[]).some(matches)||(h.Links||[]).some(matches))throw fail('Another container shares this container’s namespace or lifecycle. Update the deployment together using its original tool.');
+ }));
+}
 export async function installDockerImageUpdate(row,input,{query=docker,hostId='',sleep=ms=>new Promise(r=>setTimeout(r,ms)),healthAttempts=30}={}){
  if(!row||row.status!=='available'||row.containerId!==input.containerId||row.imageId!==input.imageId||row.remoteDigest!==input.remoteDigest||!digestPattern.test(input.remoteDigest||''))throw fail('The update changed. Recheck and review it before installing.');
  const lock=hostId+':'+row.containerId;if(locks.has(lock))throw fail('An update is already running for this container.');locks.add(lock);
@@ -37,6 +48,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   old=await query(base+'/json');if(old.Image!==input.imageId)throw fail('This container is already using a different image. Recheck updates.');
   const oldImage=await query('/images/'+encodeURIComponent(old.Image)+'/json'),plan=updatePlan(old,oldImage);
   if(input.configDigest!==plan.binding)throw fail('The container configuration changed since review. Reopen the update before installing.');
+  await ensureNoContainerDependents(old,query);
   const ref=old.Config.Labels?.[trackedImageLabel]||old.Config.Image;if(ref!==row.image)throw fail('The container image reference changed. Recheck updates.');
   const repository=imageRepository(row.image),pin=repository+'@'+row.remoteDigest;
   await query('/images/create?fromImage='+encodeURIComponent(pin),{method:'POST',timeoutMs:300000});
@@ -44,6 +56,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   if(!pulled.Id||!(pulled.RepoDigests||[]).some(d=>d.endsWith('@'+row.remoteDigest)))throw fail('The pulled image did not match the reviewed registry digest.');
   if(pulled.Id===old.Image)return {unchanged:true,containerId:old.Id,message:'The registry metadata changed, but this platform already has the current image. No container restart was needed.'};
   const fresh=await query(base+'/json');if(updatePlan(fresh,oldImage).binding!==plan.binding)throw fail('The container configuration changed during download. Nothing was stopped; recheck before retrying.');
+  await ensureNoContainerDependents(fresh,query);
   const temp='homecloud-update-'+crypto.randomBytes(10).toString('hex');
   const created=await query('/containers/create?name='+temp,{method:'POST',body:JSON.stringify({...plan.config,Image:pulled.Id,Labels:{...plan.config.Labels,[trackedImageLabel]:row.image},HostConfig:plan.host,NetworkingConfig:{EndpointsConfig:plan.networks}})});newId=created.Id;if(!/^[a-f0-9]{12,64}$/.test(newId||''))throw fail('Docker did not return a replacement container identity.');
   await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:{Name:'no',MaximumRetryCount:0}})});changedPolicy=true;

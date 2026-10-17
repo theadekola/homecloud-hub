@@ -18,7 +18,7 @@ The installer:
 
 Startup failure attempts to remove the replacement without deleting volumes and restore the original name, networks, restart policy and running state. Incomplete restoration is reported explicitly. This is container-level restoration, not a database or filesystem backup. Application migrations may alter shared data. Files stored only in the old writable container layer are not copied into the replacement. Back up important application data before upgrading.
 
-Compose-managed containers can be updated individually; the Compose file and other services are unchanged. Use Compose or the original deployment tool for coordinated stack upgrades. Swarm tasks, automatically removed containers, legacy linked containers and containers sharing another container's namespaces are not automatically recreated. Non-Linux containers and unsupported mount/port configurations require their original deployment tool.
+Compose-managed containers can be updated individually; the Compose file and other services are unchanged. Use Compose or the original deployment tool for coordinated stack upgrades. Swarm tasks, automatically removed containers, legacy linked containers, containers sharing another container's namespaces and containers used as namespace/lifecycle providers by other containers are not automatically recreated. Non-Linux containers and unsupported mount/port configurations require their original deployment tool.
 
 ## Limits and unavailable checks
 

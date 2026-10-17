@@ -59,8 +59,9 @@ export function validateNotificationPreferences(input){
  if(!input||typeof input.enabled!=='boolean'||typeof input.notifyResolved!=='boolean'||!['info','warning','critical'].includes(input.minimumSeverity)||!input.channels||['discord','telegram','email'].some(c=>typeof input.channels[c]!=='boolean')||Object.keys(input).some(k=>!['enabled','notifyResolved','minimumSeverity','channels'].includes(k))||Object.keys(input.channels).some(k=>!notificationIds.includes(k)||typeof input.channels[k]!=='boolean'))throw Object.assign(Error('Choose valid notification delivery preferences'),{status:400});
  return {enabled:input.enabled,channels:{...input.channels},minimumSeverity:input.minimumSeverity,notifyResolved:input.notifyResolved};
 }
+const connectionRecovery=(alert,event)=>event==='resolved'&&typeof alert?.key==='string'&&alert.key.startsWith('connection:');
 export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,send=sendNotification,now=()=>Date.now()}={}){
- let inFlight=null;
+ const startedAt=now();let inFlight=null;
  const environment=()=>typeof env==='function'?env():env;
  const configured=()=>notificationChannels(environment());
  const status=()=>{const env=environment(),queue=persistence.get().notificationQueue||[];return {channels:configured(),preferences:notificationPreferences(persistence.get()),incomplete:[...(env.TELEGRAM_BOT_TOKEN&&!env.TELEGRAM_CHAT_ID||!env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID?['Telegram requires both bot token and chat ID.']:[]),...([env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].some(Boolean)&&![env.SMTP_HOST,env.NOTIFICATION_EMAIL_FROM,env.NOTIFICATION_EMAIL_TO].every(Boolean)?['Email requires SMTP host, sender and recipient.']:[])],pending:queue.filter(r=>r.event!=='test'&&!r.sentAt).length,
@@ -71,21 +72,26 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
   if(inFlight)return inFlight;
   inFlight=(async()=>{
    const preferences=notificationPreferences(persistence.get()),channels=configured().filter(c=>preferences.channels[c]);if(!preferences.enabled||!channels.length)return;
-   const eligible=alert=>alert.status==='resolved'?preferences.notifyResolved:({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
-   persistence.mutate(s=>{s.notificationQueue??=[];
+   // Do not retroactively bypass filters for the installation's old recoveries.
+   const policySince=persistence.get().connectionRecoveryNotificationsSince||new Date(startedAt).toISOString();
+   const automaticRecovery=(alert,event)=>connectionRecovery(alert,event)&&Date.parse(alert.resolvedAt)>=Date.parse(policySince);
+   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
+   const accepts=(channel,alert,event)=>automaticRecovery(alert,event)||channelAccepts(channel,alert,event,environment());
+   const queuedAlert=row=>({...alerts.find(a=>a.id===row.alertId),...row.alert});
+   persistence.mutate(s=>{s.connectionRecoveryNotificationsSince??=policySince;s.notificationQueue??=[];
     for(const alert of alerts){if(!['active','acknowledged','resolved'].includes(alert.status)||!eligible(alert))continue;
      const event=alert.status==='resolved'?'resolved':'active',date=event==='resolved'?alert.resolvedAt:alert.triggered;
      if(!date||now()-Date.parse(date)>7*86400000)continue;
-     for(const channel of channels){if(!channelAccepts(channel,alert,event,environment()))continue;const key=`${alert.id}:${event}:${channel}`;
+     for(const channel of channels){if(!accepts(channel,alert,event))continue;const key=`${alert.id}:${event}:${channel}`;
       if(!s.notificationQueue.some(r=>r.key===key)&&s.notificationQueue.filter(r=>!r.sentAt).length<1000)
-       s.notificationQueue.push({id:crypto.randomUUID(),key,channel,alertId:alert.id,event,createdAt:new Date(now()).toISOString(),alert:{title:alert.title,severity:alert.severity,source:alert.source,details:alert.details,triggered:alert.triggered,resolvedAt:alert.resolvedAt},text:textFor(alert,event),attempts:0,nextAttempt:now()});
+       s.notificationQueue.push({id:crypto.randomUUID(),key,channel,alertId:alert.id,event,createdAt:new Date(now()).toISOString(),alert:{key:alert.key,title:alert.title,severity:alert.severity,source:alert.source,details:alert.details,triggered:alert.triggered,resolvedAt:alert.resolvedAt},text:textFor(alert,event),attempts:0,nextAttempt:now()});
      }
     }
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.
     const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId));
    });
-   const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&(r.event==='resolved'?preferences.notifyResolved:eligible(r.alert||(alerts.find(a=>a.id===r.alertId)||{})))&&channelAccepts(r.channel,r.alert||{},r.event,environment())&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
-   for(const item of pending){let error=null;try{const n=notificationMessage({...item.alert,occurredAt:item.event==='resolved'?item.alert?.resolvedAt:item.alert?.triggered},item.event);if(!n.time){const date=item.text?.split('\n').at(-1);if(Number.isFinite(Date.parse(date)))n.time=new Date(date).toISOString();}await send(item.channel,messageText(n),{env:environment(),notification:n});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}
+   const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&eligible(queuedAlert(r),r.event)&&accepts(r.channel,queuedAlert(r),r.event)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
+   for(const item of pending){let error=null;try{const n=notificationMessage({...queuedAlert(item),occurredAt:item.event==='resolved'?item.alert?.resolvedAt:item.alert?.triggered},item.event);if(!n.time){const date=item.text?.split('\n').at(-1);if(Number.isFinite(Date.parse(date)))n.time=new Date(date).toISOString();}await send(item.channel,messageText(n),{env:environment(),notification:n});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}
     persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.attempts++;
      if(error){row.error=error;row.nextAttempt=now()+Math.min(3600000,30000*2**Math.min(row.attempts-1,7));}
      else{row.sentAt=new Date(now()).toISOString();delete row.error;delete row.text;}

@@ -85,3 +85,17 @@ test('missing, revoked and offline connector readings cannot resolve a stored of
  for(const reports of [[],[{id:'b',online:true}],[{id:'a',online:false}]]){connectors=reports;await monitor.sample(true);assert.equal(state.alerts[0].status,'active')}
  connectors=[{id:'a',online:true}];await monitor.sample(true);assert.equal(state.alerts[0].status,'resolved');
 });
+
+test('monitor sends one connection recovery notification when the paired node returns',async()=>{
+ const {createNotifier}=await import('../src/notifications.js');
+ const state={rules:[],alerts:[],metrics:[],notificationPreferences:{enabled:true,channels:{discord:true},notifyResolved:false,minimumSeverity:'critical'}},sent=[],deliveries=[];
+ let nodes=[{id:'a',name:'node01',online:false}],hosts=[];
+ const persistence={get:()=>state,mutate:fn=>fn(state)};
+ const notifier=createNotifier({persistence,env:{DISCORD_WEBHOOK_URL:'https://discord.com/api/webhooks/123/test',DISCORD_NOTIFICATION_FILTER:'critical'},send:async(c,t,o)=>sent.push(o.notification)});
+ const fleet=createDockerFleet({hosts:()=>hosts,nodes:()=>nodes,read:async()=>inventory('guest',10)});
+ const monitor=createMonitor({},persistence,async()=>[],fleet,alerts=>{const delivery=notifier.deliver(alerts);deliveries.push(delivery);return delivery});
+ await monitor.sample(true);await Promise.all(deliveries);sent.length=0;
+ nodes=[{id:'a',name:'node01',online:true,lastSeen:new Date().toISOString()}];hosts=[{id:'a:qemu/101',agent:'a',node:'node01',name:'guest',online:true}];
+ await monitor.sample(true);await Promise.all(deliveries);assert.equal(sent.length,1);assert.match(sent[0].title,/Connection restored: Docker node01/);
+ await monitor.sample(true);await Promise.all(deliveries);assert.equal(sent.length,1);
+});

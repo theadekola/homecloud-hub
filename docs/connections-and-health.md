@@ -13,6 +13,8 @@ link here instead of opening duplicate connection forms. Existing
 - **Needs Setup** contains offline, unverified and incomplete sources. Manage or
   Fix Setup opens the affected source’s health guide. Search by name or address,
   filter by provider, switch list/grid views and sort by name or status.
+- Open, Test and Manage stay together on one row in source cards. Optional remove
+  and connector update actions can use a separate row.
 - **Open** verifies the applicable API, connector heartbeat or exact Docker Engine
   before selecting its host and navigating. **Test** verifies without navigation.
   A paired node heartbeat does not verify all of its Docker guests. TrueNAS uses
@@ -221,3 +223,17 @@ explicitly says no Proxmox backup storage is visible. Verify the token's storage
 access and compare the Backups/Restore Points views with the provider's own archive
 listing before treating a count as proof of protection. Discovery does not verify
 archive integrity or a successful restore.
+
+## Docker event details
+
+Docker → Events keeps source, object and View labels on one line. Wide event logs
+scroll inside their card. The Action column uses readable event names; hover it
+for the original Docker action.
+
+Details stay closed until **View** is selected in the log or timeline. The panel
+explains the selected event, identifies its object and timestamp, and reports an
+exit code only when supplied by Docker. A prepared or started exec command does
+not establish whether it succeeded. **Close** at the top hides the details until
+another View action. Background refresh does not open or replace the selection.
+Recorded commands and the original JSON remain in expandable technical sections;
+Copy Event copies the original event without running its command.

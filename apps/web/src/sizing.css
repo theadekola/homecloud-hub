@@ -328,3 +328,21 @@
 .configuration-tags { display:flex; flex-wrap:wrap; gap:5px; max-width:270px; }
 .configuration-path { display:block; max-width:260px; overflow:hidden; text-overflow:ellipsis; }
 .storage-configuration .storage-scope-note strong { display:block; margin-bottom:8px; }
+
+/* Events keep readable cells and contain horizontal scrolling within the log. */
+.docker-events .compose-workspace>.card,.docker-events .docker-side{min-width:0}
+.docker-events .table-wrap{min-width:0;max-width:100%;overflow:auto}
+.content.content .docker-event-table .event-object{display:inline;max-width:none;white-space:nowrap;overflow:visible;word-break:normal}
+.docker-event-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.docker-event-detail-heading h3{margin:0}
+.docker-event-detail-heading .btn{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap}
+.docker-event-details p,.docker-event-details dd{overflow-wrap:anywhere;line-height:1.6}
+.docker-event-details details{margin-top:16px;min-width:0}
+.docker-event-details summary{cursor:pointer}
+.docker-event-details .event-json{max-width:100%;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.docker-events .event-timeline li{display:flex;align-items:center;gap:10px}
+.docker-events .event-timeline li>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.docker-events .event-timeline .btn{flex:none;white-space:nowrap}
+.docker-events .docker-side{display:flex;flex-direction:column}
+.docker-events .docker-side>.card{width:100%;box-sizing:border-box}
+@media(max-width:1200px){.content .docker-events .compose-workspace{grid-template-columns:minmax(0,1fr)}}

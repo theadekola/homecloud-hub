@@ -1,6 +1,6 @@
 import PageIcon, {pageIconForTitle} from './PageIcon';
 import React, { useEffect, useState, useRef, useId } from 'react';
-import { X } from 'lucide-react';
+import { CheckCircle2, X } from 'lucide-react';
 
 export function PageHeader({title, subtitle, actions}:{title:string; subtitle:string; actions?:React.ReactNode}) {
   return <div className="page-header"><div><h1><PageIcon name={pageIconForTitle(title)} className="page-title-icon"/>{title}</h1><p>{subtitle}</p></div><div className="header-actions">{actions}</div></div>
@@ -22,7 +22,7 @@ export function Button({children,onClick,variant='primary',disabled=false}:{chil
   return <button className={`btn ${variant}`} onClick={onClick} disabled={disabled}>{children}</button>
 }
 
-export function Modal({open,onClose,title,children}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode}) {
+export function Modal({open,onClose,title,children,success}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode;success?:string}) {
   const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=onClose;
   useEffect(()=>{
     if(!open)return;
@@ -38,8 +38,15 @@ export function Modal({open,onClose,title,children}:{open:boolean;onClose:()=>vo
   },[open]);
   if(!open) return null;
   return <div className="modal-backdrop" onMouseDown={onClose}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>
-    <div className="modal-head"><h3 id={titleId}>{title}</h3><button type="button" className="icon-btn" aria-label="Close dialog" onClick={onClose}><X size={18}/></button></div>{children}
+    <div className="modal-head"><h3 id={titleId}>{title}</h3><button type="button" className="icon-btn" aria-label="Close dialog" onClick={onClose}><X size={18}/></button></div>{success?<ConnectionSuccess message={success} onDone={onClose}/>:children}
   </div></div>
+}
+
+export const CONNECTION_SUCCESS_DELAY=2000;
+export function ConnectionSuccess({message,onDone}:{message:string;onDone:()=>void}){
+ const done=useRef(onDone),notice=useRef<HTMLDivElement>(null);done.current=onDone;
+ useEffect(()=>{const timer=setTimeout(()=>done.current(),CONNECTION_SUCCESS_DELAY);notice.current?.focus();const modal=notice.current?.closest('.modal');if(modal)modal.scrollTop=0;return()=>clearTimeout(timer)},[message]);
+ return <div ref={notice} tabIndex={-1} className="connection-success" role="status" aria-live="polite"><CheckCircle2 size={32} aria-hidden="true"/><strong>{message}</strong><small>Closing automatically…</small></div>;
 }
 
 export function Tabs({items,active,onChange}:{items:string[];active:string;onChange:(v:string)=>void}) {

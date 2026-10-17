@@ -45,3 +45,12 @@
 @media(max-width:650px){.connections-page .connection-inventory.grid,.guest-connection-list.grid{grid-template-columns:minmax(0,1fr)}}
 
 .guest-connection-list.grid .connection-row-actions:empty{display:none}
+
+/* Keep the three primary actions together, even on narrow desktop cards. */
+.connection-primary-actions{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;min-width:0;max-width:100%}
+.connections-page .connection-inventory .connection-primary-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:0;flex:1 0 auto;padding:8px 6px;font-size:11px;white-space:nowrap}
+.connections-page .connection-primary-actions .btn svg{flex:none;width:14px;height:14px}
+.connections-page .connection-inventory.grid .connection-row-actions{justify-content:flex-start;gap:6px}
+.connection-inventory.grid .connection-primary-actions{width:100%}
+.connection-inventory.grid .connection-row{container-type:inline-size}
+@container(max-width:200px){.connections-page .connection-primary-actions .btn svg{display:none}}

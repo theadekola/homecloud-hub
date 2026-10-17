@@ -37,3 +37,19 @@ test('header update alerts link to the matching Docker host and Updates page',as
 test('automatic checks honor their switch and interval, while explicit checks remain read-only',async()=>{
  const state={alerts:[]};let reads=0,now=Date.now();const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},now:()=>now,query:async p=>{reads++;return p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:old}}}});service.settings({enabled:false,intervalHours:6});service.observe(snapshot);assert.equal(reads,0);service.observe(snapshot,true);await service.settled();assert.equal(reads,2);service.settings({enabled:true,intervalHours:6});service.observe(snapshot);await service.settled();assert.equal(reads,2);now+=6*3600000;service.observe(snapshot);await service.settled();assert.equal(reads,4);assert.throws(()=>service.settings(null),e=>e.status===400);
 });
+test('installation progress is read-only, owner-only and isolated from other users, hosts and attempts',async()=>{
+ process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');let release,started=false;const pending=new Promise(r=>release=r);
+ const row={containerId:'a'.repeat(64),status:'available',imageId:img,image:'nginx:latest',remoteDigest:next},operationId='test-installation-attempt-1234';
+ const app=createApp({authenticate:(req,res,next)=>{req.user={sub:req.headers['x-user']||'owner-one',role:req.headers['x-role']||'owner'};next()},imageUpdates:{status:()=>({rows:[row]}),installed(){}},imageUpdateInstaller:async(r,input,{onProgress})=>{started=true;onProgress(20,'Pulling image from registry');await pending;onProgress(95,'Finalizing');return {message:'Updated'}},audit:async()=>{},monitor:{invalidate(){}}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ const base=`http://127.0.0.1:${server.address().port}/api/docker/updates/${row.containerId}`,headers={'Content-Type':'application/json'},body=JSON.stringify({imageId:img,remoteDigest:next,configDigest:'fixture',operationId});let installation;
+ try{
+  const challenge=await fetch(base+'/install',{method:'POST',headers,body});assert.equal(challenge.status,409);const phrase=(await challenge.json()).confirmationPhrase;
+  assert.equal((await (await fetch(base+'/progress?operation='+operationId)).json()).progress,null);
+  installation=fetch(base+'/install',{method:'POST',headers:{...headers,'x-homecloud-confirm':phrase},body});for(let i=0;i<50&&!started;i++)await new Promise(r=>setTimeout(r,5));assert.ok(started);
+  const progress=()=>fetch(base+'/progress?operation='+operationId);assert.equal((await (await progress()).json()).progress.percent,20);
+  assert.equal((await fetch(base+'/progress?operation='+operationId,{headers:{'x-role':'viewer'}})).status,403);
+  for(const header of [{'x-user':'owner-two'},{'x-homecloud-docker-host':'another-host'}])assert.equal((await (await fetch(base+'/progress?operation='+operationId,{headers:header})).json()).progress,null);
+  assert.equal((await (await fetch(base+'/progress?operation=different-attempt-1234')).json()).progress,null);
+  release();assert.equal((await installation).status,200);assert.equal((await (await progress()).json()).progress.percent,100);
+ }finally{release();if(installation)await installation;server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

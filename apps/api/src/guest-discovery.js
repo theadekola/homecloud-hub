@@ -10,9 +10,9 @@ export function parseLinuxInventory(output){
  }
  return result;
 }
-const cache=new Map();
+const cache=new Map();let generation=0;
 export async function inspectGuests(guests,call,connection){
- const reports=[],limitations=[];
+ const reports=[],limitations=[],started=generation;
  for(let i=0;i<guests.length;i+=3)await Promise.all(guests.slice(i,i+3).map(async guest=>{
   if(guest.status!=='running')return;
   const key=`${connection}:${guest.node}:${guest.id}`;
@@ -36,7 +36,7 @@ export async function inspectGuests(guests,call,connection){
     const inventory=windows?JSON.parse(result['out-data']||'{}'):parseLinuxInventory(result['out-data']);
     entry={time:Date.now(),report:{id:`qga-${guest.id}`,hostname:guest.name,node:guest.node,os:os.name||os.id,receivedAt:new Date().toISOString(),status:'online',services:(inventory.services||[]).slice(0,1000),packages:(inventory.packages||[]).slice(0,6000),containers:(inventory.containers||[]).slice(0,1000),errors:[],source:'Proxmox guest API'}};
    }catch(error){const status=error.providerStatus||Number(error.message.match(/HTTP (\d+)/)?.[1]);const guidance=status===401||status===403?'The token lacks guest-agent access; check its user and token ACLs.':status===501?'This guest or its agent does not support the requested inventory command. Use a Docker Engine connection for Docker inventory.':'Check that QEMU Guest Agent is enabled in VM Options and running inside this guest. A cluster read token alone does not enable guest execution.';entry={time:Date.now(),error:`${guest.name}: ${error.message}. ${guidance}`};}
-   cache.set(key,entry);if(cache.size>1000)cache.delete(cache.keys().next().value);
+   if(started===generation)cache.set(key,entry);if(cache.size>1000)cache.delete(cache.keys().next().value);
   }
   if(entry.report)reports.push(entry.report);else limitations.push(entry.error);
  }));
@@ -60,3 +60,5 @@ export function backgroundGuestInventory(guests, call, connection) {
  const active = new Set(guests.filter(g => g.status === 'running').map(g => `qga-${g.id}`));
  return {...scan.result, reports: scan.result.reports.filter(r => active.has(r.id))};
 }
+
+export function resetGuestDiscovery(){generation++;cache.clear();scans.clear();}

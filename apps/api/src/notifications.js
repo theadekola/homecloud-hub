@@ -53,11 +53,12 @@ export function notificationTestError(channel,error){
  if(['ETIMEDOUT','ESOCKET','ECONNECTION','ECONNREFUSED','ENOTFOUND'].includes(code)||error?.name==='TimeoutError')return `${name} connection failed. Check the host, port, network, DNS and TLS settings.`;
  return `${name} test failed. Check the entered connection details and service availability.`;
 }
-export const defaultNotificationPreferences=()=>({enabled:true,channels:Object.fromEntries(notificationIds.map(id=>[id,['discord','telegram','email'].includes(id)])),minimumSeverity:'info',notifyResolved:true});
+export const defaultNotificationPreferences=()=>({enabled:true,channels:Object.fromEntries(notificationIds.map(id=>[id,['discord','telegram','email'].includes(id)])),minimumSeverity:'info',notifyResolved:true,notifyDockerUpdates:true});
 export function notificationPreferences(state){const d=defaultNotificationPreferences(),p=state.notificationPreferences||{};return {...d,...p,channels:{...d.channels,...p.channels}};}
 export function validateNotificationPreferences(input){
- if(!input||typeof input.enabled!=='boolean'||typeof input.notifyResolved!=='boolean'||!['info','warning','critical'].includes(input.minimumSeverity)||!input.channels||['discord','telegram','email'].some(c=>typeof input.channels[c]!=='boolean')||Object.keys(input).some(k=>!['enabled','notifyResolved','minimumSeverity','channels'].includes(k))||Object.keys(input.channels).some(k=>!notificationIds.includes(k)||typeof input.channels[k]!=='boolean'))throw Object.assign(Error('Choose valid notification delivery preferences'),{status:400});
- return {enabled:input.enabled,channels:{...input.channels},minimumSeverity:input.minimumSeverity,notifyResolved:input.notifyResolved};
+ if(input?.notifyDockerUpdates!==undefined&&typeof input.notifyDockerUpdates!=='boolean')throw Object.assign(Error('Choose a valid Docker update notification preference'),{status:400});
+ if(!input||typeof input.enabled!=='boolean'||typeof input.notifyResolved!=='boolean'||!['info','warning','critical'].includes(input.minimumSeverity)||!input.channels||['discord','telegram','email'].some(c=>typeof input.channels[c]!=='boolean')||Object.keys(input).some(k=>!['enabled','notifyResolved','notifyDockerUpdates','minimumSeverity','channels'].includes(k))||Object.keys(input.channels).some(k=>!notificationIds.includes(k)||typeof input.channels[k]!=='boolean'))throw Object.assign(Error('Choose valid notification delivery preferences'),{status:400});
+ return {enabled:input.enabled,channels:{...input.channels},minimumSeverity:input.minimumSeverity,notifyResolved:input.notifyResolved,...(input.notifyDockerUpdates===undefined?{}:{notifyDockerUpdates:input.notifyDockerUpdates})};
 }
 const connectionRecovery=(alert,event)=>event==='resolved'&&typeof alert?.key==='string'&&alert.key.startsWith('connection:');
 export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,send=sendNotification,now=()=>Date.now()}={}){
@@ -75,8 +76,9 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
    // Do not retroactively bypass filters for the installation's old recoveries.
    const policySince=persistence.get().connectionRecoveryNotificationsSince||new Date(startedAt).toISOString();
    const automaticRecovery=(alert,event)=>connectionRecovery(alert,event)&&Date.parse(alert.resolvedAt)>=Date.parse(policySince);
-   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
-   const accepts=(channel,alert,event)=>automaticRecovery(alert,event)||channelAccepts(channel,alert,event,environment());
+   const imageUpdate=alert=>alert?.key?.startsWith('docker-image:');
+   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>imageUpdate(alert)?event==='active'&&['active','acknowledged'].includes(alert.status)&&preferences.notifyDockerUpdates!==false:event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
+   const accepts=(channel,alert,event)=>imageUpdate(alert)||automaticRecovery(alert,event)||channelAccepts(channel,alert,event,environment());
    const queuedAlert=row=>({...alerts.find(a=>a.id===row.alertId),...row.alert});
    persistence.mutate(s=>{s.connectionRecoveryNotificationsSince??=policySince;s.notificationQueue??=[];
     for(const alert of alerts){if(!['active','acknowledged','resolved'].includes(alert.status)||!eligible(alert))continue;

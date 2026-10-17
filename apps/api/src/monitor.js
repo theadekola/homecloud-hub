@@ -1,3 +1,4 @@
+import {dockerImageUpdates} from './docker-image-updates.js';
 import {observeHeaderActivity} from './header-notifications.js';
 import {notifier} from './notifications.js';
 import {dockerFleet,monitoredDocker} from './docker-fleet.js';
@@ -23,7 +24,7 @@ export function alertConditions(snapshot,rules){
   for(const a of snapshot.truenas?.alerts||[])if(!a.dismissed)conditions.push({key:`truenas:${a.id||a.uuid}`,title:a.klass||'TrueNAS alert',source:'TrueNAS',provider:'truenas',severity:['CRITICAL','ALERT','EMERGENCY'].includes(a.level)?'critical':'warning',details:a.formatted||a.text||JSON.stringify(a.args)});
   return conditions;
 }
-export function createMonitor(sources=providers,persistence={get,mutate},checkServices=extraServices,fleet=async()=>({hosts:[]}),notify=async()=>{}){
+export function createMonitor(sources=providers,persistence={get,mutate},checkServices=extraServices,fleet=async()=>({hosts:[]}),notify=async()=>{},observeUpdates=()=>{}){
  let latest=null,inFlight=null,progress=null,completed=0,generation=0;
  const readings=new Map();
  const empty=()=>({sampledAt:new Date().toISOString(),services:[],hosts:[],metrics:persistence.get().metrics,alerts:persistence.get().alerts});
@@ -62,6 +63,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         state.metrics.push({time:snapshot.sampledAt,cpu:mean('cpu'),memory:mean('memory'),docker:monitoredDocker(snapshot).map(c=>({hostId:c.hostId,id:c.id,name:c.name,status:c.status,cpu:c.cpu,memory:c.memoryPercent,memoryBytes:c.memory})),nodes:measured.map(n=>({name:n.name,cpu:n.cpu,memory:n.memoryPercent})),storage:snapshot.proxmox?.storage||[]});state.metrics=state.metrics.slice(-2880);
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
+          if(existing.key?.startsWith('docker-image:'))continue;
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           // A no-heartbeat placeholder disappears when real Docker hosts are discovered.
           // Resolve its exact connector alert only from a fresh online node report.
@@ -84,7 +86,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
       });
       snapshot.metrics=persistence.get().metrics;
       snapshot.alerts=persistence.get().alerts;
-    latest=snapshot;completed=Date.now();Promise.resolve().then(()=>notify(snapshot.alerts)).catch(()=>{});return snapshot;
+    latest=snapshot;completed=Date.now();observeUpdates(snapshot);Promise.resolve().then(()=>notify(snapshot.alerts)).catch(()=>{});return snapshot;
    });
    inFlight=work;void work.finally(()=>{if(inFlight===work){inFlight=null;progress=null;}}).catch(()=>{});
   }
@@ -98,4 +100,4 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
   return {...await collect(name),sampledAt:new Date().toISOString()};
  },invalidate:async()=>{generation++;latest=null;progress=null;inFlight=null;readings.clear();}};
 }
-export const monitor=createMonitor(providers,{get,mutate},extraServices,dockerFleet,alerts=>notifier.deliver(alerts));
+export const monitor=createMonitor(providers,{get,mutate},extraServices,dockerFleet,alerts=>notifier.deliver(alerts),snapshot=>dockerImageUpdates.observe(snapshot));

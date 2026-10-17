@@ -39,3 +39,8 @@ test('unavailable mount-point storage includes actionable coverage without readi
  const calls=[];const result=await backupArchives(async path=>{calls.push(path);if(path==='/nodes')return [{node:'node02',status:'online'}];if(path==='/storage')return [{storage:'media-storage',type:'dir',is_mountpoint:1,path:'/mnt/pve/media-storage'}];return [{storage:'media-storage',active:0}];});
  assert.equal(result.coverage.complete,false);assert.equal(result.coverage.checkedStorage,0);assert.equal(result.coverage.issues[0].code,'storage-unavailable');assert.match(result.coverage.issues[0].help,/\/mnt\/pve\/media-storage.*mounted on node02/);assert.match(result.coverage.issues[0].help,/Do not disable/);assert.ok(!calls.some(path=>path.includes('/content')));
 });
+
+test('backup archives only treat storage as unavailable on nodes assigned to that storage',async()=>{
+ const calls=[];const result=await backupArchives(async path=>{calls.push(path);if(path==='/nodes')return [{node:'node01',status:'online'},{node:'node02',status:'online'}];if(path==='/storage')return [{storage:'backup-ssd',nodes:'node01'}];if(path.endsWith('/storage?content=backup'))return [{storage:'backup-ssd',active:path.includes('/node01/')?1:0,enabled:path.includes('/node01/')?1:0}];return [{volid:'backup-ssd:backup/one.vma.zst'}];});
+ assert.equal(result.coverage.complete,true);assert.equal(result.coverage.visibleStorage,1);assert.equal(result.points.length,1);assert.deepEqual(result.errors,[]);assert.ok(!calls.some(path=>path.includes('/node02/storage/backup-ssd/content')));
+});

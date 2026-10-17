@@ -562,7 +562,7 @@ test('storage power icons preserve the target without opening inspection',async(
   return {tasks:[],history:[],content:[]};
  });
  try{
-  const power=page.container.querySelector('button[aria-label="Enable store on node"]');
+  const power=page.container.querySelector('button[aria-label="Enable store on node (all assigned nodes)"]');
   assert.equal(power.textContent.trim(),'');await page.click(power.querySelector('svg'));
   assert.deepEqual(writes,[{path:'/proxmox/storage/store/enabled',body:{enabled:true}}]);
   assert.ok(page.container.querySelector('.storage-inline-inspect').textContent.includes('Select a pool row'));
@@ -605,4 +605,12 @@ test('unverified repair results never hide pending VMs or display a success mess
 test('Overview directs guest access repairs to central Connections',async()=>{
  const calls=[];const page=await mounted('pages/Overview.tsx',{},async p=>{calls.push(p);if(p==='/auth/me')return {user:{role:'owner'}};if(p==='/backups')return {jobs:[],points:[],errors:[]};return {nodes:[],guests:[],services:[],hosts:[],metrics:[],alerts:[],resources:[],discoveryLimitations:['VM 100: Proxmox HTTP 403']}});
  try{assert.ok(page.container.querySelector('a[href="/settings?tab=Connections&section=setup"]'));assert.equal(button(page.container,'Fix Guest Discovery Access'),undefined);assert.equal(page.container.querySelector('[role=dialog]'),null);assert.ok(!calls.includes('/connections/proxmox/guest-permissions'))}finally{await page.close()}
+});
+
+test('storage shows host assignments and supported uses without enabling storage on an unassigned node',async()=>{
+ const pools=[{id:'node01/backup-ssd',node:'node01',name:'backup-ssd',provider:'proxmox',status:'online',type:'dir',path:'/mnt/backup',content:'backup',assignedNodes:['node01'],scopeVerified:true},{id:'node02/backup-ssd',node:'node02',name:'backup-ssd',provider:'proxmox',status:'not-assigned',applicable:false,type:'dir',path:'/mnt/backup',content:'backup',assignedNodes:['node01'],availabilityReason:'Assigned to node01; not assigned to node02.'},{id:'tn-pool',node:'nas-vm',name:'media-pool',provider:'truenas',type:'ZFS',status:'ONLINE',location:'TrueNAS pool media-pool'}];
+ const page=await mounted('pages/Storage.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/storage'?{pools,summary:{notAssigned:1},providerInventory:{truenas:{configured:true}}}:{tasks:[],history:[],content:[]});
+ try{assert.equal(page.container.querySelectorAll('tbody tr').length,3);const foreign=[...page.container.querySelectorAll('tbody tr')].find(row=>row.textContent.includes('not assigned to node02'));assert.match(foreign.textContent,/Not assigned/);assert.match(foreign.textContent,/Supports: Backups/);assert.ok(!foreign.querySelector('button[aria-label^="Enable"]'));assert.ok(!foreign.querySelector('button[aria-label^="Disable"]'));
+ const select=page.container.querySelector('[aria-label="Storage provider"]');await act(async()=>{select.value='truenas';select.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}));});assert.equal(page.container.querySelectorAll('tbody tr').length,1);assert.match(page.container.querySelector('tbody').textContent,/nas-vm/);assert.match(page.container.querySelector('tbody').textContent,/TrueNAS pool media-pool/);
+ }finally{await page.close()}
 });

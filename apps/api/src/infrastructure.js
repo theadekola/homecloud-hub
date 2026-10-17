@@ -1,3 +1,4 @@
+import {storageAppliesToNode} from './storage-scope.js';
 import {runtimeEnvironment} from './runtime-configuration.js';
 import {validateBackupSelection} from './backup-validation.js';
 import crypto from 'node:crypto';
@@ -46,7 +47,9 @@ export async function backupArchives(query=pve){
     let stores;
     try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
     coverage.visibleStorage+=stores.length;
-    await Promise.all(stores.map(async store=>{
+    const applicableStores=stores.filter(store=>storageAppliesToNode(configs.find(config=>config.storage===store.storage)||{},n.node));
+    coverage.visibleStorage-=stores.length-applicableStores.length;
+    await Promise.all(applicableStores.map(async store=>{
       if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){const message=`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`,config=configs.find(c=>c.storage===store.storage),mount=config?.type==='dir'&&[1,true,'1'].includes(config.is_mountpoint);errors.push(message);coverage.issues.push({code:'storage-unavailable',node:n.node,storage:store.storage,message,help:mount?`Confirm ${config.path||'the configured directory'} is mounted on ${n.node}, then retry inventory. Do not disable the mount-point check or write backups into an unmounted directory.`:'Check that this storage is enabled, online and accessible on this node in Proxmox, then retry inventory.'});return;}
       try{const files=await query(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
         if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');

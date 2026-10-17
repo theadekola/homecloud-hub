@@ -18,3 +18,18 @@ test('shared-pool totals prefer current online complete readings without double 
 test('dataset pool summaries preserve missing-node and unavailable TrueNAS coverage',async()=>{
  const row={id:'a/local',name:'local',node:'a',provider:'proxmox',shared:false,status:'online',capacity:100,used:40,available:60};const base={proxmox:true,inventory:async()=>({resources:[row],errors:[],coverage:{complete:false,missingNodes:['b']}}),query:async()=>[]};const partial=await datasetInventory(base);assert.equal(partial.summary.capacity,null);assert.deepEqual(partial.summary.coverage.missingNodes,['b']);const tnUnavailable=await datasetInventory({...base,inventory:async()=>({resources:[row],errors:[],coverage:{complete:true}}),truenasEnabled:true,tn:async()=>[],snapshot:{}});assert.equal(tnUnavailable.summary.complete,false);assert.equal(tnUnavailable.summary.capacity,null);
 });
+
+test('storage inventory distinguishes node assignments from globally disabled or offline storage',async()=>{
+ const configs=[{storage:'backup-ssd',nodes:'node01',type:'dir',path:'/mnt/backup',content:'backup',shared:0},{storage:'media-storage',nodes:'node02',type:'dir',path:'/mnt/pve/media-storage',is_mountpoint:1,content:'backup',shared:0},{storage:'paused',nodes:'node01',disable:1,shared:0}];
+ const query=async path=>path==='/nodes'?[{node:'node01'},{node:'node02'}]:path==='/storage'?configs:path.includes('/node01/')?[{storage:'backup-ssd',active:1,enabled:1,total:100,used:30,avail:70},{storage:'media-storage',active:0,enabled:0},{storage:'paused',active:0,enabled:0}]:[{storage:'backup-ssd',active:0,enabled:0},{storage:'media-storage',active:0,enabled:1}];
+ const result=await storageInventory(query),foreign=result.resources.find(row=>row.id==='node02/backup-ssd'),offline=result.resources.find(row=>row.id==='node02/media-storage');
+ assert.equal(foreign.status,'not-assigned');assert.equal(foreign.applicable,false);assert.deepEqual(foreign.assignedNodes,['node01']);assert.match(foreign.availabilityReason,/not assigned to node02/);assert.equal(offline.status,'offline');assert.match(offline.availabilityReason,/required mount point.*media-storage/);assert.equal(result.resources.find(row=>row.id==='node01/paused').status,'disabled');
+ const summary=storageSummary(result.resources.map(row=>({...row,provider:'proxmox'})),result.coverage);assert.equal(summary.notAssigned,2);assert.equal(summary.pools,3);assert.equal(summary.capacity,100);
+});
+test('registered storage missing from a node response remains visible without fabricated capacity',async()=>{
+ const result=await storageInventory(async path=>path==='/nodes'?[{node:'node01'}]:path==='/storage'?[{storage:'registered',nodes:'node01',type:'dir',path:'/mnt/data',shared:0}]:[]);
+ assert.equal(result.resources.length,1);const row=result.resources[0];assert.equal(row.reported,false);assert.equal(row.status,'unknown');assert.equal(row.capacity,null);assert.equal(row.scopeVerified,true);assert.equal(row.path,'/mnt/data');
+});
+test('unknown node assignment does not authorize storage configuration changes',async()=>{
+ const result=await storageInventory(async path=>path==='/nodes'?[{node:'node01'}]:path==='/storage'?[]:[{storage:'unlisted',active:1,total:100,used:20,avail:80}]);assert.equal(result.resources[0].scopeVerified,false);assert.equal(result.resources[0].scope,'unknown');assert.equal(result.resources[0].status,'online');
+});

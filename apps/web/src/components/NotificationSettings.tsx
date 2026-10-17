@@ -4,7 +4,7 @@ import BrandIcon from './BrandIcon';
 import ConfigurationDialog from './ConfigurationDialog';
 import {useEffect,useState} from 'react';
 import {useNotificationPreferences} from './useNotificationPreferences';
-import {Link} from 'react-router-dom';
+import {Link,useSearchParams} from 'react-router-dom';
 import {Bell,Send,Mail,MessageCircle,Clock,Activity,Settings,Play,RefreshCw,SlidersHorizontal,Info} from 'lucide-react';
 import {useApi} from '../hooks';
 import {confirmedApi} from '../api';
@@ -16,6 +16,8 @@ function Block({title,detail,icon:Icon,children,className=''}:any){return <Card 
 function Toggle({label,checked,disabled,onChange}:any){return <label className="settings-toggle"><span><b>{label}</b></span><input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={e=>onChange(e.target.checked)}/><span className="settings-switch-track" aria-hidden="true"/></label>}
 export default function NotificationSettings(props:any){return props.owner?<Panel {...props}/>:<Block title="Notifications" detail="Owner-managed delivery settings." icon={Bell}><p>Your role cannot access channel credentials, delivery diagnostics or notification preferences. Ask a HomeCloud owner to manage delivery.</p><Link className="btn secondary" to="/alerts">View Alerts</Link></Block>}
 function Panel({editing,busy,search}:any){
+ const [query,setQuery]=useSearchParams();
+ useEffect(()=>{const channel=query.get('channel');if(channel&&notificationChannels.includes(channel)){setGuide(channel);const next=new URLSearchParams(query);next.delete('channel');setQuery(next,{replace:true})}},[query]);
  const live=useApi<any>('/notifications',null),[draft,setDraft]=useState<any>(null),[guide,setGuide]=useState(''),[testing,setTesting]=useState(false),[results,setResults]=useState<any[]>([]),[error,setError]=useState('');
  const data=live.data,available=!!data&&!live.error,channels=data?.channels||[];
  useEffect(()=>{if(!saving){const saved=data?.preferences;setDraft(saved?{...saved,channels:{...channelDefaults(),...saved.channels}}:data?fallback():null);}},[data]);

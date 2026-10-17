@@ -1,61 +1,92 @@
 # Connections and connection health
 
-Open Settings → Connections. The page uses actual configured sources and paired
-connectors; it does not create the sample connections shown in the design.
+Open **Settings → Connections** to manage Proxmox, paired node connectors, Docker,
+TrueNAS, the AI Assistant and external notification delivery. Other resource pages
+link here instead of opening duplicate connection forms. Existing
+`Settings?tab=Notifications` bookmarks redirect to Connections → Notifications.
 
-- Search by name, endpoint or connection method; filter by type and status cards.
-- Switch between list and grid views and sort by name or status.
-- Open verifies Proxmox/API or a selected Docker Engine before navigating. Paired
-  Proxmox node checks verify its heartbeat, not every Docker guest on that node.
-- Test performs the applicable connection verification. Other provider checks
-  request a background monitoring scan; their pending results are clearly marked.
-- Manage opens the affected connection’s health guide, configuration controls and,
-  when applicable, removal. Removing a connection never deletes a guest or host.
-- Add Connection keeps Proxmox pairing, standalone Docker pairing and Advanced
-  Direct Docker API setup. Only one active Proxmox API and one direct Docker
+## Connected and Needs Setup
 
-## Automatic checks and recovery
+- **Connected** contains sources with online checks and no reported setup issues,
+  plus VMs whose QEMU Guest Agent has responded. Source counts include API
+  connections, paired nodes and Docker hosts, rather than unique physical machines.
+- **Needs Setup** contains offline, unverified and incomplete sources. Manage or
+  Fix Setup opens the affected source’s health guide. Search by name or address,
+  filter by provider, switch list/grid views and sort by name or status.
+- **Open** verifies the applicable API, connector heartbeat or exact Docker Engine
+  before selecting its host and navigating. **Test** verifies without navigation.
+  A paired node heartbeat does not verify all of its Docker guests. TrueNAS uses
+  its read-only provider test. AI tests require confirmation and can incur charges.
+- **Recheck Connections** refreshes provider checks. Background checks and errors
+  remain visible. Failed reads do not turn unverified sources into connected ones.
+- Removing a saved connection or revoking a connector removes HomeCloud access,
+  without deleting its hosts or guests. Connector service removal is separate.
 
-The owner-only `/api/connections/health` endpoint combines monitoring readings
-with current connector heartbeats, versions, guest setup state and configured
-provider information. It returns no tokens, private keys or CA material. An
-explicit Check Setup starts a shared background monitoring scan; initial results
-return promptly and the page polls partial results until the scan completes.
-Ordinary reads reuse monitoring freshness and do not restart the scan on every
-poll. Live timestamps are shown; stale/absent data is not labelled as a new test.
+## Add a connection
 
-No Direct Engine entry is displayed when that optional endpoint is absent.
-Reachability and setup issues are separate: a connected Proxmox API can still
-need guest-execution permission, and an online connector can need an update.
-Health rows distinguish offline, unverified, partial and setup-required states.
-Counts refer to connection entries, including an API, paired nodes and discovered
-Docker hosts; they are not a count of unique physical machines.
+**Add Connection** offers Proxmox API, Proxmox node pairing, standalone Docker,
+TrueNAS, AI Assistant and notification channels. Direct Docker HTTPS API setup
+is under Advanced connection methods. One active Proxmox API endpoint and one
+optional direct Docker API endpoint are supported. Saving replaces that endpoint.
+After connecting Proxmox, pair each node when Docker guest discovery is needed.
+Secrets stay encrypted on the server and saved values are never shown in forms.
+A saved configuration is distinct from a successful delivery or connection test.
 
-Manage gives scoped instructions for guest ACLs, connector version 5 updates,
-offline agents, guest-agent setup and Docker checks. Copy commands does not
-execute them. Connector updates can be run through the owner-only SSH popup described below,
-with an explicit confirmation and fresh credentials. The manual command remains
-available. Service starts outside connector maintenance remain explicit administrator
-actions; no unauthenticated repair channel is introduced. Proxmox permission grants are also
-manual administrator actions. Existing Install & Connect remains the integrated
-repair path for supported guests, using its existing SSH identity verification,
-privileged-account confirmation and readiness checks. The guide expands and
-highlights the selected guest’s setup row; it never installs in a different guest.
-VM power cycles are always scheduled separately by the user.
+## VM guest access
 
-The page is available to HomeCloud owners. Other roles receive an owner-access
-message and do not request the health/configuration endpoints. The existing
-Proxmox and Docker authentication, action approvals, TLS checks and audit paths
-remain in force.
+Each VM is identified by its Proxmox node and VM ID. Read-only checks distinguish
+verified agents, disabled options, stopped VMs, permission failures and unavailable
+agents. An unavailable probe cannot prove whether the package is missing or the
+service is stopped. Checks run in the background so slow guests do not hold up the
+page. **Recheck VMs** explicitly refreshes those checks.
 
-## Validation
+**Set Up Guest Agent** or **Install / Start Guest Agent** opens the selected VM’s
+SSH installer. On Debian/Ubuntu it installs QEMU Guest Agent if missing, enables
+its Proxmox option, preserves other agent options and starts its service when the
+VirtIO channel exists. This operation does not install Docker. The verified SSH
+host must match the selected VM’s UUID or configured adapter. Use that VM’s Linux
+SSH password with root or sudo access, rather than an application or Proxmox login.
+Other operating systems require their supported agent installation procedure.
 
-Regression tests cover owner authorization, secret omission, real source counts,
-optional Direct Engine absence, offline/outdated connectors, guest ACL errors,
-partial Docker statistics, filters, views, targeted recovery, read-only checks,
-and exact-host verification before Docker host selection. Browser fixtures cover
-320, 375, 390, 768, 1024, 1440 and 1920px list/grid/guide layouts. All fixtures are
-local; no live infrastructure is changed during testing.
+**Fix Permissions** opens the existing scoped administrator repair and selects the
+affected VM when it is still pending. It needs a separate Proxmox administrator
+login and explicit consent. Existing user and privilege-separated token grants
+are preserved. A stopped VM must be started separately before installing or testing.
+
+Successful verification displays a success message and closes the dialog after
+two seconds. Verified VMs move to Connected. When a full shutdown and start is
+needed, the dialog states that requirement and remains pending until Recheck
+Guest Agent verifies it. No guest is restarted automatically.
+
+## Optional Docker guest setup
+
+Needs Setup lists eligible unconnected Debian/Ubuntu guests separately. Install
+Docker only in guests intended to run Docker; application or appliance monitoring
+does not imply that Docker should be installed. **Set Up Docker** explains the
+selected target and required guest SSH account before installation. LXC setup uses
+the paired node and enables nesting; QEMU setup uses supported guest access or the
+existing verified SSH bootstrap. QEMU Guest Agent setup does not apply to LXC.
+
+After installation, HomeCloud waits for discovery and verifies the exact selected
+Docker Engine. Unrelated ready hosts cannot satisfy this check. Failed verification
+remains retryable. Success closes the popup after its message, removes the guest
+from pending setup and selects the verified host. The Docker page contains host
+selection and resource management, with Manage Connections links to this page.
+
+## Notifications
+
+Connections → Notifications contains channel setup, enabled delivery preferences,
+severity/recovery settings, explicit tests and delivery history. All nine supported
+channels retain their existing credential forms. A test sends a real message and
+requires confirmation; it does not silently save or enable a draft. Configuration
+saves show success and close automatically. Failed tests and saves retain the form.
+Notification links from Alerts and Integrations point here. Old notification URLs
+continue to work through the central settings route.
+
+The page and its private configuration endpoints require a HomeCloud owner. Other
+roles receive an access message without requesting private connection or delivery
+data. Existing TLS verification, SSH fingerprints, target privilege checks,
+confirmation grants and audit records remain in force.
 
 ## Connector updates from Connections
 

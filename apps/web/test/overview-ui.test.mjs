@@ -58,9 +58,9 @@ test('LXC information does not display VM permission repair after successful dis
  let limitations=[];
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/backups'?{points:[],jobs:[]}:({...sample(),discoveryNotes:[note],discoveryLimitations:limitations}));
  try{
-  const info=page.container.querySelector('.discovery-notes');assert.ok(info.textContent.includes(note));assert.equal(info.querySelector('a').getAttribute('href'),'/docker');
+  const info=page.container.querySelector('.discovery-notes');assert.ok(info.textContent.includes(note));assert.equal(info.querySelector('a').getAttribute('href'),'/settings?tab=Connections&section=setup');
   assert.ok(!page.container.textContent.includes('Restore guest discovery'));assert.ok(!page.container.textContent.includes('Fix Guest Discovery Access'));assert.ok(!page.container.textContent.includes('Guest discovery access ('));
   limitations=['VM 101: Proxmox HTTP 403'];await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));
-  assert.ok(page.container.textContent.includes('VM 101: Proxmox HTTP 403'));assert.ok(page.container.textContent.includes('Fix Guest Discovery Access'));assert.ok(page.container.querySelector('.discovery-notes'));
+  assert.ok(page.container.textContent.includes('VM 101: Proxmox HTTP 403'));assert.ok(page.container.textContent.includes('Manage Guest Connections'));assert.ok(page.container.querySelector('.discovery-notes'));
  }finally{await page.close()}
 });

@@ -12,3 +12,36 @@
 @media(max-width:600px){.connections-hero{padding:18px;gap:12px}.connections-hero>div:nth-child(2){min-width:0;flex-basis:70%}.connections-hero .connection-heading-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.connections-hero .connection-heading-actions>.btn{width:100%;padding:10px;min-height:44px;font-size:12px;white-space:nowrap}.connection-overview{grid-template-columns:1fr;gap:8px}.connection-overview>button{padding:12px 15px}.connection-overview strong{font-size:24px}.connection-overview small{margin-top:0}.connection-workspaces>button{padding:12px 10px;gap:6px;font-size:12px}.connection-workspaces>button>svg{width:15px}.connection-section-heading .connection-search{width:100%}.guest-connection-panel{padding:16px}.guest-connection-row{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:13px}.guest-connection-row>.badge,.guest-connection-row>.btn,.guest-connection-row>.connection-row-actions{grid-column:1/-1}.guest-connection-row .btn{white-space:nowrap;word-break:normal;min-height:42px}.connection-catalog{grid-template-columns:1fr}.connection-catalog>button{padding:15px}.connection-next-step>.btn{width:100%}.connections-page .notification-settings-channel{display:flex;flex-wrap:wrap;gap:10px;padding:15px 0}.connections-page .notification-settings-channel>div{flex:1;min-width:130px}.connections-page .notification-settings-channel>.settings-toggle{flex-basis:100%}.connection-notifications .settings-overview-card{min-width:0}.connection-notifications .notification-settings-summary{grid-template-columns:1fr 1fr}}
 
 .connection-action-results dl{display:grid;grid-template-columns:minmax(90px,auto) minmax(0,1fr);gap:10px}.connection-action-results dd{margin:0;overflow-wrap:anywhere}.connection-action-results ul{padding-left:20px;max-height:240px;overflow:auto;overflow-wrap:anywhere}.connection-action-results li{margin:8px 0}
+
+/* Compact source and guest cards share the selected grid/list view. */
+.connections-page .connection-inventory.grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.connection-title-line{display:flex;align-items:center;gap:8px;min-width:0}
+.connection-title-line h3{flex:1;min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connection-title-line .connection-row-state{display:inline-flex;align-items:center;flex:none;grid-column:auto}
+.connection-title-line .badge{font-size:10px;white-space:nowrap}
+.connection-identity{min-width:0}
+.connection-identity>span{display:block;margin-top:6px;overflow-wrap:anywhere}
+.connection-endpoint{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:nowrap}
+.connection-endpoint code{flex:none;max-width:35%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connection-endpoint small{min-width:0;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connections-page .connection-inventory.grid .connection-row{grid-template-columns:28px minmax(0,1fr);gap:12px;padding:14px;align-content:start;grid-template-rows:auto auto 1fr}
+.connection-inventory.grid .connection-provider-icon{width:28px;height:32px;align-self:start}
+.connection-inventory.grid .connection-provider-icon svg{width:22px;height:22px}
+.connection-inventory.grid .connection-row-actions{margin-top:auto;align-self:end}
+.connection-inventory.grid .connection-row-actions .btn{padding:8px;font-size:11px;min-height:44px}
+.connection-inventory.list .connection-row{grid-template-columns:40px minmax(180px,1fr) minmax(220px,1fr) auto}
+.connection-inventory.list .connection-row>.connection-row-actions{grid-column:auto}
+.guest-connection-list.grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.guest-connection-list.grid .guest-connection-row{grid-template-columns:28px minmax(0,1fr);gap:12px;padding:14px;align-content:start}
+.guest-connection-list.grid .connection-provider-icon{width:28px;height:32px}
+.guest-connection-list.grid .guest-connection-row>div:first-of-type{min-width:0}
+.guest-connection-list.grid .guest-connection-row h4{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.guest-connection-list.grid .guest-connection-row>.badge,.guest-connection-list.grid .guest-connection-row>.btn,.guest-connection-list.grid .guest-connection-row>.connection-row-actions{grid-column:1/-1;justify-self:start}
+@media(max-width:1099px){
+ .connections-page .connection-inventory.grid,.guest-connection-list.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .connection-inventory.list .connection-row{grid-template-columns:36px minmax(0,1fr)}
+ .connection-inventory.list .connection-row>.connection-endpoint,.connection-inventory.list .connection-row>.connection-row-actions{grid-column:1/-1}
+}
+@media(max-width:650px){.connections-page .connection-inventory.grid,.guest-connection-list.grid{grid-template-columns:minmax(0,1fr)}}
+
+.guest-connection-list.grid .connection-row-actions:empty{display:none}

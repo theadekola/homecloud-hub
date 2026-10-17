@@ -110,8 +110,8 @@ explain that the address must be reachable from HomeCloud; they do not enable th
 verification checkbox or bypass host identity checks. HTTPS is required by the form. Credentials are
 used for this operation only and are not saved. Password-based SSH plus root or
 password-based sudo access must be available from the HomeCloud API server. If
-that access is unavailable, the existing manual `--update` command remains a
-fallback. No extra agent inside each VM/container is needed.
+that access is unavailable, correct SSH access before retrying the button.
+No extra agent inside each VM/container is needed.
 
 Before replacing anything, the fixed remote maintenance script checks that the
 host's existing pairing ID and token hash match the selected paired connection.
@@ -138,6 +138,39 @@ After each host update, verify Docker discovery, switch between the intended
 hosts, compare running containers and CPU/memory readings, and watch for recurring
 timeouts. An updated connector heartbeat alone does not verify every guest or
 Docker operation. Automated fixture tests are separate from live deployment QA.
+
+## Service checks and starts from Manage
+
+The connection health guide uses buttons instead of terminal commands:
+
+- **Check Installed Connector** and **Check Connector & Logs** read the paired
+  host's connector service, installed protocol and bounded, redacted service logs.
+- **Start Connector** starts only an inactive connector service. Success requires
+  both an active service and a fresh authenticated heartbeat to HomeCloud.
+- **Check Docker** reads Docker's service and Engine status, container counts and
+  available resource readings on the selected host or guest.
+- **Start Docker** starts only that target's inactive Docker service, then checks
+  the service and Engine. It does not restart an already active service.
+
+These owner-only actions use the same SSH address lookup and fingerprint checks
+as connector updates. The form requires HTTPS and fresh root/sudo SSH credentials
+for the paired host. Credentials are not saved, appear in neither audit records
+nor command arguments, and are cleared from the form when submitted. Starting a
+service requires explicit consent. Read results remain visible for inspection;
+verified starts show a success message and close their action dialog. Failure or
+missing heartbeat stays open without claiming that the connection is restored.
+
+Every action verifies the existing pairing ID and token hash on the SSH host.
+Connector actions always target the paired host. Docker guest actions use the
+exact reported QEMU/LXC identity through that host and its existing guest access.
+Standalone pairings cannot target Proxmox guests. Only four fixed operations are
+accepted; users cannot submit shell commands. Maintenance is serialized with
+connector updates and other management jobs. No package installation, guest
+restart, reboot, token rewrite or Docker restart is part of these service actions.
+Direct Docker API connections can run their existing API checks; pairing is
+required to manage their host service. These actions require the standard Linux
+connector installation and systemd. Unavailable SSH or VM guest access must be
+restored before a remote action can complete.
 
 ## Successful connection feedback
 

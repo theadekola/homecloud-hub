@@ -49,7 +49,8 @@ try{
   });
  });
  await test('backup page remains readable without a configured Proxmox provider',async()=>{
-  const r=await call('/backups');assert.equal(r.status,200);assert.deepEqual(r.body.jobs,[]);assert.deepEqual(r.body.points,[]);
+  const r=await call('/backups');assert.equal(r.status,200);assert.deepEqual(r.body.jobs,[]);assert.deepEqual(r.body.points,[]);assert.deepEqual(r.body.archiveInventory,{configured:false,complete:false});assert.deepEqual(r.body.providerInventory.jobs,{configured:false,complete:false});
+  const restore=await call('/restore');assert.equal(restore.status,200);assert.deepEqual(restore.body.archiveInventory,{configured:false,complete:false});assert.deepEqual(restore.body.providerInventory.snapshots,{configured:false,complete:false});
  });
  await test('backup archive failures retain successful job inventory',async()=>{
   const upstream=http.createServer((req,res)=>{res.setHeader('Content-Type','application/json');
@@ -59,7 +60,8 @@ try{
   process.env.PROXMOX_URL=`http://127.0.0.1:${upstream.address().port}`;
   process.env.PROXMOX_TOKEN_ID='fixture@pve!read';process.env.PROXMOX_TOKEN_SECRET='fixture';
   try{const r=await call('/backups');assert.equal(r.status,200);assert.equal(r.body.jobs[0].id,'retained-job');
-   assert.deepEqual(r.body.points,[]);assert.ok(r.body.errors.some(e=>e.includes('503')));
+   assert.deepEqual(r.body.points,[]);assert.ok(r.body.errors.some(e=>e.includes('503')));assert.equal(r.body.providerInventory.jobs.complete,true);assert.equal(r.body.archiveInventory.complete,false);
+   const restore=await call('/restore');assert.equal(restore.body.archiveInventory.configured,true);assert.equal(restore.body.archiveInventory.complete,false);assert.ok(restore.body.errors.length);
   }finally{delete process.env.PROXMOX_URL;delete process.env.PROXMOX_TOKEN_ID;delete process.env.PROXMOX_TOKEN_SECRET;await new Promise(resolve=>upstream.close(resolve));}
  });
  await test('login compares the exact password including leading and trailing spaces',async()=>{

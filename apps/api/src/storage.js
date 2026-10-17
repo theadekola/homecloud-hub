@@ -3,7 +3,7 @@ import {required,httpError,pveWrite,encode} from './infrastructure.js';
 
 export async function storageInventory(query=pve){
  const errors=[],resources=[],readNodes=[];
- const nodes=await query('/nodes');if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];
+ const nodes=await query('/nodes');if(!Array.isArray(nodes)||nodes.some(n=>!n||typeof n.node!=='string'||!n.node.trim()))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];if(!nodes.length)errors.push('No Proxmox nodes are visible; storage inventory could not be verified.');
  try{configs=await query('/storage');if(!Array.isArray(configs))throw new Error('Invalid storage configuration response');}catch(e){configs=[];errors.push(`Storage configuration: ${e.message}`);}
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
   try{const entries=await query(`/nodes/${encode(node.node)}/storage`);
@@ -18,7 +18,7 @@ export async function storageInventory(query=pve){
    readNodes.push(node.node);
   }catch(e){errors.push(`${node.node} storage: ${e.message}`);}
  }));
- const missingNodes=nodes.map(n=>n.node).filter(n=>!readNodes.includes(n)),coverage={complete:missingNodes.length===0&&!errors.some(e=>e.startsWith('Storage configuration:')),expectedNodes:nodes.map(n=>n.node),readNodes,missingNodes};
+ const missingNodes=nodes.map(n=>n.node).filter(n=>!readNodes.includes(n)),coverage={complete:!errors.length&&nodes.length>0&&missingNodes.length===0,expectedNodes:nodes.map(n=>n.node),readNodes,missingNodes};
  return {resources,errors,coverage,nodes:nodes.map(n=>n.node),reportedNodes:[...new Set(resources.map(r=>r.node))],sampledAt:new Date().toISOString()};
 }
 export async function storageDetails(node,id,timeframe='day',includeHistory=true){

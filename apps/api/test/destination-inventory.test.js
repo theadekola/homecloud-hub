@@ -13,3 +13,8 @@ test('disabled configuration takes precedence over active node state',async()=>{
  const data=await storageInventory(async path=>path==='/nodes'?[{node:'pve1'}]:path==='/storage'?[{storage:'local',disable:'1',shared:'1'}]:[{storage:'local',active:1,total:100,used:20,avail:80,content:'backup'}]);
  assert.equal(data.resources[0].status,'disabled');assert.equal(data.resources[0].shared,true);
 });
+
+test('destination inventory cannot establish zero storage without visible nodes',async()=>{
+ const data=await storageInventory(async()=>[]);assert.equal(data.coverage.complete,false);assert.ok(data.errors.length);
+ for(const nodes of [[{}],[null],[{node:''}]])await assert.rejects(()=>storageInventory(async()=>nodes),{status:502});
+});

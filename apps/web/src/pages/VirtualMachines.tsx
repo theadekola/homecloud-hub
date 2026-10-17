@@ -1,3 +1,4 @@
+import Pagination from '../components/Pagination';
 import {OSIcon} from '../components/BrandIcon';
 import GuestCreateFields,{CreationHa} from '../components/GuestCreateFields';
 import {inventoryComplete} from '../proxmox-state';
@@ -16,6 +17,7 @@ const sum=(rows:any[],key:string)=>rows.length&&rows.every(row=>typeof row[key]=
 const tone=(status:string)=>status==='running'?'green':status==='stopped'?'red':'gray';
 
 export default function VirtualMachines({navigation,data,role,clusterUrl,refresh}:{navigation?:import('react').ReactNode;data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
+ const [rowsPerPage,setRowsPerPage]=useState(12);
  const [params,setParams]=useSearchParams();
  const vms=data?.vms||[],nodes=data?.nodes||[],storage=data?.storage||[],operator=['operator','admin','owner'].includes(role||'');
  const [selected,setSelected]=useState<string>(vms[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
@@ -26,7 +28,7 @@ export default function VirtualMachines({navigation,data,role,clusterUrl,refresh
  const filtered=useMemo(()=>vms.filter((vm:any)=>(node==='all'||vm.node===node)&&(status==='all'||vm.status===status)&&`${vm.id} ${vm.name} ${vm.node}`.toLowerCase().includes(search.toLowerCase())),[vms,node,status,search]);
  useEffect(()=>{if(!filtered.some((r:any)=>r.id===selected))setSelected(filtered[0]?.id||'');},[filtered,selected]);
  useEffect(()=>setPage(1),[node,status,search]);
- const pages=Math.max(1,Math.ceil(filtered.length/12)),visible=filtered.slice((page-1)*12,page*12),current=filtered.find((vm:any)=>vm.id===selected);
+ const pages=Math.max(1,Math.ceil(filtered.length/rowsPerPage)),visible=filtered.slice((page-1)*rowsPerPage,page*rowsPerPage),current=filtered.find((vm:any)=>vm.id===selected);
  useEffect(()=>setPage(p=>Math.max(1,Math.min(p,pages))),[pages]);
  const destination=createNode||nodes[0]?.name||'';
  useEffect(()=>{setIso('');setMedia(null);setMediaError('');if(modal!=='create'||!destination||!operator)return;const controller=new AbortController();setMediaLoading(true);api<any>(`/proxmox/installation-media/${encodeURIComponent(destination)}`,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted)setMedia(result);}).catch(error=>{if(!controller.signal.aborted)setMediaError(error.message);}).finally(()=>{if(!controller.signal.aborted)setMediaLoading(false);});return()=>controller.abort();},[modal,destination,operator,mediaRevision]);
@@ -52,7 +54,7 @@ export default function VirtualMachines({navigation,data,role,clusterUrl,refresh
     <div className="vm-filters"><select aria-label="Filter VMs by node" value={node} onChange={e=>setNode(e.target.value)}><option value="all">All Nodes</option>{nodes.map((item:any)=><option key={item.name}>{item.name}</option>)}</select><select aria-label="Filter VMs by status" value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All Status</option>{[...new Set(vms.map((vm:any)=>vm.status).filter(Boolean))].map((value:any)=><option key={value}>{value}</option>)}</select><label className="vm-search"><Search size={14}/><input aria-label="Search virtual machines" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search VMs…"/></label><div className="vm-layout"><button aria-label="List view" className={layout==='list'?'active':''} onClick={()=>setLayout('list')}><Columns3 size={15}/></button><button aria-label="Grid view" className={layout==='grid'?'active':''} onClick={()=>setLayout('grid')}><Grid2X2 size={15}/></button></div></div>
     {layout==='list'?<div className="table-wrap"><table className="vm-table"><thead><tr><th>ID</th><th>Name</th><th>Node</th><th>Status</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Uptime</th></tr></thead><tbody>{visible.map((vm:any)=><tr key={vm.id} className={current?.id===vm.id?'selected':''} onClick={()=>setSelected(vm.id)}><td>{vm.id}</td><td><span className="vm-row-name"><Monitor size={15}/><b>{vm.name}</b></span></td><td>{vm.node}</td><td><Badge tone={tone(vm.status)}>{vm.status||'Unknown'}</Badge></td><td>{percent(vm.cpu)}</td><td><Meter value={vm.memoryPercent} text={vm.memoryTotal!=null?`${bytes(vm.memory)} / ${bytes(vm.memoryTotal)}`:bytes(vm.memory)}/></td><td><Meter value={vm.diskPercent} text={vm.disk!=null?`${bytes(vm.disk)} used · ${bytes(vm.diskFree)} free`:'Usage unavailable'}/></td><td>{duration(vm.uptime)}</td></tr>)}</tbody></table></div>:<div className="vm-card-grid">{visible.map((vm:any)=><button key={vm.id} className={current?.id===vm.id?'selected':''} onClick={()=>setSelected(vm.id)}><Monitor size={25}/><span><b>{vm.name}</b><small>VM {vm.id} · {vm.node}</small></span><Badge tone={tone(vm.status)}>{vm.status}</Badge><small>CPU {percent(vm.cpu)} · Memory {percent(vm.memoryPercent)}</small></button>)}</div>}
     {!visible.length&&<p className="vm-empty">No virtual machines match these filters.</p>}
-    <div className="vm-pagination"><span>Showing {visible.length?`${(page-1)*12+1}–${(page-1)*12+visible.length}`:'0'} of {filtered.length} VMs</span><div><button disabled={page===1} onClick={()=>setPage(value=>value-1)}>‹</button><b>{page} / {pages}</b><button disabled={page===pages} onClick={()=>setPage(value=>value+1)}>›</button></div></div>
+    <Pagination className="vm-pagination" label="VMs" total={filtered.length} page={page-1} pageSize={rowsPerPage} onPageChange={next=>setPage(next+1)} onPageSizeChange={setRowsPerPage}/>
    </Card>
    {current?<VmDetails key={`${current.node}:${current.id}`} vm={current} role={role} clusterUrl={clusterUrl} busy={pending} run={run} console={()=>openConsole()} snapshot={()=>{setOperationTarget({...current});setModal('snapshot')}} backup={()=>{setOperationTarget({...current});setModal('backup')}}/>:<Card><p className="vm-empty">No VM selected.</p></Card>}
   </div>

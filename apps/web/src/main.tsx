@@ -9,6 +9,7 @@ import './appearance.css';
 import './themes.css';
 import './brand-icons.css';
 import './components/header-notifications.css';
+import './components/pagination.css';
 
 applyAppearance();
 

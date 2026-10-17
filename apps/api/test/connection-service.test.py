@@ -4,6 +4,8 @@ spec=importlib.util.spec_from_file_location('service',pathlib.Path(__file__).par
 STATUS='LoadState=loaded\nActiveState=active\nSubState=running\nResult=success\n'
 DOCKER=STATUS+'\n__VERSION__\n28.0.0\n\n__CONTAINERS__\nrunning\nexited\n__CONTAINERS_OK__\n\n__STATS__\n1.2%|20MiB / 1GiB\n'
 class Services(unittest.TestCase):
+ def setUp(self):
+  identity=patch.object(m.os,'geteuid',return_value=0);identity.start();self.addCleanup(identity.stop)
  def fixture(self,kind='proxmox'):
   tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);root=pathlib.Path(tmp.name)
   (root/'etc').mkdir();(root/'usr/local/sbin').mkdir(parents=True)
@@ -47,4 +49,8 @@ class Services(unittest.TestCase):
   with self.assertRaisesRegex(RuntimeError,'VM guest access'):m.diagnose({**p,'action':'docker-check','target':'qemu/100'},root,lambda *a,**k:'{"exited":1,"exitcode":1,"err-data":"do not expose"}')
   root,p=self.fixture('docker')
   with self.assertRaisesRegex(RuntimeError,'Standalone'):m.diagnose({**p,'action':'docker-check','target':'lxc/101'},root)
+ def test_unprivileged_execution_is_rejected_before_service_commands(self):
+  root,p=self.fixture();calls=[]
+  with patch.object(m.os,'geteuid',return_value=1001),self.assertRaisesRegex(RuntimeError,'Root or sudo access is required'):m.diagnose(p,root,lambda *a,**k:calls.append(a))
+  self.assertEqual(calls,[])
 if __name__=='__main__':unittest.main()

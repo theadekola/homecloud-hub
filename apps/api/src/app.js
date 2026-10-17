@@ -179,12 +179,12 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    catch{return {inventory:null,id:selectedAgentHost(),errors:['Selected Docker host is unavailable. Inspect its node agent; no other host was substituted.']};}
  };
  const providerReads=async requests=>{
-   const s=await sampleView();const response={errors:[],connectors:s.services,refreshing:!!s.refreshing};
+   const s=await sampleView();const response={errors:[],connectors:s.services,refreshing:!!s.refreshing,providerInventory:{}};
 
    await Promise.all(requests.map(async([key,provider,handler])=>{
-     response[key]=[];
+     response[key]=[];response.providerInventory[key]={configured:providers[provider].configured(),complete:false};
      if(!providers[provider].configured())return;
-     try{response[key]=await handler();}catch(e){response.errors.push(`${provider}: ${e.message}`);}
+     try{const rows=await handler();if(!Array.isArray(rows))throw new Error('Unexpected provider inventory response');response[key]=rows;response.providerInventory[key].complete=true;}catch(e){response.errors.push(`${provider}: ${e.message}`);}
    }));
    return response;
  };
@@ -338,8 +338,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const {node,storage,rule}=req.body;return {node,task:await pve(`/nodes/${encode(required(node,'Node'))}/storage/${encode(required(storage,'Backup storage'))}/prunebackups?${new URLSearchParams({'prune-backups':retention(rule),...(req.body.vmid?{vmid:String(integer(req.body.vmid,'VM ID',100))}:{})})}`,{method:'DELETE'})};
  },true);
  read('/restore',async()=>{
-   const result=await providerReads([['snapshots','truenas',async()=>(await snapshot('truenas')).snapshots]]);result.points=[];
-   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
+   const result=await providerReads([['snapshots','truenas',async()=>(await snapshot('truenas')).snapshots]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
+   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
    return result;
  });
  action('post','/restore/:id/run','admin','proxmox.restore',req=>restoreArchive(req.params.id,req.body),true);

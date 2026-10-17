@@ -113,5 +113,31 @@ test('operators retain unprivileged defaults and cannot choose HA or privileged 
 });
 
 test('Backup Jobs has six cards and orders enabled upcoming schedules',async()=>{
- const jobs=[{id:'late','next-run':200,enabled:1},{id:'disabled','next-run':50,enabled:0},{id:'early','next-run':100,enabled:1}];const page=await mounted('pages/ProxmoxBackups.tsx',{role:'viewer',hours:'24',onTasks(){},onStorage(){}},async p=>p==='/backups'?{points:[],jobs,errors:[]}:p==='/proxmox/storage'?{resources:[],errors:[]}:p==='/proxmox'?{nodes:[],vms:[],lxc:[]}:{tasks:[],errors:[]});try{assert.equal(page.container.querySelectorAll('.backup-stats>.card').length,6);const upcoming=[...page.container.querySelectorAll('.backup-side>.card')].find(c=>c.querySelector('h3')?.textContent==='Upcoming Backups');assert.deepEqual([...upcoming.querySelectorAll('.backup-target b')].map(b=>b.textContent),['early','late']);}finally{await page.close();}
+ const jobs=[{id:'late','next-run':Math.floor(Date.now()/1000)+200,enabled:1},{id:'disabled','next-run':Math.floor(Date.now()/1000)+50,enabled:0},{id:'early','next-run':Math.floor(Date.now()/1000)+100,enabled:1}];const page=await mounted('pages/ProxmoxBackups.tsx',{role:'viewer',hours:'24',onTasks(){},onStorage(){}},async p=>p==='/backups'?{points:[],jobs,errors:[]}:p==='/proxmox/storage'?{resources:[],errors:[]}:p==='/proxmox'?{nodes:[],vms:[],lxc:[]}:{tasks:[],errors:[]});try{assert.equal(page.container.querySelectorAll('.backup-stats>.card').length,6);const upcoming=[...page.container.querySelectorAll('.backup-side>.card')].find(c=>c.querySelector('h3')?.textContent==='Upcoming Backups');assert.deepEqual([...upcoming.querySelectorAll('.backup-target b')].map(b=>b.textContent),['early','late']);}finally{await page.close();}
+});
+
+const backupTabApi=async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{jobs:[],points:[],errors:[],providerInventory:{jobs:{configured:false,complete:false}},archiveInventory:{configured:false,complete:false}}:p==='/restore'?{points:[],snapshots:[],errors:[],providerInventory:{snapshots:{configured:false,complete:false}},archiveInventory:{configured:false,complete:false}}:p==='/schedules'?{items:[],truenas:[],errors:[],providerInventory:{items:{configured:false,complete:false},truenas:{configured:false,complete:false}}}:p==='/retention'?{policies:[],truenas:[],errors:[],providerInventory:{policies:{configured:false,complete:false}}}:p.startsWith('/proxmox/tasks')?{tasks:[],errors:['No visible nodes'],coverage:{complete:false}}:p==='/proxmox/storage'?{resources:[],errors:['No visible nodes'],coverage:{complete:false}}:{nodes:[],vms:[],lxc:[]};
+test('all backup tabs preserve URL context, support history and do not present unavailable inventory as zero',async()=>{
+ const page=await mounted('pages/Backups.tsx',{},backupTabApi,true,false,'/backups?keep=1&archive=chosen');
+ try{
+  const metric=label=>[...page.container.querySelectorAll('.metric-grid .card')].find(e=>e.querySelector('small')?.textContent===label)?.querySelector('strong')?.textContent;
+  assert.equal(metric('Backup Archives'),'Unknown');
+  for(const [tab,label] of [['Restore Points','Total Restore Points'],['Schedules','Total Schedules'],['Retention Policies','Known Archive Data'],['Destinations',null],['Reports',null]]){
+   await page.click(button(page,tab));const params=new URLSearchParams(route(page).split('?')[1]);assert.equal(params.get('keep'),'1');assert.equal(params.get('archive'),'chosen');assert.equal(params.get('tab'),tab);
+   assert.equal(page.container.querySelector('.tabs .active').textContent,tab);
+   if(label)assert.equal(metric(label),'Unknown',label);
+   if(tab==='Reports'){const archive=[...page.container.querySelectorAll('.card')].find(c=>c.querySelector('h3')?.textContent==='Backup Archive Data');assert.equal(archive.querySelector('strong').textContent,'Unknown');}
+  }
+  await page.click(button(page,'Audit Back'));assert.equal(page.container.querySelector('.tabs .active').textContent,'Destinations');
+  await page.click(button(page,'Audit Forward'));assert.equal(page.container.querySelector('.tabs .active').textContent,'Reports');
+ }finally{await page.close();}
+});
+test('backup node filter scopes job summaries and tasks while retaining cluster-wide schedules',async()=>{
+ const now=Math.floor(Date.now()/1000),jobs=[{id:'global',comment:'Cluster schedule',enabled:1,'next-run':now+500},{id:'n1-job',node:'n1',enabled:1,'next-run':now+1000},{id:'n2-job',node:'n2',enabled:1,'next-run':now+2000},{id:'past',node:'n2',enabled:1,'next-run':now-100},{id:'disabled',node:'n2',enabled:'0','next-run':now+100}];
+ const page=await mounted('pages/ProxmoxBackups.tsx',{role:'viewer',hours:'24',onTasks(){},onStorage(){}},async p=>p==='/backups'?{jobs,points:[],errors:[]}:p.startsWith('/proxmox/tasks')?{tasks:[{upid:'one',type:'vzdump',node:'n1',status:'OK',endtime:now,starttime:now-20},{upid:'two',type:'vzdump',node:'n2',status:'ERROR',endtime:now,starttime:now-20}],errors:[]}:p==='/proxmox/storage'?{resources:[]}:guests);
+ try{await select(page,'Backup node','n2');const metric=label=>[...page.container.querySelectorAll('.metric-grid .card')].find(e=>e.textContent.includes(label))?.querySelector('strong')?.textContent;
+ assert.equal(metric('Total Backup Jobs'),'4');assert.equal(metric('Successful Tasks'),'0');assert.equal(metric('Failed Tasks'),'1');
+ assert.ok(page.container.querySelector('.backup-table').textContent.includes('Cluster schedule'));assert.ok(!page.container.querySelector('.backup-table').textContent.includes('n1-job'));
+ const upcoming=[...page.container.querySelectorAll('.backup-side .card')].find(e=>e.querySelector('h3')?.textContent==='Upcoming Backups');assert.ok(upcoming.textContent.includes('Cluster schedule'));assert.ok(upcoming.textContent.includes('n2-job'));assert.ok(!upcoming.textContent.includes('past'));assert.ok(!upcoming.textContent.includes('disabled'));
+ }finally{await page.close();}
 });

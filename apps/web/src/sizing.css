@@ -250,3 +250,9 @@
   max-height: none;
   overflow: visible;
 }
+
+/* Keep backup metric words readable in narrow cards. */
+.content.content .backup-hub .metric-grid strong {
+  overflow-wrap: normal;
+  word-break: normal;
+}

@@ -116,3 +116,18 @@ test('verified repair can clear cached discovery permission errors immediately',
  const denied=async()=>{reads++;throw Object.assign(Error('Proxmox HTTP 403'),{providerStatus:403})};await inspectGuests(guests,denied,'repair-cache');await inspectGuests(guests,denied,'repair-cache');assert.equal(reads,1);resetGuestDiscovery();
  const result=await inspectGuests(guests,async path=>path.endsWith('get-osinfo')?{result:{id:'linux'}}:path.endsWith('/exec')?{pid:42}:{exited:true,exitcode:0,'out-data':'__SERVICES__\nnginx.service loaded active running\n__END__'},'repair-cache');assert.equal(result.limitations.length,0);assert.equal(result.reports[0].services[0].name,'nginx.service');
 });
+
+test('repair list excludes already verified access, including direct non-propagated grants, and restores revoked VMs',async()=>{
+ const f=fixture();for(const subject of ['homecloud@pve','homecloud@pve!reader'])f.base[subject+':/vms/100'][needed]=0;
+ let state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['101']);assert.equal(state.verifiedCount,1);assert.equal(state.totalCount,2);assert.ok(!f.calls.some(c=>c.path==='/access/ticket'));
+ delete f.base['homecloud@pve!reader:/vms/100'][needed];state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
+ const result=await f.service.repair(await f.input());assert.equal(result.verified,true);state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['101']);assert.equal(state.verifiedCount,1);
+});
+test('repair list checks effective token access rather than its user permission alone',async()=>{
+ const f=fixture();f.base['homecloud@pve:/vms/100'][needed]=1;const state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
+});
+test('unavailable permission checks remain visible with a warning instead of disappearing',async()=>{
+ const config={url:'https://pve.example:8006',tokenId:'homecloud@pve!reader',tokenSecret:'saved',verifyTls:true};
+ const service=createGuestPermissionRepair({config:()=>config,query:async path=>{if(path.startsWith('/cluster/resources'))return [{vmid:100,name:'Unknown',node:'n1',type:'qemu'},{vmid:101,name:'Verified',node:'n1',type:'qemu'}];if(path.includes('100'))throw Error('Unavailable');return {'/vms/101':{[needed]:0}};}});
+ const state=await service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100']);assert.match(state.guests[0].permissionError,/could not be verified/);assert.equal(state.verifiedCount,1);
+});

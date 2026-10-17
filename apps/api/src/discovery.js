@@ -8,5 +8,6 @@ export function discovered(snapshot){
   for(const service of host.services)resources.push({id:`${host.id}:service:${service.name}`,name:service.name,host:host.hostname,node:host.node,kind:'System service',status:host.status==='stale'?'stale':service.status,source:'Proxmox guest API',lastSeen:host.receivedAt});
   for(const c of host.containers)if(!resources.some(r=>r.source==='Docker API'&&r.containerId===c.id&&r.host===host.hostname))resources.push({id:`${host.id}:docker:${c.id}`,name:c.name,host:host.hostname,node:host.node,kind:'Docker container',status:host.status==='stale'?'stale':c.status,source:'Proxmox guest API',image:c.image,lastSeen:host.receivedAt});
  }
- return {resources,reports,discoveryLimitations:[...(snapshot.proxmox?.guestInventory?.limitations||[]),...(snapshot.proxmox?.lxc?.length?['LXC application inventory requires guest access; Proxmox exposes its lifecycle and resource measurements.']:[])]};
+ // LXC capability information is not a failed VM access check.
+ return {resources,reports,discoveryLimitations:snapshot.proxmox?.guestInventory?.limitations||[],discoveryNotes:snapshot.proxmox?.lxc?.length?['LXC lifecycle and resource measurements are available through Proxmox. For application inventory, use a paired Proxmox node under Docker. QEMU Guest Agent permissions apply only to VMs.']:[]};
 }

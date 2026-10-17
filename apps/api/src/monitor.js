@@ -63,7 +63,10 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
-          if(service?.status==='reachable'){
+          // A no-heartbeat placeholder disappears when real Docker hosts are discovered.
+          // Resolve its exact connector alert only from a fresh online node report.
+          const connectorRecovered=!existing.metric&&(snapshot.dockerFleet?.connectors||[]).some(n=>n.online===true&&existing.connectorId===`docker:${n.id}:node-agent`);
+          if(service?.status==='reachable'||connectorRecovered){
             if(existing.metric){
               let row,value;
               if(existing.provider==='docker'){row=monitoredDocker(snapshot).find(c=>c.monitorId===existing.resourceId);value=existing.metric==='memory'?row?.memoryPercent:row?.cpu;}

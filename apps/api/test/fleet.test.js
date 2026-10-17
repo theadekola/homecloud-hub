@@ -62,3 +62,26 @@ test('fleet errors identify timeouts and Engine authorization without leaking pr
  assert.match((await fleet()).hosts[0].error,/timed out/);message='Docker HTTP 403: secret-provider-body';const denied=(await fleet()).hosts[0].error;assert.match(denied,/Docker HTTP 403/);assert.doesNotMatch(denied,/secret-provider-body/);
  message='arbitrary secret';assert.doesNotMatch((await fleet()).hosts[0].error,/arbitrary secret/);
 });
+
+
+test('offline connector placeholder resolves after that exact connector reconnects with discovered hosts',async()=>{
+ let nodes=[{id:'a',name:'node01',online:false},{id:'b',name:'node02',online:false}],hosts=[];
+ const fleet=createDockerFleet({hosts:()=>hosts,nodes:()=>nodes,read:async()=>inventory('guest',10)});
+ const state={rules:[],alerts:[],metrics:[]};
+ const monitor=createMonitor({}, {get:()=>state,mutate:fn=>fn(state)},async()=>[],fleet);
+ await monitor.sample(true);
+ const first=state.alerts.find(a=>a.connectorId==='docker:a:node-agent'),second=state.alerts.find(a=>a.connectorId==='docker:b:node-agent');
+ assert.equal(first.status,'active');assert.equal(second.status,'active');
+ nodes=[{id:'a',name:'node01',online:true,lastSeen:new Date().toISOString()},nodes[1]];
+ hosts=[{id:'a:qemu/101',agent:'a',node:'node01',name:'guest',online:true}];
+ await monitor.sample(true);
+ assert.equal(first.status,'resolved');assert.ok(first.resolvedAt);assert.equal(second.status,'active');
+ assert.ok(!state.alerts.some(a=>a.connectorId==='docker:a:qemu/101'&&a.status==='active'));
+});
+test('missing, revoked and offline connector readings cannot resolve a stored offline placeholder',async()=>{
+ const state={rules:[],alerts:[{id:'old',key:'connection:docker:a:node-agent',connectorId:'docker:a:node-agent',provider:'docker',status:'active'}],metrics:[]};
+ let connectors=[];
+ const monitor=createMonitor({}, {get:()=>state,mutate:fn=>fn(state)},async()=>[],async()=>({hosts:[],connectors}));
+ for(const reports of [[],[{id:'b',online:true}],[{id:'a',online:false}]]){connectors=reports;await monitor.sample(true);assert.equal(state.alerts[0].status,'active')}
+ connectors=[{id:'a',online:true}];await monitor.sample(true);assert.equal(state.alerts[0].status,'resolved');
+});

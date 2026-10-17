@@ -36,18 +36,26 @@ export async function runBackupJob(id,{query=pve,write=pveWrite}={}){
 }
 export async function toggleBackupJob(id){const job=await pve(`/cluster/backup/${encode(id)}`);await pveWrite(`/cluster/backup/${encode(id)}`,'PUT',{enabled:job.enabled===0||job.enabled===false?1:0});}
 export async function backupArchives(query=pve){
-  const nodes=await query('/nodes');const points=[],errors=[];let configs=[];
+  const nodes=await query('/nodes');
+  if(!Array.isArray(nodes)||nodes.some(n=>!n||typeof n.node!=='string'||!n.node))throw httpError('Unexpected backup node inventory',502);
+  const points=[],errors=[],coverage={nodes:nodes.length,checkedNodes:0,visibleStorage:0,checkedStorage:0};let configs=[];
+  if(!nodes.length)errors.push('No Proxmox nodes are visible to the backup inventory. Check the API token permissions.');
   try{configs=await query('/storage');if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
-  await Promise.all(nodes.filter(n=>n.status==='online').map(async n=>{
+  await Promise.all(nodes.map(async n=>{
+    if(n.status!=='online'){errors.push(`${n.node}: node is ${n.status||'unavailable'}; its backup archives were not checked.`);return;}
     let stores;
-    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`)}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
-    await Promise.all(stores.filter(s=>s.active).map(async store=>{
+    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){errors.push(`${n.node}: ${e.message}`);return;}
+    coverage.visibleStorage+=stores.length;
+    await Promise.all(stores.map(async store=>{
+      if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){errors.push(`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`);return;}
       try{const files=await query(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
+        if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');
+        coverage.checkedStorage++;
         for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,shared:(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===1||(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===true,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});
       }catch(e){errors.push(`${n.node}/${store.storage}: ${e.message}`);}
     }));
   }));
-  return {points,errors};
+  return {points,errors,coverage:{...coverage,complete:errors.length===0}};
 }
 export async function restoreArchive(id,body,{query=pve,archives=backupArchives,write=pveWrite}={}){
   const inventory=await archives();const point=inventory.points.find(p=>p.id===id);

@@ -12,7 +12,10 @@ export function overviewData(data:any,backup:any,node:string,search:string){
  const inventoryKnown=proxmox?.status==='reachable';
  const dockerKnown=(data.services||[]).filter((s:any)=>s.provider==='docker'||s.name==='docker').every((s:any)=>s.status==='reachable');
  const backupErrors=backup?.errors||[];
+ const backupKnown=!!backup&&!backupErrors.length&&(backup.archiveInventory?backup.archiveInventory.configured===true&&backup.archiveInventory.complete===true:true);
+ const backupDetail=!backup?'Not measured':backup.archiveInventory?.configured===false?'Connect Proxmox to discover archives':!backupKnown?'Inventory incomplete or unavailable':backup.archiveInventory?.visibleStorage===0?'No Proxmox backup storage visible':'Proxmox backup archives';
  const points=(backup?.points||[]).filter((p:any)=>!node||p.node===node);
+ const backupCount=backupKnown||points.length>0?points.length:null;
  const jobs=(backup?.jobs||[]).filter((j:any)=>!node||!j.node||j.node===node);
- return {nodes,guests,storage,inventory,resources,alerts,cpu:measured(reporting,'cpu'),memory:measured(reporting,'memoryPercent'),disk:measured(storage.filter((s:any)=>s.status==='online'),'usage'),inventoryKnown,dockerKnown,points,jobs,backupErrors};
+ return {nodes,guests,storage,inventory,resources,alerts,cpu:measured(reporting,'cpu'),memory:measured(reporting,'memoryPercent'),disk:measured(storage.filter((s:any)=>s.status==='online'),'usage'),inventoryKnown,dockerKnown,points,jobs,backupErrors,backupKnown,backupDetail,backupCount};
 }

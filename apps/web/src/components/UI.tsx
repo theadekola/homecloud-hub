@@ -33,8 +33,8 @@ export function Modal({open,onClose,title,children,success}:{open:boolean;onClos
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close.current();}
       if(event.key==='Tab'){const controls=focusable(),first=controls[0],last=controls.at(-1);if(!first){event.preventDefault();dialog.current?.focus();return;}if(event.shiftKey&&(document.activeElement===first||!dialog.current?.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey&&(document.activeElement===last||!dialog.current?.contains(document.activeElement))){event.preventDefault();first.focus();}}
     };
-    (focusable()[0]||dialog.current)?.focus();document.addEventListener('keydown',key);
-    return()=>{document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus();};
+    (focusable()[0]||dialog.current)?.focus({preventScroll:true});document.addEventListener('keydown',key);
+    return()=>{document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus({preventScroll:true});};
   },[open]);
   if(!open) return null;
   return <div className="modal-backdrop" onMouseDown={onClose}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>
@@ -51,7 +51,7 @@ export function usePopupSuccess(open:boolean){
 export const CONNECTION_SUCCESS_DELAY=2000;
 export function ConnectionSuccess({message,onDone}:{message:string;onDone:()=>void}){
  const done=useRef(onDone),notice=useRef<HTMLDivElement>(null);done.current=onDone;
- useEffect(()=>{const timer=setTimeout(()=>done.current(),CONNECTION_SUCCESS_DELAY);notice.current?.focus();const modal=notice.current?.closest('.modal');if(modal)modal.scrollTop=0;return()=>clearTimeout(timer)},[message]);
+ useEffect(()=>{const timer=setTimeout(()=>done.current(),CONNECTION_SUCCESS_DELAY);notice.current?.focus({preventScroll:true});const modal=notice.current?.closest('.modal');if(modal)modal.scrollTop=0;return()=>clearTimeout(timer)},[message]);
  return <div ref={notice} tabIndex={-1} className="connection-success" role="status" aria-live="polite"><CheckCircle2 size={32} aria-hidden="true"/><strong>{message}</strong><small>Closing automatically…</small></div>;
 }
 

@@ -322,8 +322,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  },true);
  read('/docker/events',async req=>{const hours=integer(req.query.hours||1,'Hours',1,168),until=Math.floor(Date.now()/1000);return {events:await docker(`/events?since=${until-hours*3600}&until=${until}`),since:until-hours*3600,until};});
  read('/backups',async()=>{
-   const result=await providerReads([['jobs','proxmox',backupJobs]]);result.points=[];
-   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
+   const result=await providerReads([['jobs','proxmox',backupJobs]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
+   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
    return result;
  });
  read('/schedules',()=>providerReads([['items','proxmox',backupJobs],['truenas','truenas',()=>truenas('pool.snapshottask.query')]]));

@@ -5,3 +5,11 @@ test('services search never changes scoped container inventory',()=>{const d=ove
 test('node ownership filters new and historical storage alerts and backups including global jobs',()=>{const d=overviewData(sample,{points:[{node:'n1'},{node:'n2'}],jobs:[{node:'n1'},{node:'n2'},{name:'global'}]},'n1','');assert.deepEqual(d.alerts.map(a=>a.id),['old','new']);assert.equal(d.points.length,1);assert.equal(d.jobs.length,2);});
 test('resource averages exclude offline rows and return unknown when nothing reports',()=>{const d=overviewData(sample,null,'','');assert.equal(d.cpu,10);assert.equal(d.memory,20);assert.equal(d.disk,60);const offline=overviewData(sample,null,'n2','');assert.equal(offline.cpu,null);assert.equal(offline.memory,null);assert.equal(offline.disk,null);});
 test('failed and partial readings never establish complete inventory',()=>{assert.equal(overviewData({...sample,services:[{name:'proxmox',status:'partial'}]},null,'','').inventoryKnown,false);assert.equal(overviewData({...sample,services:[{name:'proxmox',status:'error'}]},null,'','').inventoryKnown,false);assert.equal(overviewData({...sample,services:[...sample.services,{provider:'docker',status:'error'}]},null,'','').dockerKnown,false);});
+
+test('backup summary requires complete configured archive coverage and explains an empty visible scope',()=>{
+ const base={points:[],jobs:[],errors:[]};
+ const unconfigured=overviewData(sample,{...base,archiveInventory:{configured:false,complete:false}},'','');assert.equal(unconfigured.backupKnown,false);assert.match(unconfigured.backupDetail,/Connect Proxmox/);
+ const incomplete=overviewData(sample,{...base,archiveInventory:{configured:true,complete:false}},'','');assert.equal(incomplete.backupKnown,false);assert.match(incomplete.backupDetail,/incomplete/);
+ const empty=overviewData(sample,{...base,archiveInventory:{configured:true,complete:true,visibleStorage:0}},'','');assert.equal(empty.backupKnown,true);assert.match(empty.backupDetail,/No Proxmox backup storage visible/);
+ const measured=overviewData(sample,{...base,points:[{node:'n1'}],archiveInventory:{configured:true,complete:true,visibleStorage:1}},'','');assert.equal(measured.backupKnown,true);assert.equal(measured.points.length,1);assert.equal(measured.backupDetail,'Proxmox backup archives');
+});

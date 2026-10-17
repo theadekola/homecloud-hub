@@ -39,3 +39,15 @@ test('backup refresh still runs when a forced dashboard sample fails',async()=>{
  let backupReads=0;const page=await mounted('pages/Overview.tsx',{},async p=>{if(p==='/auth/me')return {user:{role:'viewer'}};if(p==='/backups'){backupReads++;return {points:[],jobs:[]}}if(p==='/dashboard?refresh=1')throw Error('Forced sample failed');return sample();});
  try{await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(backupReads,2);assert.ok(page.container.querySelector('[role=alert]').textContent.includes('Forced sample failed'));}finally{await page.close();}
 });
+
+test('overview does not report zero backups from an unconfigured or incomplete archive inventory',async()=>{
+ for(const configured of [false,true]){
+  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[],jobs:[],errors:[],archiveInventory:{configured,complete:false}}:sample());
+  try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'Unknown');assert.match(stat(page,'Backups').textContent,configured?/incomplete/:/Connect Proxmox/)}finally{await page.close()}
+ }
+});
+
+test('overview retains discovered backups when another storage or node is unavailable',async()=>{
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[{node:'n1'}],jobs:[],errors:['n2: node is offline; archives were not checked.'],archiveInventory:{configured:true,complete:false}}:sample());
+ try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/incomplete/);assert.ok([...page.container.querySelectorAll('[role=alert]')].some(e=>e.textContent.includes('n2: node is offline')))}finally{await page.close()}
+});

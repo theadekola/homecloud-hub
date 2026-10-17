@@ -135,3 +135,18 @@ the editor and its draft. Draft-only connection tests keep unsaved settings open
 until Save Configuration is selected. Pending provider jobs are not labelled as
 completed configurations. Closing or reopening an editor clears its previous
 success state.
+
+## Overview backup inventory
+
+The Overview Backups card counts stored Proxmox backup archives visible through
+its configured API token. Schedules, VM snapshots, TrueNAS snapshots and Docker
+volumes are separate resources and are not added to this count. The history-period
+selector controls resource charts, not backup-archive age.
+
+A zero count requires a successful scan. Offline nodes, inactive/disabled backup
+storage, permission errors and malformed provider responses mark the inventory
+incomplete and show Unknown. When online nodes report no backup storage, the card
+explicitly says no Proxmox backup storage is visible. Verify the token's storage
+access and compare the Backups/Restore Points views with the provider's own archive
+listing before treating a count as proof of protection. Discovery does not verify
+archive integrity or a successful restore.

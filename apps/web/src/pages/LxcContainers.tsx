@@ -1,3 +1,4 @@
+import Pagination from '../components/Pagination';
 import {OSIcon} from '../components/BrandIcon';
 import GuestCreateFields,{CreationHa} from '../components/GuestCreateFields';
 import {inventoryComplete} from '../proxmox-state';
@@ -15,6 +16,7 @@ const sum=(rows:any[],key:string)=>rows.length&&rows.every(row=>typeof row[key]=
 const tone=(status:string)=>status==='running'?'green':status==='stopped'?'red':'gray';
 
 export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:{navigation?:import('react').ReactNode;data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
+ const [rowsPerPage,setRowsPerPage]=useState(12);
  const [params,setParams]=useSearchParams();
  const containers=data?.lxc||[],nodes=data?.nodes||[],storage=data?.storage||[],operator=['operator','admin','owner'].includes(role||'');
  const [selected,setSelected]=useState<string>(containers[0]?.id||''),[search,setSearch]=useState(''),[node,setNode]=useState('all'),[status,setStatus]=useState('all'),[layout,setLayout]=useState<'list'|'grid'>('list'),[page,setPage]=useState(1);
@@ -25,7 +27,7 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:
  const filtered=useMemo(()=>containers.filter((ct:any)=>(node==='all'||ct.node===node)&&(status==='all'||ct.status===status)&&`${ct.id} ${ct.name} ${ct.node}`.toLowerCase().includes(search.toLowerCase())),[containers,node,status,search]);
  useEffect(()=>{if(!filtered.some((r:any)=>r.id===selected))setSelected(filtered[0]?.id||'');},[filtered,selected]);
  useEffect(()=>setPage(1),[node,status,search]);
- const pages=Math.max(1,Math.ceil(filtered.length/12)),visible=filtered.slice((page-1)*12,page*12),current=filtered.find((ct:any)=>ct.id===selected);
+ const pages=Math.max(1,Math.ceil(filtered.length/rowsPerPage)),visible=filtered.slice((page-1)*rowsPerPage,page*rowsPerPage),current=filtered.find((ct:any)=>ct.id===selected);
  useEffect(()=>setPage(p=>Math.max(1,Math.min(p,pages))),[pages]);
  const destination=createNode||nodes[0]?.name||'';
  useEffect(()=>{setTemplates(null);setTemplateError('');if(modal!=='create'||!destination||!operator)return;const controller=new AbortController();setTemplateLoading(true);api<any>(`/proxmox/ct-templates/${encodeURIComponent(destination)}`,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted)setTemplates(result)}).catch(e=>{if(!controller.signal.aborted)setTemplateError(e.message)}).finally(()=>{if(!controller.signal.aborted)setTemplateLoading(false)});return()=>controller.abort();},[modal,destination,operator,templateRevision]);
@@ -51,7 +53,7 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:
     <div className="vm-filters"><select aria-label="Filter containers by node" value={node} onChange={e=>setNode(e.target.value)}><option value="all">All Nodes</option>{nodes.map((item:any)=><option key={item.name}>{item.name}</option>)}</select><select aria-label="Filter containers by status" value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All Status</option>{[...new Set(containers.map((ct:any)=>ct.status).filter(Boolean))].map((value:any)=><option key={value}>{value}</option>)}</select><label className="vm-search"><Search size={14}/><input aria-label="Search containers" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search containers…"/></label><div className="vm-layout"><button aria-label="List view" className={layout==='list'?'active':''} onClick={()=>setLayout('list')}><Columns3 size={15}/></button><button aria-label="Grid view" className={layout==='grid'?'active':''} onClick={()=>setLayout('grid')}><Grid2X2 size={15}/></button></div></div>
     {layout==='list'?<div className="table-wrap"><table className="vm-table"><thead><tr><th>ID</th><th>Name</th><th>Node</th><th>Status</th><th>CPU</th><th>Memory</th><th>Root disk</th><th>Uptime</th></tr></thead><tbody>{visible.map((ct:any)=><tr key={ct.id} className={current?.id===ct.id?'selected':''} onClick={()=>setSelected(ct.id)}><td>{ct.id}</td><td><span className="vm-row-name"><Box size={15}/><b>{ct.name}</b></span></td><td>{ct.node}</td><td><Badge tone={tone(ct.status)}>{ct.status||'Unknown'}</Badge></td><td>{percent(ct.cpu)}</td><td><Meter value={ct.memoryPercent} text={ct.memoryTotal!=null?`${bytes(ct.memory)} / ${bytes(ct.memoryTotal)}`:bytes(ct.memory)}/></td><td><Meter value={ct.diskPercent} text={ct.diskTotal!=null&&ct.disk!=null?`${bytes(ct.disk)} used / ${bytes(Math.max(0,ct.diskTotal-ct.disk))} free`:bytes(ct.disk)}/></td><td>{duration(ct.uptime)}</td></tr>)}</tbody></table></div>:<div className="vm-card-grid">{visible.map((ct:any)=><button key={ct.id} className={current?.id===ct.id?'selected':''} onClick={()=>setSelected(ct.id)}><Box size={25}/><span><b>{ct.name}</b><small>CT {ct.id} · {ct.node}</small></span><Badge tone={tone(ct.status)}>{ct.status}</Badge><small>CPU {percent(ct.cpu)} · Memory {percent(ct.memoryPercent)}</small></button>)}</div>}
     {!visible.length&&<p className="vm-empty">No containers match these filters.</p>}
-    <div className="vm-pagination"><span>Showing {visible.length?`${(page-1)*12+1}–${(page-1)*12+visible.length}`:'0'} of {filtered.length} containers</span><div><button disabled={page===1} onClick={()=>setPage(value=>value-1)}>‹</button><b>{page} / {pages}</b><button disabled={page===pages} onClick={()=>setPage(value=>value+1)}>›</button></div></div>
+    <Pagination className="vm-pagination" label="Containers" total={filtered.length} page={page-1} pageSize={rowsPerPage} onPageChange={next=>setPage(next+1)} onPageSizeChange={setRowsPerPage}/>
    </Card>
    {current?<CtDetails key={`${current.node}:${current.id}`} ct={current} role={role} clusterUrl={clusterUrl} busy={pending} run={run} console={openConsole} snapshot={()=>{setOperationTarget({...current});setModal('snapshot')}} backup={()=>{setOperationTarget({...current});setModal('backup')}}/>:<Card><p className="vm-empty">No container selected.</p></Card>}
   </div>

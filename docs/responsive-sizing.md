@@ -58,3 +58,23 @@ checking these layouts. Visit each primary route and its tab query strings at
    Real Safari/iOS keyboard and browser zoom behavior still requires device QA.
 
 Run `npm test` and `npm run build` after changing shared sizing or its consumers.
+
+## List pagination
+
+Use `components/Pagination.tsx` for list footers. Its shared stylesheet is loaded
+from `main.tsx` after the page styles. Pass a zero-based page, the filtered row
+count, and the same page size used to slice the visible rows. One-based lists
+convert their page at the component boundary.
+
+All footers show the item range, Previous, page position, Next, and a page-size
+selector. Standard choices are 10, 25 and 50 rows; the current list size remains
+available to preserve existing defaults. Changing the size resets to the first
+page. Empty inventories show 0–0 of 0 and disable navigation. A shrinking list
+clamps its page before slicing rows.
+
+The five controls share a row in wide cards. At a container width of 560px or
+less, range and page size appear above the three navigation controls. This also
+works in narrow desktop panels. Controls have a 44px minimum height, named
+navigation regions, visible keyboard focus, and 16px select text on mobile to
+avoid Safari focus zoom. Keep unrelated footer actions in the optional child
+slot instead of inserting them among the pagination controls.

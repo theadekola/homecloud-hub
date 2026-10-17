@@ -34,3 +34,8 @@ test('a valid node scan with no visible backup storage reports its limited scope
  const result=await backupArchives(async path=>path==='/nodes'?[{node:'node01',status:'online'}]:[]);
  assert.equal(result.coverage.complete,true);assert.equal(result.coverage.checkedNodes,1);assert.equal(result.coverage.visibleStorage,0);assert.deepEqual(result.points,[]);
 });
+
+test('unavailable mount-point storage includes actionable coverage without reading an unmounted path',async()=>{
+ const calls=[];const result=await backupArchives(async path=>{calls.push(path);if(path==='/nodes')return [{node:'node02',status:'online'}];if(path==='/storage')return [{storage:'media-storage',type:'dir',is_mountpoint:1,path:'/mnt/pve/media-storage'}];return [{storage:'media-storage',active:0}];});
+ assert.equal(result.coverage.complete,false);assert.equal(result.coverage.checkedStorage,0);assert.equal(result.coverage.issues[0].code,'storage-unavailable');assert.match(result.coverage.issues[0].help,/\/mnt\/pve\/media-storage.*mounted on node02/);assert.match(result.coverage.issues[0].help,/Do not disable/);assert.ok(!calls.some(path=>path.includes('/content')));
+});

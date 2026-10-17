@@ -41,3 +41,7 @@ test('unread recent activity never contributes to the bell badge',()=>{
  state.alerts[0].status='acknowledged';assert.equal(feed.read(user).badgeCount,1);
  state.alerts[0].status='resolved';assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).unreadCount,1);
 });
+
+test('attention summary separates monitoring alerts from updates before preview truncation',()=>{
+ const state={alerts:Array.from({length:60},(_,i)=>({id:String(i),status:i%2?'active':'acknowledged',severity:'critical'}))};const feed=createHeaderNotifications({get:()=>state,mutate:fn=>fn(state)},()=>[{id:'node1',name:'node1',update:{available:true,version:5}}]);const result=feed.read(owner,{enabled:true,available:true});assert.equal(result.attention.length,50);assert.equal(result.attentionCount,62);assert.equal(result.alertCount,60);assert.equal(result.updateCount,2);assert.equal(result.criticalCount,60);assert.equal(feed.read(user).attentionCount,60);
+});

@@ -64,3 +64,23 @@ test('LXC information does not display VM permission repair after successful dis
   assert.ok(page.container.textContent.includes('VM 101: Proxmox HTTP 403'));assert.ok(page.container.textContent.includes('Manage Guest Connections'));assert.ok(page.container.querySelector('.discovery-notes'));
  }finally{await page.close()}
 });
+
+test('Overview uses the bell attention total and links pending connector updates to setup',async()=>{
+ const updates=[{id:'update',kind:'update',severity:'info',title:'Connector update available: node02',message:'Update the paired host',link:'/settings?tab=Connections&connector=node02'}];
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/header-notifications'?{attentionCount:2,updateCount:2,criticalCount:0,attention:updates}:p==='/backups'?{points:[],jobs:[]}:sample());
+ try{assert.equal(stat(page,'Alerts').querySelector('strong').textContent,'2');assert.match(stat(page,'Alerts').textContent,/0 Critical.*2 Updates/);assert.equal(stat(page,'Alerts').getAttribute('href'),updates[0].link);assert.ok(page.container.textContent.includes(updates[0].title));assert.match(page.container.querySelector('.overview-toolbar').textContent,/2 item\(s\) need attention/);}finally{await page.close()}
+});
+test('backup archive coverage and job coverage are independent and shared archives count once',async()=>{
+ const point={shared:true,storage:'shared',volid:'shared:backup/one'};
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/header-notifications'?{attention:[],attentionCount:0,updateCount:0,criticalCount:0}:p==='/backups'?{points:[{...point,node:'n1'},{...point,node:'n2'}],jobs:[{enabled:1}],errors:['Backup jobs denied'],archiveInventory:{configured:true,complete:true},providerInventory:{jobs:{configured:true,complete:false}}}:sample());
+ try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.ok(page.container.textContent.includes('Unknown configured jobs'));}finally{await page.close()}
+});
+test('unmounted backup storage is actionable and does not show a healthy green card or hide known jobs',async()=>{
+ const message='node02/media-storage: backup storage is inactive, disabled or unavailable; archives were not checked.';
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/header-notifications'?{attention:[],attentionCount:0,updateCount:0,criticalCount:0}:p==='/backups'?{points:[],jobs:[{enabled:1}],errors:[message],providerInventory:{jobs:{configured:true,complete:true}},archiveInventory:{configured:true,complete:false,issues:[{node:'node02',storage:'media-storage',code:'storage-unavailable',help:'Confirm /mnt/pve/media-storage is mounted on node02.'}]}}:sample());
+ try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'Unknown');assert.match(stat(page,'Backups').textContent,/node02\/media-storage unavailable/);assert.ok(stat(page,'Backups').classList.contains('needs-attention'));assert.ok(page.container.textContent.includes('1 configured jobs'));assert.ok(page.container.querySelector('.backup-inventory-notice').textContent.includes('/mnt/pve/media-storage'));assert.equal(page.container.querySelector('.backup-inventory-notice a').getAttribute('href'),'/backups?tab=Destinations');assert.match(page.container.querySelector('.overview-toolbar').textContent,/Backup inventory needs attention/);}finally{await page.close()}
+});
+test('unavailable notification reads do not report zero alerts',async()=>{
+ const page=await mounted('pages/Overview.tsx',{},async p=>{if(p==='/header-notifications')throw Error('Notification read failed');return p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[],jobs:[]}:sample()});
+ try{assert.equal(stat(page,'Alerts').querySelector('strong').textContent,'Unknown');assert.match(page.container.textContent,/Notification read failed/);}finally{await page.close()}
+});

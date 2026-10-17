@@ -33,3 +33,9 @@ test('registered storage missing from a node response remains visible without fa
 test('unknown node assignment does not authorize storage configuration changes',async()=>{
  const result=await storageInventory(async path=>path==='/nodes'?[{node:'node01'}]:path==='/storage'?[]:[{storage:'unlisted',active:1,total:100,used:20,avail:80}]);assert.equal(result.resources[0].scopeVerified,false);assert.equal(result.resources[0].scope,'unknown');assert.equal(result.resources[0].status,'online');
 });
+
+
+test('storage registered on an unreachable node stays visible with unavailable measurements',async()=>{
+ const result=await storageInventory(async path=>{if(path==='/nodes')return [{node:'node01'},{node:'node02'}];if(path==='/storage')return [{storage:'backup-ssd',nodes:'node02',type:'dir',shared:0,path:'/mnt/backup'}];if(path.includes('/node02/'))throw Error('Node unreachable');return []});
+ assert.equal(result.resources.length,1);assert.equal(result.resources[0].id,'node02/backup-ssd');assert.equal(result.resources[0].status,'unknown');assert.equal(result.resources[0].capacity,null);assert.match(result.resources[0].availabilityReason,/Node unreachable/);assert.equal(result.coverage.complete,false);assert.deepEqual(result.coverage.missingNodes,['node02']);
+});

@@ -21,7 +21,12 @@ export async function storageInventory(query=pve){
     resources.push({id:`${node.node}/${row.storage}`,name:row.storage,node:node.node,type:row.type||config.type||'Unknown',shared:flag(row.shared??config.shared),...placement,scopeVerified:!!config.storage,scope:config.storage?placement.scope:'unknown',status,availabilityReason,reported:row.reported!==false,capacity,used,available,usage:capacity!==null&&used!==null?used/capacity*100:null,content:row.content||config.content||null,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
    }
    readNodes.push(node.node);
-  }catch(e){errors.push(`${node.node} storage: ${e.message}`);}
+  }catch(e){errors.push(`${node.node} storage: ${e.message}`);
+   // Keep assigned registrations visible even if the node cannot be queried.
+   for(const config of configs){const placement=storagePlacement(config,node.node);if(!placement.applicable)continue;
+    resources.push({id:`${node.node}/${config.storage}`,name:config.storage,node:node.node,type:config.type||'Unknown',shared:[1,true,'1'].includes(config.shared)?true:[0,false,'0'].includes(config.shared)?false:null,...placement,scopeVerified:true,status:[1,true,'1'].includes(config.disable)?'disabled':'unknown',reported:false,capacity:null,used:null,available:null,usage:null,content:config.content||null,availabilityReason:`Storage is registered for ${node.node}, but its measurements could not be read: ${e.message}`,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
+   }
+  }
  }));
  const missingNodes=nodes.map(n=>n.node).filter(n=>!readNodes.includes(n)),coverage={complete:!errors.length&&nodes.length>0&&missingNodes.length===0,expectedNodes:nodes.map(n=>n.node),readNodes,missingNodes};
  return {resources,errors,coverage,nodes:nodes.map(n=>n.node),reportedNodes:[...new Set(resources.map(r=>r.node))],sampledAt:new Date().toISOString()};

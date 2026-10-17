@@ -30,7 +30,15 @@ export function createGuestPermissionRepair({config=clusterConfig,query=pve,tran
  let busy=false;
  const visible=async c=>{const rows=await query('/cluster/resources?type=vm',{},c);if(!Array.isArray(rows))throw fail('Proxmox VM inventory is unavailable.',502);return rows.filter(r=>r.type==='qemu'&&Number.isSafeInteger(Number(r.vmid))&&r.node).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,status:r.status}));};
  return {
-  async inspect(){const c=config(),connection=target(c);return {...connection,connectionId:identity(c),guests:await visible(c)};},
+  async inspect(){
+   const c=config(),connection=target(c),binding=identity(c),guests=await visible(c),checked=[];
+   for(let i=0;i<guests.length;i+=4)checked.push(...await Promise.all(guests.slice(i,i+4).map(async guest=>{
+    try{const path='/vms/'+guest.id,current=permissions(await query('/access/permissions?'+new URLSearchParams({path}),{},c),path);return {...guest,verified:Object.hasOwn(current,privilege)};}
+    catch{return {...guest,verified:false,permissionError:'Current guest access could not be verified. Recheck this VM.'};}
+   })));
+   if(identity(config())!==binding)throw fail('The Proxmox connection changed. Reopen the repair window.',409);
+   return {...connection,connectionId:binding,guests:checked.filter(g=>!g.verified),verifiedCount:checked.filter(g=>g.verified).length,totalCount:checked.length};
+  },
   async repair(input){
    if(busy)throw fail('A guest permission repair is already running.',409);
    const c=config(),connection=target(c),binding=identity(c);

@@ -1839,3 +1839,21 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .monitor-layout>.monitor-sidebar{grid-area:sidebar}
 .monitor-layout.without-sidebar{grid-template-areas:"stats" "main"}
 @media(max-width:950px){.monitor-layout{grid-template-areas:"stats" "main" "sidebar"}.monitor-layout.without-sidebar{grid-template-areas:"stats" "main"}}
+
+/* Match Proxmox panels within each desktop row; let mobile panels size naturally. */
+@media(min-width:951px){
+ .pve-page .pve-grid{align-items:stretch}
+ .pve-page .pve-grid>.card{height:100%;align-self:stretch;box-sizing:border-box}
+}
+@media(min-width:1251px){
+ .vm-manager .vm-workspace{align-items:stretch}
+ .vm-manager .vm-workspace>.vm-list-card{height:100%;align-self:stretch;box-sizing:border-box;display:flex;flex-direction:column;margin:0}
+ .vm-manager .vm-workspace>.vm-detail-stack{height:auto;align-self:stretch;min-height:0}
+ .vm-manager .vm-workspace>.vm-list-card>.table-wrap{flex:1;min-height:0}
+ .vm-manager .vm-workspace>.vm-list-card>.vm-pagination{margin-top:0;padding-top:12px}
+}
+.pve-network .network-workspace,.pve-network .network-lower{align-items:stretch}
+.pve-network .network-workspace>.card,.pve-network .network-lower>.card{align-self:stretch;height:100%;box-sizing:border-box;margin:0}
+/* Expand the scroll viewport into spare card space, immediately above pagination. */
+.task-manager .task-workspace>.vm-list-card>.table-wrap{flex:1 1 auto;max-height:none;min-height:0}
+.task-manager .task-workspace>.vm-list-card>.vm-pagination{margin-top:0;padding-top:12px}

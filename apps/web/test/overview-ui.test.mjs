@@ -51,3 +51,16 @@ test('overview retains discovered backups when another storage or node is unavai
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[{node:'n1'}],jobs:[],errors:['n2: node is offline; archives were not checked.'],archiveInventory:{configured:true,complete:false}}:sample());
  try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/incomplete/);assert.ok([...page.container.querySelectorAll('[role=alert]')].some(e=>e.textContent.includes('n2: node is offline')))}finally{await page.close()}
 });
+
+
+test('LXC information does not display VM permission repair after successful discovery',async()=>{
+ const note='LXC lifecycle and resource measurements are available through Proxmox. For application inventory, use a paired Proxmox node under Docker. QEMU Guest Agent permissions apply only to VMs.';
+ let limitations=[];
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/backups'?{points:[],jobs:[]}:({...sample(),discoveryNotes:[note],discoveryLimitations:limitations}));
+ try{
+  const info=page.container.querySelector('.discovery-notes');assert.ok(info.textContent.includes(note));assert.equal(info.querySelector('a').getAttribute('href'),'/docker');
+  assert.ok(!page.container.textContent.includes('Restore guest discovery'));assert.ok(!page.container.textContent.includes('Fix Guest Discovery Access'));assert.ok(!page.container.textContent.includes('Guest discovery access ('));
+  limitations=['VM 101: Proxmox HTTP 403'];await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));
+  assert.ok(page.container.textContent.includes('VM 101: Proxmox HTTP 403'));assert.ok(page.container.textContent.includes('Fix Guest Discovery Access'));assert.ok(page.container.querySelector('.discovery-notes'));
+ }finally{await page.close()}
+});

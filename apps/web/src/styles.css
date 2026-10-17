@@ -1857,3 +1857,18 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 /* Expand the scroll viewport into spare card space, immediately above pagination. */
 .task-manager .task-workspace>.vm-list-card>.table-wrap{flex:1 1 auto;max-height:none;min-height:0}
 .task-manager .task-workspace>.vm-list-card>.vm-pagination{margin-top:0;padding-top:12px}
+
+/* Keep network analytics panels level within their shared rows. */
+.interface-focused .network-lower,.network-devices .device-summary,.network-routing .device-summary,.network-traffic .device-summary,.network-dns .dns-bottom{align-items:stretch}
+.interface-focused .network-lower>.card,.network-devices .device-summary>.card,.network-routing .device-summary>.card,.network-traffic .device-summary>.card,.network-dns .dns-bottom>.card{height:100%;align-self:stretch;box-sizing:border-box;margin:0}
+.network-routing .device-workspace>.card{height:100%;align-self:stretch;box-sizing:border-box;margin:0}
+.network-overview .network-layout>aside>.network-health-panel{flex:1;margin:0;height:100%;box-sizing:border-box}
+@media(min-width:1051px){
+ .network-dns .device-workspace>div,.network-dns .device-workspace>aside{display:contents}
+ .network-dns .device-workspace>div>.card:first-child{grid-column:1;grid-row:1}
+ .network-dns .device-workspace>aside>.card:first-child{grid-column:2;grid-row:1}
+ .network-dns .device-workspace>div>.card:last-child{grid-column:1;grid-row:2}
+ .network-dns .device-workspace>aside>.card:last-child{grid-column:2;grid-row:2}
+ .network-dns .device-workspace .card{height:100%;align-self:stretch;box-sizing:border-box;margin:0}
+ .network-dns .dns-bottom{grid-template-columns:minmax(0,2.4fr) minmax(310px,1fr)}
+}

@@ -36,7 +36,7 @@ export function createDockerFleet({hosts=agentHosts,read=dockerSnapshot,nodes=()
     if(!pending.length&&!active)resolve();
    };pump();
   });
-  return {hosts:results.sort((a,b)=>a.id.localeCompare(b.id))};
+  return {hosts:results.sort((a,b)=>a.id.localeCompare(b.id)),connectors:(registered||[]).map(n=>({id:n.id,online:n.online===true,lastSeen:n.lastSeen||null}))};
  };
 }
 export const dockerFleet=createDockerFleet({nodes:agentNodes});

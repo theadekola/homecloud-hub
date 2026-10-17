@@ -19,10 +19,10 @@ class Services(unittest.TestCase):
   root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
   def run(args,**kw):
    calls.append(args)
-   if args[0]=='journalctl':return json.dumps({'MESSAGE':'token=secret private-token https://private-hub/api','__REALTIME_TIMESTAMP':'123'})
+   if args[0]=='journalctl':return '\n'.join(json.dumps({'MESSAGE':message,'__REALTIME_TIMESTAMP':'123'}) for message in ['token=secret private-token https://private-hub/api','Authorization: Bearer header-credential','password=multi word credential','API Key: provider-key'])
    return STATUS
   result=m.diagnose(p,root,run)
-  self.assertEqual(result['version'],5);self.assertTrue(result['active']);self.assertNotIn('private-token',json.dumps(result));self.assertNotIn('private-hub',json.dumps(result));self.assertNotIn('token=secret',json.dumps(result));self.assertNotIn('systemctl start',str(calls));self.assertNotIn('restart',str(calls));self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes())
+  self.assertEqual(result['version'],5);self.assertTrue(result['active']);self.assertNotIn('private-token',json.dumps(result));self.assertNotIn('private-hub',json.dumps(result));self.assertNotIn('token=secret',json.dumps(result));self.assertNotIn('header-credential',json.dumps(result));self.assertNotIn('multi word credential',json.dumps(result));self.assertNotIn('provider-key',json.dumps(result));self.assertNotIn('systemctl start',str(calls));self.assertNotIn('restart',str(calls));self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes())
  def test_guest_docker_uses_exact_guest_and_fixed_commands(self):
   root,p=self.fixture()
   for target in ('lxc/101','qemu/100','node'):

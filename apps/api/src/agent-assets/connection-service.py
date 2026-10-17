@@ -73,7 +73,8 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
                 entry=json.loads(line);message=str(entry.get('MESSAGE',''))
                 for secret in (paired.get('token'),paired.get('url')):
                     if secret: message=message.replace(str(secret),'[redacted]')
-                message=re.sub(r'(?i)(bearer\s+|(?:password|token|secret|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+',r'\1[redacted]',message)
+                message=re.sub(r'(?i)((?:password|token|secret|authorization|api[ _-]?key)\s*[:=]\s*)[^\r\n]+',r'\1[redacted]',message)
+                message=re.sub(r'(?i)(bearer\s+)[^\s,;]+',r'\1[redacted]',message)
                 message=re.sub(r'https?://\S+','[endpoint]',message)
                 lines.append({'time':str(entry.get('__REALTIME_TIMESTAMP',''))[:20],'message':message[:300]})
             result['logs']=lines

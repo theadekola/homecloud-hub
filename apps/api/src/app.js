@@ -1,3 +1,4 @@
+import {createGuestConnectionReader} from './guest-connections.js';
 import {guestPermissionRepair} from './guest-permissions.js';
 import {resetGuestDiscovery} from './guest-discovery.js';
 import {notificationIds} from './notification-channels.js';
@@ -53,7 +54,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig})}={}){
 
  const app=express(),readCache=createReadCache();
  app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
@@ -103,6 +104,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
  app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
  app.get('/api/connections/health',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');if(req.query.refresh==='1')void monitor.sample(true).catch(()=>{});const snapshot=await monitor.sample();res.json(connectionHealth({snapshot,cluster:publicCluster(clusterConfig()),direct:publicDocker(),nodes:agentNodes(),refreshing:!!monitor.isRefreshing?.(),configurations:Object.fromEntries(['truenas'].map(id=>{const c=configuration.resolve(id);return [id,{source:configuration.publicConfig(id).source,endpoint:c.TRUENAS_URL||null}]}))}));});
+ app.get('/api/connections/proxmox/guests',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestConnectionReader(req.query.refresh==='1'||req.headers['x-homecloud-refresh']==='1'));});
  app.get('/api/connections/proxmox/guest-permissions',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestPermissions.inspect());});
  app.post('/api/connections/proxmox/guest-permissions',authorize('owner'),loginLimiter,async(req,res)=>{
   res.set('Cache-Control','no-store');let result;
@@ -171,6 +173,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    await audit(req,label,resource,{result:result??null},status);
    res.json({ok:true,result,message:status==='queued'?'Task accepted. Check task history for completion.':'Operation completed.'});
  });
+ action('post','/node-agents/guest/agent','owner','guest.install-agent',req=>bootstrapGuest({...req.body,purpose:'guest-agent'}));
  action('post','/node-agents/guest/bootstrap','owner','guest.install-agent-docker',req=>bootstrapGuest(req.body));
  action('post','/node-agents/guest/setup','owner','guest.install-docker',req=>installAgentHost(required(req.body.host,'Guest host')),true);
  const snapshot=async(provider,force=false)=>{

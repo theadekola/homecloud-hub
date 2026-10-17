@@ -18,7 +18,7 @@ export default function PairConnector({kind,onPaired,onComplete}:{kind:'proxmox'
   if(standalone){const id=node.id+':node';await api(`/docker/hosts/${encodeURIComponent(id)}/verify`);setConnected(id);}
   else{setConnected(node.id);}
  }catch(e:any){setError(e.message)}finally{setBusy(false)}};
- if(connected)return <ConnectionSuccess message={standalone?'Docker host paired and connection verified successfully.':'Proxmox node paired and connection verified successfully.'} onDone={()=>{onPaired?.();onComplete?.();if(standalone){setDockerHost(connected);navigate('/docker')}else if(!onComplete){setConnected('');setPairing(null)}}}/>;
+ if(connected)return <ConnectionSuccess message={standalone?'Docker host paired and connection verified successfully.':'Proxmox node paired and connection verified successfully.'} onDone={()=>{onPaired?.();onComplete?.();if(standalone&&!onComplete){setDockerHost(connected);navigate('/docker')}else if(!onComplete){setConnected('');setPairing(null)}}}/>;
  return <div className="node-pairing"><h3>{standalone?'Pair Docker Host':'Pair Proxmox Node'}</h3>
  <p>{standalone?'Run the installer on your Linux Docker server. It connects outward to HomeCloud and uses the local Docker socket. No Docker API port or client certificates are needed.':'Install once on each Proxmox node as root in its Shell. Do not run this node installer inside a VM or CT.'}</p>
  <p className="muted">The connector runs as root and permits authorized Docker management. Use a trusted HomeCloud server. Removing the connection revokes access; uninstall its service separately on the host.</p>

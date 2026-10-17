@@ -106,7 +106,7 @@ Open **Settings → Connections → Add Connection**.
 
 For Proxmox pairing, install one connector per node. Linux CT access uses `pct exec`; Linux VM access uses `qm guest exec`. VMs need the QEMU Guest Agent enabled in Proxmox and installed/running inside the VM. Guests need `/bin/sh`, `curl`, `base64` and the local Docker socket. Windows guests are not provisioned by this Linux Docker setup flow.
 
-**Connect** verifies an existing Engine. **Install & Connect** supports eligible Debian/Ubuntu guests, reuses existing Docker installations, and asks for explicit approval and target credentials. A CT configuration change may require a restart; HomeCloud does not restart guests automatically for setup. Use verified SSH bootstrap where the UI offers it for missing guest access.
+**Open** verifies an existing Engine. Under **Settings → Connections → Needs Setup → Optional Docker guest setup**, **Set Up Docker** supports eligible Debian/Ubuntu guests, reuses existing Docker installations, and asks for explicit approval and target credentials. A CT configuration change may require a restart; HomeCloud does not restart guests automatically for setup. Use verified SSH bootstrap where the UI offers it for missing guest access.
 
 Use dedicated provider identities with only the privileges needed. Proxmox guest command execution needs a separate scoped privilege, not just the read role. See [connection recovery](docs/connections-and-health.md) and [warning recovery](docs/monitoring-warning-recovery.md).
 
@@ -118,9 +118,9 @@ Provider monitoring normally samples every 30 seconds; read caches and UI pollin
 
 The header bell counts **unresolved alerts only**, including acknowledged conditions that have not recovered. Recent activity stays in the popup without increasing the badge. Marking activity read does not resolve alerts.
 
-Configure your channel in **Settings → Notifications**, choose its severity/recovery preference, save, enable it and send an explicitly confirmed test. Supported channels include Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, custom webhooks and IFTTT. Each automatic alert is sent separately; Discord displays a colour-coded card. See the [channel setup guide](docs/notification-channels.md). Saved credentials do not prove delivery. Failed deliveries retry with backoff; delivery is not guaranteed exactly once.
+Configure your channel in **Settings → Connections → Notifications**, choose its severity/recovery preference, save, enable it and send an explicitly confirmed test. Supported channels include Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, custom webhooks and IFTTT. Each automatic alert is sent separately; Discord displays a colour-coded card. See the [channel setup guide](docs/notification-channels.md). Saved credentials do not prove delivery. Failed deliveries retry with backoff; delivery is not guaranteed exactly once.
 
-AI configuration is under **Settings → Integrations** and on the Assistant page. You can load models and test an unsaved API-key/model/API-type draft before saving. AI tests and use can incur provider charges. Assistant requests send user text and selected infrastructure measurements to OpenAI; the assistant cannot execute infrastructure actions.
+AI configuration is under **Settings → Connections → Add Connection → AI Assistant**. The Assistant page links to the same setup flow. You can load models and test an unsaved API-key/model/API-type draft before saving. AI tests and use can incur provider charges. Assistant requests send user text and selected infrastructure measurements to OpenAI; the assistant cannot execute infrastructure actions.
 
 ## Updates and build information
 

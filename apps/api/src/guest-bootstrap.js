@@ -12,6 +12,20 @@ printf 'HC_OS=%s\\n' "$ID"
 printf 'HC_UUID=%s\\n' "$(cat /sys/class/dmi/id/product_uuid 2>/dev/null || true)"
 for file in /sys/class/net/*/address; do printf 'HC_MAC=%s\\n' "$(cat "$file")"; done
 `;
+const agentInstaller=`set -eu
+export DEBIAN_FRONTEND=noninteractive
+if ! dpkg-query -W -f='\${db:Status-Status}' qemu-guest-agent 2>/dev/null | grep -qx installed; then
+ apt-get update
+ apt-get install -y qemu-guest-agent
+fi
+if [ -e /dev/virtio-ports/org.qemu.guest_agent.0 ]; then
+ systemctl start qemu-guest-agent
+ systemctl is-active --quiet qemu-guest-agent
+ printf 'HC_AGENT=ready\\n'
+else
+ printf 'HC_AGENT=needs-power-cycle\\n'
+fi
+`;
 const installer=readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')+`
 if [ -e /dev/virtio-ports/org.qemu.guest_agent.0 ] && systemctl is-active --quiet qemu-guest-agent; then
  printf 'HC_AGENT=ready\\n'
@@ -49,6 +63,7 @@ function execute(client,username,password,script,timeout=900000){return new Prom
 });}
 export async function bootstrapGuest(input,{query=pve,clientFactory=()=>new Client(),run=execute}={}){
  const {node,vmid,host,username,password,fingerprint}=input;
+ const purpose=input.purpose||'docker';if(!['docker','guest-agent'].includes(purpose))throw failure('Invalid guest setup purpose');
  if(typeof host!=='string'||!host||host.length>253||/[\s/]/.test(host))throw failure('Enter the VM SSH hostname or IP');
  const port=Number(input.port||22);if(!Number.isInteger(port)||port<1||port>65535)throw failure('Invalid SSH port');
  if(typeof username!=='string'||!username||username.length>100||typeof password!=='string'||!password||password.length>2048||/[\r\n]/.test(password))throw failure('Enter fresh SSH and sudo credentials. Passwords must not contain line breaks.');
@@ -67,10 +82,11 @@ export async function bootstrapGuest(input,{query=pve,clientFactory=()=>new Clie
   // Revalidate placement immediately before enabling configuration, with optimistic concurrency.
   await assertGuestPlacement(node,vmid,'qemu',query);
   await query(base+'/config',{method:'PUT',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({agent:enableAgentOption(config.agent),...(config.digest?{digest:config.digest}:{})})});
-  const output=await run(client,username,password,installer);
+  const output=await run(client,username,password,purpose==='guest-agent'?agentInstaller:installer);
   const requiresPowerCycle=!/^HC_AGENT=ready$/m.test(output);
   let agentVerified=false;
   if(!requiresPowerCycle)try{await query(base+'/agent/get-osinfo');agentVerified=true;}catch{}
+  if(purpose==='guest-agent')return {node,vmid:String(vmid),agentVerified,requiresPowerCycle,message:requiresPowerCycle?'Guest-agent package installed and Proxmox option enabled. A full VM shutdown and start is required before verification. No power action was performed.':agentVerified?'QEMU Guest Agent installed, enabled and verified successfully.':'Guest-agent service started, but Proxmox verification failed. Check API permissions and recheck this VM.'};
   return {node,vmid:String(vmid),dockerVerified:true,agentVerified,requiresPowerCycle,message:requiresPowerCycle?'Docker and guest-agent packages installed. A full VM shutdown and start is required to activate the guest-agent channel; no power action was performed.':agentVerified?'Docker and guest agent installed and verified. Waiting for paired-node discovery.':'Docker installed. Guest-agent service is running, but Proxmox verification failed. Check token permissions and retry discovery.'};
  }finally{active.delete(identity);client.end();}
 }

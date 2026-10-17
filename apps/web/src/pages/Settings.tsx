@@ -12,16 +12,16 @@ import IntegrationChecks from '../components/IntegrationChecks';
 import './settings-overview.css';
 import SystemSettings from '../components/SystemSettings';
 import SecuritySettings from '../components/SecuritySettings';
-import NotificationSettings from '../components/NotificationSettings';
 import IntegrationsSettings from '../components/IntegrationsSettings';
 import AppearanceSettings from '../components/AppearanceSettings';
 import AboutSettings from '../components/AboutSettings';
 import {safeLocale} from '../regional';
-const categories=[['General',SettingsIcon],['System',Server],['Security',Shield],['Notifications',Bell],['Connections',Link2],['Integrations',Globe],['Appearance',Palette],['Backup & Restore',Archive],['Advanced',SlidersHorizontal],['About',Info]] as const;
+const categories=[['General',SettingsIcon],['System',Server],['Security',Shield],['Connections',Link2],['Integrations',Globe],['Appearance',Palette],['Backup & Restore',Archive],['Advanced',SlidersHorizontal],['About',Info]] as const;
 const Editing=createContext(false);
 function Switch({label,detail,checked,onChange}:{label:string;detail?:string;checked:boolean;onChange:(v:boolean)=>void}){const enabled=useContext(Editing);return <label className="settings-toggle"><span><b>{label}</b>{detail&&<small>{detail}</small>}</span><input type="checkbox" role="switch" disabled={!enabled} checked={checked} onChange={e=>onChange(e.target.checked)}/><span className="settings-switch-track" aria-hidden="true"/></label>}
 function SettingsCard({title,detail,icon:Icon,children}:{title:string;detail:string;icon:any;children:any}){return <Card className="settings-overview-card"><div className="settings-card-heading"><span><Icon size={23}/></span><div><h2>{title}</h2><p>{detail}</p></div></div>{children}</Card>}
-export default function Settings(){const [query,setQuery]=useSearchParams();const raw=query.get('tab')||'General',category=categories.some(([name])=>name===raw)?raw:'General';const change=(tab:string)=>{const next=new URLSearchParams(query);next.set('tab',tab);next.delete('setup');setQuery(next)};
+export default function Settings(){const [query,setQuery]=useSearchParams();const raw=query.get('tab')||'General',category=raw==='Notifications'?'Connections':categories.some(([name])=>name===raw)?raw:'General';const change=(tab:string)=>{const next=new URLSearchParams(query);next.set('tab',tab);next.delete('setup');setQuery(next)};
+ useEffect(()=>{if(raw==='Notifications'){const next=new URLSearchParams(query);next.set('tab','Connections');next.set('section','notifications');setQuery(next,{replace:true})}},[raw]);
  return <div className="settings-overview-page">{category==='Connections'?<><nav className="settings-overview-tabs" aria-label="Settings sections">{categories.map(([name,Icon])=><button type="button" key={name} className={category===name?'active':''} aria-current={category===name?'page':undefined} onClick={()=>change(name)}><Icon size={16}/>{name}</button>)}</nav><ConnectionManager/></>:<SettingsOverview category={category} change={change}/>}</div>;
 }
 function SettingsOverview({category,change}:{category:string;change:(tab:string)=>void}){
@@ -56,7 +56,7 @@ function SettingsOverview({category,change}:{category:string;change:(tab:string)
  {show('General','Units & Measurement','storage network temperature memory CPU')&&<SettingsCard title="Units & Measurement" detail="Measurement conventions used by the current views." icon={Gauge}>{info('Storage & memory','Automatic capacity units')}{info('Network','Rates reported by each view')}{info('CPU usage','Percentage (%)')}{info('Temperature','When reported by the provider')}<small className="settings-note">Global unit overrides are not currently available. Views keep their existing units and mark unavailable measurements as unknown.</small></SettingsCard>}
 
 
- {category==='Notifications'&&<NotificationSettings owner={owner} editing={true} busy={busy} search={search}/>}
+
  {category==='About'&&<AboutSettings data={data} owner={owner} search={search}/>}
  {category==='Appearance'&&<AppearanceSettings value={appearance} sidebar={sidebar} editing={editing} busy={busy} search={search} onChange={setAppearance} onSidebar={setSidebar}/>}
  {category==='Integrations'&&<IntegrationsSettings search={search} owner={owner}/>}

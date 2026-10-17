@@ -1,6 +1,6 @@
 # Runtime integration configuration
 
-Owners configure Discord, Telegram, SMTP, Slack, Microsoft Teams, Pushover, Gotify, custom webhooks and IFTTT under Settings → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Integrations.
+Owners configure Discord, Telegram, SMTP, Slack, Microsoft Teams, Pushover, Gotify, custom webhooks and IFTTT under Settings → Connections → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Connections.
 
 1. Open Configure and enter the endpoint and required credentials.
 2. Click Save Configuration. Changes apply without restarting HomeCloud.

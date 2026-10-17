@@ -37,3 +37,10 @@ test('installer failure returns no success or credentials and performs no power 
 test('non-VirtIO agent channels require review before any SSH or configuration write',async()=>{
  const f=fixture();const old=f.query;f.query=async(p,i)=>p.endsWith('/config')&&!i?{...config,agent:'enabled=0,type=isa'}:old(p,i);await assert.rejects(()=>bootstrapGuest(input,f),/ISA channel/);assert.equal(f.runs.length,0);assert.equal(f.calls.filter(c=>c.init).length,0);
 });
+test('guest-agent-only setup never installs Docker and verifies the selected VM',async()=>{
+ const f=fixture();const result=await bootstrapGuest({...input,purpose:'guest-agent'},f);
+ assert.equal(result.agentVerified,true);assert.equal(result.dockerVerified,undefined);assert.equal(result.requiresPowerCycle,false);
+ assert.match(f.runs[1].script,/systemctl start qemu-guest-agent/);assert.match(f.runs[1].script,/apt-get install -y qemu-guest-agent/);assert.ok(!/docker|containerd|download.docker/.test(f.runs[1].script));assert.ok(!f.calls.some(c=>/status\/(stop|shutdown|reboot|start)/.test(c.path)));
+ const pending=await bootstrapGuest({...input,purpose:'guest-agent'},fixture(preflight,'needs-power-cycle'));assert.equal(pending.agentVerified,false);assert.equal(pending.requiresPowerCycle,true);assert.match(pending.message,/shutdown and start/);
+ await assert.rejects(()=>bootstrapGuest({...input,purpose:'arbitrary-script'},fixture()),/Invalid guest setup purpose/);
+});

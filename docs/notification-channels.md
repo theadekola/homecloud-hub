@@ -1,6 +1,6 @@
 # Notification channels and alert preferences
 
-Owners manage delivery in **Settings → Notifications**. Every channel has Setup, Enable and Test controls. Setup saves encrypted credentials on the HomeCloud server, without environment-file edits or a restart. Tests can use unsaved details after explicit confirmation; they do not save settings or enable automatic delivery.
+Owners manage delivery in **Settings → Connections → Notifications**. Every channel has Setup, Enable and Test controls. Setup saves encrypted credentials on the HomeCloud server, without environment-file edits or a restart. Tests can use unsaved details after explicit confirmation; they do not save settings or enable automatic delivery.
 
 | Channel | Setup fields | Provider setup |
 | --- | --- | --- |

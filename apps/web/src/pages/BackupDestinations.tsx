@@ -1,7 +1,8 @@
+import '../backup-status.css';
 import PageIcon from '../components/PageIcon';
 import StorageRegistration from '../components/StorageRegistration';
 import {useEffect,useRef,useState} from 'react';
-import {Link} from 'react-router-dom';
+import {Link,useSearchParams} from 'react-router-dom';
 import {Database,Server,CheckCircle,AlertTriangle,PieChart as PieIcon,Search,RefreshCw,Plus,Play,FileText,HardDrive,Network,Folder,Pencil,Eye,X,ChevronLeft,ChevronRight,Info,Clock,ArrowUpRight} from 'lucide-react';
 import {ResponsiveContainer,AreaChart,Area,XAxis,YAxis,CartesianGrid,Tooltip} from 'recharts';
 import {useApi,refreshResources} from '../hooks';
@@ -20,18 +21,19 @@ function Usage({row,color='#00d598'}:{row:any;color?:string}){
  return <div className="destination-usage"><small>{bytes(reading.used)}{reading.percent===null?'':` (${Math.round(reading.percent)}%)`}</small><i role="img" aria-label={reading.percent===null?'Storage usage unavailable':`${Math.round(reading.percent)}% used`}><b style={{width:`${reading.percent??0}%`,background:color}}/></i></div>;
 }
 export default function BackupDestinations({navigation}:{navigation?:import('react').ReactNode}){
+ const [params,setParams]=useSearchParams(),node=params.get('node')||'';
  const live=useApi<any>('/proxmox/storage',null),session=useApi<any>('/auth/me',null);
  const [search,setSearch]=useState(''),[type,setType]=useState('all'),[status,setStatus]=useState('all'),[selected,setSelected]=useState(''),[closed,setClosed]=useState(false),[page,setPage]=useState(0),[limit,setLimit]=useState(6),[checked,setChecked]=useState<string[]>([]);
  const [modal,setModal]=useState<'add'|'test'|'summary'|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[checks,setChecks]=useState<any[]>([]);
  const run=useRef<AbortController|null>(null),writing=useRef(false);
  useEffect(()=>()=>run.current?.abort(),[]);
- const raw=(Array.isArray(live.data?.resources)?live.data.resources:[]).filter((r:any)=>String(r.content||'').split(',').map((s:string)=>s.trim()).includes('backup'));
+ const raw=(Array.isArray(live.data?.resources)?live.data.resources:[]).filter((r:any)=>String(r.content||'').split(',').map((s:string)=>s.trim()).includes('backup')&&(!node||r.node===node));
  const rows=distinctStorage(raw).map(row=>({...row,...destinationReading(row)})),capacity=storageCapacity(rows),complete=inventoryComplete(live.data,live.error)&&live.data?.coverage?.complete!==false,admin=['owner','admin'].includes(session.data?.user?.role);
  const known=!!live.data&&!live.error&&(capacity.measured.length>0||complete&&rows.length===0),partial=capacity.partial||!complete||rows.some(row=>row.shared==null);
  const filtered=rows.filter(row=>(type==='all'||(type.startsWith('category:')?category(row)===type.slice(9):row.type===type))&&(status==='all'||(status==='attention'?['offline','disabled'].includes(row.status):row.status===status))&&`${row.name} ${row.type} ${row.node} ${destinationEndpoint(row)}`.toLowerCase().includes(search.trim().toLowerCase()));
  const pages=Math.max(1,Math.ceil(filtered.length/limit)),actual=Math.min(page,pages-1),shown=filtered.slice(actual*limit,actual*limit+limit),current=filtered.find(row=>row.id===selected)||filtered[0];
  const selectedRows=rows.filter(row=>checked.includes(row.id));
- useEffect(()=>{setPage(0);setChecked([])},[search,type,status,limit]);
+ useEffect(()=>{setPage(0);setChecked([])},[search,type,status,limit,node]);
  const select=(row:any)=>{setSearch('');setType('all');setStatus('all');setSelected(row.id);setClosed(false);setPage(Math.floor(rows.findIndex(r=>r.id===row.id)/limit));};
  const reset=()=>{setSearch('');setType('all');setStatus('all');setChecked([]);setPage(0)};
  const refresh=()=>refreshResources(['/proxmox/storage']);
@@ -58,6 +60,7 @@ export default function BackupDestinations({navigation}:{navigation?:import('rea
   <div className="page-header"><div><h1><PageIcon name="backups" className="page-title-icon"/>Destinations</h1><p>Manage where your backups are stored. Monitor storage capacity, usage and availability.</p></div><div className="header-actions"><Link className="btn secondary" to="/proxmox?tab=Tasks%20%26%20Logs"><FileText size={14}/> View Logs</Link><button className="btn secondary" disabled={busy||!raw.length||!!live.error} onClick={()=>test(raw)}><Play size={14}/> Test All</button><button className="btn primary" disabled={!admin||busy} onClick={()=>{setError('');setModal('add')}}><Plus size={15}/> Add Destination</button></div></div>
   <div className="destination-stats metric-grid">{stats.map(([Icon,title,value,sub]:any,index)=><Card key={title}><button aria-label={`Inspect ${title}`} onClick={()=>{if(index<3){reset();setStatus(index===1?'online':index===2?'attention':'all')}else setModal('summary')}}><span className="destination-stat-icon"><Icon size={28}/></span><span><small>{title}</small><strong>{value}</strong><small className="muted">{sub}</small>{index===4&&<i className="destination-stat-progress"><b style={{width:`${known&&capacity.capacity&&capacity.used!=null?capacity.used/capacity.capacity*100:0}%`}}/></i>}</span></button></Card>)}</div>
   {navigation}
+  {node&&<p className="destination-node-filter" role="status">Backup destinations on <strong>{node}</strong> <button className="btn secondary small" onClick={()=>{const next=new URLSearchParams(params);next.delete('node');setParams(next)}}>Show all nodes</button></p>}
   {(error||live.error)&&<div className="destination-error" role="alert"><span>{error||`Unable to load backup destinations: ${live.error}`}</span><button className="btn secondary" disabled={live.loading} onClick={()=>{setError('');refresh()}}>Retry</button></div>}{message&&<p className="destination-message" role="status">{message}</p>}
   <div className={`destination-workspace${closed?' details-closed':''}`}>
    <Card className="destination-list"><div className="destination-toolbar"><label><Search size={15}/><input aria-label="Search backup destinations" placeholder="Search destinations (name, type, location...)" value={search} onChange={event=>setSearch(event.target.value)}/></label><select aria-label="Backup destination type" value={type} onChange={event=>setType(event.target.value)}><option value="all">All Types</option><optgroup label="Category">{['Local','Network','Other'].map(name=><option key={name} value={`category:${name}`}>{name}</option>)}</optgroup><optgroup label="Storage type">{Array.from(new Set<string>(rows.map(row=>row.type).filter(Boolean))).map(value=><option key={value}>{value}</option>)}</optgroup></select><select aria-label="Destination status" value={status} onChange={event=>setStatus(event.target.value)}><option value="all">All Status</option><option value="online">Online</option><option value="attention">Offline / Disabled</option><option value="offline">Offline</option><option value="disabled">Disabled</option><option value="unknown">Unknown</option></select><button className="btn secondary" disabled={live.loading} onClick={refresh}><RefreshCw size={14}/> Refresh</button></div>

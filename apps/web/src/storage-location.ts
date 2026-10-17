@@ -1,0 +1,4 @@
+export const storageStatus=(row:any)=>row.applicable===false||row.status==='not-assigned'?'Not assigned':row.status||'Unknown';
+export const storageLocation=(row:any)=>row.location||row.path||(row.server&&row.export?`${row.server}:${row.export}`:row.portal||row.export||'Not reported');
+export const storageUses=(row:any)=>String(row.content||'').split(',').filter(Boolean).map(value=>({images:'VM disks',rootdir:'Container disks',backup:'Backups',iso:'ISO images',vztmpl:'Container templates',snippets:'Snippets',import:'Disk imports'}[value]||value)).join(', ')||(row.provider==='truenas'?'Datasets, volumes and shares':'Not reported');
+export const storageAssignment=(row:any)=>row.scope==='unknown'?'Not reported':row.assignedNodes?.length?row.assignedNodes.join(', '):row.nodes|| (row.provider==='proxmox'?'All configured Proxmox nodes':row.node||row.provider);

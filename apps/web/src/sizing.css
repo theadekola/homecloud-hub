@@ -310,3 +310,13 @@
 .backup-inventory-notice { padding:14px; margin:12px 0; border:1px solid #88652a; border-radius:10px; background:#392b13; color:#f5d28c; overflow-wrap:anywhere; }
 .backup-inventory-notice p { margin:8px 0; }
 .overview-stat.needs-attention small { color:#f5c66b; }
+
+.storage-scope-note { padding:12px 14px; margin:12px 0; border:1px solid #29435a; border-radius:10px; background:#102136; color:#adc3db; }
+.storage-scope-note p { margin:0 0 8px; }
+.storage-scope-note p:last-child { margin-bottom:0; }
+.storage-availability-detail { display:block; max-width:230px; margin-top:5px; color:#9db1ca; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+.storage-resource-location { display:block; max-width:260px; overflow-wrap:anywhere; }
+.storage-pool-table table { min-width:1150px; }
+.storage-overview-toolbar { flex-wrap:wrap; }
+
+.content .storage-pool-table .single-line-table :is(.storage-availability-detail, .storage-resource-location) { white-space:normal; }

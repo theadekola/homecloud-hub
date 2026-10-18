@@ -20,3 +20,6 @@ test('failed attempts never reach 100%, and retained entries are bounded and exp
  const expiring=createDockerUpdateProgress({now:()=>now,ttl:100});expiring.start('owner','direct','a',id).finish();now+=101;assert.equal(expiring.read('owner','direct','a',id).progress,null);
  assert.throws(()=>service.start('owner','direct','c','invalid'),e=>e.status===400);
 });
+test('concurrent attempts cannot target the same host/container even across owners, and terminal details survive reads',()=>{
+ const service=createDockerUpdateProgress(),tracking=service.start('one','node:qemu/1','plex',id);assert.throws(()=>service.start('two','node:qemu/1','plex','another-attempt-1234'),/already running/);tracking.fail('Download timed out; original container retained.');assert.match(service.read('one','node:qemu/1','plex',id).progress.error,/original container retained/);const next=service.start('two','node:qemu/1','plex','another-attempt-1234');next.finish({containerId:'new',message:'Verified replacement'});assert.equal(service.read('two','node:qemu/1','plex','another-attempt-1234').progress.result.containerId,'new');
+});

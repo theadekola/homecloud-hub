@@ -54,10 +54,14 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   await ensureNoContainerDependents(old,query);
   const ref=old.Config.Labels?.[trackedImageLabel]||old.Config.Image;if(ref!==row.image)throw fail('The container image reference changed. Recheck updates.');
   const repository=imageRepository(row.image),pin=repository+'@'+row.remoteDigest;
+  let pulled;
+  try{const cached=await query('/images/'+encodeURIComponent(pin)+'/json',{timeoutMs:15000});if(cached.Id&&(cached.RepoDigests||[]).some(d=>d.endsWith('@'+row.remoteDigest)))pulled=cached}catch(error){if(error.dockerStatus!==404)throw fail('The reviewed local image could not be checked. Check Docker access and retry before replacing the container.',502)}
+  if(!pulled){
   onProgress(20,'Pulling image from registry');
   try{await query('/images/create?fromImage='+encodeURIComponent(pin),{method:'POST',timeoutMs:900000,onProgress})}catch(error){pullFailure=true;if(error.code==='CONNECTOR_UPDATE_REQUIRED')throw error;const timed=/timed? ?out|timeout|expired/i.test(error.message||'');throw fail(timed?'Image download timed out. Check the Docker host’s registry access, DNS and free disk space, then retry. The original container was not stopped.':'Image download failed. Check registry access, credentials, DNS and free disk space on the Docker host. The original container was not stopped.',502)}
   onProgress(65,'Verifying downloaded image digest');
-  const pulled=await query('/images/'+encodeURIComponent(pin)+'/json');
+  pulled=await query('/images/'+encodeURIComponent(pin)+'/json');
+  }else onProgress(65,'Verified reviewed image already downloaded; preparing installation');
   if(!pulled.Id||!(pulled.RepoDigests||[]).some(d=>d.endsWith('@'+row.remoteDigest)))throw fail('The pulled image did not match the reviewed registry digest.');
   if(pulled.Id===old.Image)return {unchanged:true,containerId:old.Id,message:'The registry metadata changed, but this platform already has the current image. No container restart was needed.'};
   const fresh=await query(base+'/json');if(updatePlan(fresh,oldImage).binding!==plan.binding)throw fail('The container configuration changed during download. Nothing was stopped; recheck before retrying.');

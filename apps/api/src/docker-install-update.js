@@ -78,7 +78,22 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   }
   onProgress(95,'Finalizing image tag and cleanup');
   switched=true;let warning='';try{const tag=row.image===repository?'latest':row.image.slice(repository.length+1);await query('/images/'+encodeURIComponent(pulled.Id)+'/tag?repo='+encodeURIComponent(repository)+'&tag='+encodeURIComponent(tag),{method:'POST'})}catch{warning='The container uses the reviewed image, but its local tag could not be updated. Pull the tag before a future redeployment. '}try{await query(base+'?v=false',{method:'DELETE'})}catch{warning+=`The old container is retained, stopped, as ${backup}. Its restart policy is disabled. Remove it manually after review.`}
-  return {containerId:newId,previousId:old.Id,imageId:pulled.Id,warning,message:plan.running?'Container updated and running. Review its application logs and health.':'Stopped container updated. It remains stopped.'};
+  let imageCleanup={status:'retained',reason:'The old container or image tag could not be cleaned up.'};
+  if(!warning){
+   onProgress(98,'Removing the unused previous image');
+   try{
+    const containers=await query('/containers/json?all=1',{timeoutMs:15000});
+    if(!Array.isArray(containers))throw Error('Container references unavailable');
+    if(containers.some(c=>c.ImageID===old.Image))imageCleanup={status:'retained',reason:'Another container still uses the previous image.'};
+    else{
+     const previous=await query('/images/'+encodeURIComponent(old.Image)+'/json');
+     if((previous.RepoTags||[]).some(t=>t!=='<none>:<none>'))imageCleanup={status:'retained',reason:'The previous image still has another tag.'};
+     else{await query('/images/'+encodeURIComponent(old.Image)+'?force=false&noprune=true',{method:'DELETE'});imageCleanup={status:'removed',reason:'The unused previous image was removed automatically.'}}
+    }
+   }catch(error){imageCleanup=error.dockerStatus===404?{status:'removed',reason:'The previous image is already absent.'}:{status:'retained',reason:'Docker could not remove the previous image safely. The verified update remains installed.'}}
+  }
+  warning+=(warning?' ':'')+imageCleanup.reason;
+  return {containerId:newId,previousId:old.Id,imageId:pulled.Id,imageCleanup,warning,message:plan.running?'Container updated and running. Review its application logs and health.':'Stopped container updated. It remains stopped.'};
  }catch(error){
   if(newId&&!switched){onProgress(95,'Restoring original container after failed verification');let restored=true;
    try{await query('/containers/'+newId+'?force=1&v=false',{method:'DELETE'})}catch{restored=false}

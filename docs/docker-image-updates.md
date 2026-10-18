@@ -14,7 +14,7 @@ The installer:
 2. Creates a replacement with user configuration, environment overrides, ports, actual volume identities, bind mounts, restart policy and supported network settings. New image defaults supply unchanged commands and metadata. Secret environment values are never returned in the review.
 3. Stops a running original, disables its restart policy during the transaction, preserves its name for recovery, and transfers supported network attachments.
 4. Starts the replacement only if the original was running. It checks running state and Docker health status, waiting up to about a minute for a configured health check. Without a health check, several running observations are required. A stopped container remains stopped.
-5. Updates the local tag after success and removes the old container without deleting volumes. If old-container cleanup fails, the response names its stopped backup and notes that its restart policy is disabled.
+5. Updates the local tag after success and removes the old container without deleting volumes. It then deletes only the previous image, without force or parent-image pruning, if no running or stopped container uses it and it has no remaining tag. Shared images are retained. Cleanup results appear in the successful installation message; cleanup failures do not roll back a verified replacement. If old-container cleanup fails, the response names its stopped backup and notes that its restart policy is disabled.
 
 Startup failure attempts to remove the replacement without deleting volumes and restore the original name, networks, restart policy and running state. Incomplete restoration is reported explicitly. This is container-level restoration, not a database or filesystem backup. Application migrations may alter shared data. Files stored only in the old writable container layer are not copied into the replacement. Back up important application data before upgrading.
 
@@ -78,3 +78,5 @@ container untouched. The replacement still requires the reviewed image digest,
 fresh configuration/dependency checks, and startup/health verification.
 Connector-update payloads are compressed to fit SSH execution packet limits;
 source hashes, host verification and pairing checks remain enforced.
+
+Registry checks allow 20 seconds for local image inspection and 45 seconds for each registry lookup, including paired transport time. Transient DNS, timeout and server/connection failures receive one bounded retry. Authentication, missing tags, TLS and rate-limit failures are reported separately without exposing raw registry messages or credentials. A healthy Docker connection does not establish registry reachability.

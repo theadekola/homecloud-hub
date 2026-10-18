@@ -31,21 +31,30 @@ export function registryCheckFailure(error,phase='registry'){
  else if(http>=500||/ECONNRESET|ECONNREFUSED|socket hang up|connection reset|connection refused/i.test(message)){code='registry-unavailable';detail='The registry lookup failed on the Docker host. Its connection to HomeCloud can still be healthy. Check registry availability and outbound network access.';retryable=true}
  return {status:'unknown',code,detail,retryable};
 }
-export function createDockerImageUpdates({persistence={get,mutate},query=docker,now=Date.now,notify=async()=>{},sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}){
- let pending=null,lastSnapshot=null,lastSignature='',version=0;
+export async function readUpdateHost(query=docker){
+ const [containers,info]=await Promise.all([query('/containers/json?all=1',{timeoutMs:30000}),query('/info',{timeoutMs:30000})]);
+ if(!Array.isArray(containers)||!info||Array.isArray(info)||typeof info.Name!=='string')throw Error('Invalid Docker inventory response');
+ return {host:{hostname:info.Name,engineId:info.ID},containers:containers.map(c=>({id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Labels?.[trackedImageLabel]||c.Image,imageId:c.ImageID}))};
+}
+export function createDockerImageUpdates({persistence={get,mutate},query=docker,now=Date.now,notify=async()=>{},sleep=ms=>new Promise(r=>setTimeout(r,ms)),readHost=()=>readUpdateHost(query)}={}){
+ let lastSnapshot=null,lastSignature='',version=0;const pending=new Map(),hostReads=new Map(),hostVersions=new Map(),hostProgress=new Map(),hostRequestedAt=new Map();
  const settings=()=>({...updateDefaults,...persistence.get().dockerImageUpdates?.settings});
- const status=(host)=>{const data=persistence.get().dockerImageUpdates||{};return {settings:settings(),checking:!!pending,lastChecked:data.lastChecked||null,rows:(data.rows||[]).filter(r=>host===undefined||r.hostId===(host||'direct'))}};
+ const status=(host)=>{const data=persistence.get().dockerImageUpdates||{};return {settings:settings(),checking:host===undefined?pending.size+hostReads.size>0:pending.has('all')||pending.has(host||'direct')||hostReads.has(host||'direct'),manualChecking:host===undefined?hostReads.size>0:[host||'direct'].some(h=>hostReads.has(h)||pending.has(h)),progress:hostProgress.get(host||'direct')||null,error:data.hostErrors?.[host||'direct']||'',lastChecked:host===undefined?data.lastChecked||null:data.hostChecked?.[host||'direct']||null,rows:(data.rows||[]).filter(r=>host===undefined||r.hostId===(host||'direct'))}};
  const saveSettings=input=>{if(!input||typeof input.enabled!=='boolean'||![1,6,12,24].includes(input.intervalHours)||Object.keys(input).some(k=>!['enabled','intervalHours'].includes(k)))throw Object.assign(Error('Choose an enabled state and a supported update interval.'),{status:400});persistence.mutate(s=>{s.dockerImageUpdates??={};s.dockerImageUpdates.settings={...input}});return status()};
- const observe=(snapshot,force=false)=>{
+ const observe=(snapshot,force=false,onlyHost=null)=>{
+  const scope=onlyHost||'all';
   if(snapshot?.refreshing)return status();
-  if(snapshot)lastSnapshot=snapshot;
-  if(pending)return status();
-  const prior=persistence.get().dockerImageUpdates||{},signature=lastSnapshot?JSON.stringify(monitoredDocker(lastSnapshot).map(c=>[c.hostId,c.id,c.imageId]).sort()):'';
-  if(!lastSnapshot||!force&&(!settings().enabled||signature===lastSignature&&now()-Date.parse(prior.lastChecked||0)<settings().intervalHours*3600000))return status();
-  lastSignature=signature;const scanning=lastSnapshot;
-  const rows=monitoredDocker(scanning).filter(c=>!String(c.name||'').startsWith('homecloud-backup-'));
-  const previous=new Map((prior.rows||[]).map(r=>[r.hostId+':'+r.containerId,r])),results=[],cache=new Map();
-  const started=version;pending=(async()=>{
+  if(snapshot&&!onlyHost)lastSnapshot=snapshot;
+  if(pending.has(scope))return status();
+  const prior=persistence.get().dockerImageUpdates||{},signature=(snapshot||lastSnapshot)?JSON.stringify(monitoredDocker(snapshot||lastSnapshot).map(c=>[c.hostId,c.id,c.imageId]).sort()):'';
+  if(!(snapshot||lastSnapshot)||!force&&(!settings().enabled||signature===lastSignature&&now()-Date.parse(prior.lastChecked||0)<settings().intervalHours*3600000))return status();
+  if(!onlyHost)lastSignature=signature;const scanning=snapshot||lastSnapshot;
+  const eligible=host=>onlyHost?host===onlyHost:!hostReads.has(host)&&!pending.has(host)&&(!scanning.sampledAt||Date.parse(scanning.sampledAt)>=(hostRequestedAt.get(host)||0));
+  const rows=monitoredDocker(scanning).filter(c=>eligible(c.hostId)&&!String(c.name||'').startsWith('homecloud-backup-'));
+  const previous=new Map((prior.rows||[]).filter(r=>eligible(r.hostId)).map(r=>[r.hostId+':'+r.containerId,r])),results=[],cache=new Map();
+  const affected=new Set([...previous.values()].map(r=>r.hostId).concat(rows.map(r=>r.hostId),onlyHost?[onlyHost]:[])),epochs=new Map([...affected].map(h=>[h,hostVersions.get(h)||0]));
+  const valid=h=>epochs.get(h)===(hostVersions.get(h)||0);
+  const started=version;const work=(async()=>{
    const check=async c=>{
     const row={hostId:c.hostId,host:c.host,node:c.node,containerId:c.id,name:c.name,image:c.image,imageId:c.imageId,checkedAt:new Date(now()).toISOString()};
     if(typeof c.image!=='string'||!c.imageId||!imageReference.test(c.image)||c.image.includes('@')||/^sha256:/.test(c.image)){results.push({...row,status:'unsupported',detail:'Digest-pinned or local-only image. Change its reference explicitly to update it.'});return}
@@ -56,17 +65,21 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
     }));
     results.push({...row,...await cache.get(key)});
    };
-   for(let i=0;i<rows.length;i+=2)await Promise.all(rows.slice(i,i+2).map(check));
+   for(let i=0;i<rows.length;i+=2){await Promise.all(rows.slice(i,i+2).map(check));if(onlyHost&&started===version&&valid(onlyHost)){hostProgress.set(onlyHost,{stage:'registry',completed:results.length,total:rows.length});persistence.mutate(s=>{s.dockerImageUpdates??={};const keys=new Set(results.map(r=>r.hostId+':'+r.containerId));s.dockerImageUpdates.rows=[...(s.dockerImageUpdates.rows||[]).filter(r=>!keys.has(r.hostId+':'+r.containerId)),...results]})}}
    // Keep prior observations when a host is absent/offline. An absent reading is not proof of recovery.
    const retired=host=>host==='direct'?scanning.services?.some(s=>s.id==='docker'&&s.status==='not-configured'):Array.isArray(scanning.dockerFleet?.connectors)&&!scanning.dockerFleet.connectors.some(n=>n.id===host.split(':')[0]);
    const keys=new Set(results.map(r=>r.hostId+':'+r.containerId));
    const reachable=new Set([...(scanning.docker?['direct']:[]),...(scanning.dockerFleet?.hosts||[]).filter(h=>h.status==='reachable').map(h=>h.id)]);
-   for(const [key,row] of previous)if(!keys.has(key)&&!reachable.has(row.hostId)&&!retired(row.hostId))results.push({...row,status:'unknown',detail:'Host not checked. Its prior update remains unresolved until a fresh reading is available.'});
+   for(const [key,row] of previous)if(!keys.has(key)&&!reachable.has(row.hostId)&&!retired(row.hostId)){
+    const host=scanning.dockerFleet?.hosts?.find(h=>h.id===row.hostId),failure=host?.failure||host?.error;
+    results.push({...row,status:'unknown',code:'host-inventory-unavailable',detail:failure?`Docker guest inventory could not be read. ${failure} The earlier update alert is retained until a fresh check succeeds.`:'No fresh Docker guest inventory was available in the monitoring scan. A healthy parent connector does not verify this guest. Use Check for Updates on this host; earlier update alerts are retained.'});
+   }
    if(started!==version)return;
    persistence.mutate(s=>{
-    for(const priorRow of previous.values())if(!keys.has(priorRow.hostId+':'+priorRow.containerId)&&(reachable.has(priorRow.hostId)||retired(priorRow.hostId))){const prefix=`docker-image:${priorRow.hostId}:${priorRow.containerId}:`;for(const alert of s.alerts||[])if(alert.key?.startsWith(prefix)&&alert.status!=='resolved'){alert.status='resolved';alert.resolvedAt=new Date(now()).toISOString()}}
-    s.dockerImageUpdates={...s.dockerImageUpdates,rows:results,lastChecked:new Date(now()).toISOString()};s.alerts??=[];
-    for(const row of results){
+    for(const priorRow of previous.values())if(valid(priorRow.hostId)&&!keys.has(priorRow.hostId+':'+priorRow.containerId)&&(reachable.has(priorRow.hostId)||retired(priorRow.hostId))){const prefix=`docker-image:${priorRow.hostId}:${priorRow.containerId}:`;for(const alert of s.alerts||[])if(alert.key?.startsWith(prefix)&&alert.status!=='resolved'){alert.status='resolved';alert.resolvedAt=new Date(now()).toISOString()}}
+    const accepted=results.filter(r=>valid(r.hostId)),checkedAt=new Date(now()).toISOString(),hostChecked={...s.dockerImageUpdates?.hostChecked},hostErrors={...s.dockerImageUpdates?.hostErrors};for(const h of affected)if(valid(h)){hostChecked[h]=checkedAt;if(reachable.has(h))delete hostErrors[h]}
+    s.dockerImageUpdates={...s.dockerImageUpdates,hostChecked,hostErrors,rows:[...(s.dockerImageUpdates?.rows||[]).filter(r=>!affected.has(r.hostId)||!valid(r.hostId)),...accepted],...(!onlyHost?{lastChecked:checkedAt}:{})};s.alerts??=[];
+    for(const row of results.filter(r=>valid(r.hostId))){
      if(!['available','current'].includes(row.status))continue;
      const prefix=`docker-image:${row.hostId}:${row.containerId}:`,key=prefix+row.remoteDigest;
      for(const alert of s.alerts)if(alert.key?.startsWith(prefix)&&alert.status!=='resolved'&&(row.status==='current'||alert.key!==key)){alert.status='resolved';alert.resolvedAt=row.checkedAt;}
@@ -75,10 +88,21 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
     s.alerts=s.alerts.slice(0,1000);
    });
    await notify(persistence.get().alerts);
-  })().catch(()=>{}).finally(()=>{pending=null});
+  })().catch(()=>{}).finally(()=>{pending.delete(scope);if(onlyHost)hostProgress.delete(onlyHost)});pending.set(scope,work);
   return status();
  };
+ const checkHost=host=>{
+  const id=host||'direct';if(hostReads.has(id)||pending.has(id))return status(host);
+  hostVersions.set(id,(hostVersions.get(id)||0)+1);hostRequestedAt.set(id,now());hostProgress.set(id,{stage:'inventory',completed:0,total:null});
+  const work=Promise.resolve().then(()=>agentContext.run({host:id==='direct'?'':id},async()=>{
+   let snapshot,inventoryError='';
+   try{const data=await readHost();snapshot=id==='direct'?{docker:data,services:[]}:{dockerFleet:{hosts:[{id,status:'reachable',inventory:data}]}}}
+   catch(error){const message=String(error?.message||''),detail=/timed? ?out|timeout|expired|deadline/i.test(message)?'The guest inventory request timed out. Check this guest’s Docker service and connector access.':[401,403].includes(error?.dockerStatus)?'The guest Docker API refused inventory access. Check its Docker permissions.':/offline|unavailable/i.test(message)?'This Docker guest is offline or unavailable through its connector.':'The Docker guest did not return a usable inventory. Check its Docker service and access through the paired connector.';inventoryError=detail;snapshot=id==='direct'?{services:[{id:'docker',status:'error'}],dockerFleet:{hosts:[{id,status:'error',failure:detail}]}}:{dockerFleet:{hosts:[{id,status:'error',failure:detail}]}}}
+   persistence.mutate(s=>{s.dockerImageUpdates??={};s.dockerImageUpdates.hostErrors??={};if(inventoryError)s.dockerImageUpdates.hostErrors[id]=inventoryError;else delete s.dockerImageUpdates.hostErrors[id]});
+   observe(snapshot,true,id);await pending.get(id);
+  })).finally(()=>{hostReads.delete(id);hostProgress.delete(id)});hostReads.set(id,work);return status(host);
+ };
  const installed=(host,id,result)=>{version++;lastSignature='';persistence.mutate(s=>{s.dockerImageUpdates??={};s.dockerImageUpdates.rows=(s.dockerImageUpdates.rows||[]).filter(r=>r.hostId!==host||r.containerId!==id);for(const alert of s.alerts||[])if(alert.key?.startsWith(`docker-image:${host}:${id}:`)&&alert.status!=='resolved'){alert.status='resolved';alert.resolvedAt=new Date(now()).toISOString()}})};
- return {status,settings:saveSettings,observe,installed,settled:()=>pending||Promise.resolve()};
+ return {status,settings:saveSettings,observe,checkHost,installed,settled:()=>Promise.all([...pending.values(),...hostReads.values()])};
 }
 export const dockerImageUpdates=createDockerImageUpdates({notify:alerts=>notifier.deliver(alerts)});

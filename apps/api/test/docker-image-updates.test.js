@@ -65,3 +65,46 @@ test('transient registry errors retry once with longer paired transport deadline
   service.observe(snapshot,true);await service.settled();assert.equal(failures,status===500?2:1);assert.equal(service.status().rows[0].status,status===500?'available':'unknown');assert.equal(calls[0].init.timeoutMs,20000);assert.equal(calls[1].init.timeoutMs,45000);assert.ok(!JSON.stringify(service.status()).includes('private-token'));
  }
 });
+test('manual checks read only the selected guest and bypass a blocked fleet scan without being overwritten',async()=>{
+ const {selectedAgentHost}=await import('../src/node-agents.js');let release;const blocked=new Promise(r=>release=r),state={alerts:[]},reads=[];
+ const data={host:{hostname:'media-server',engineId:'media'},containers:[{id:'c1',name:'web',image:'nginx:latest',imageId:img}]};
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>{reads.push(selectedAgentHost());return data},query:async p=>{if(selectedAgentHost()==='slow:qemu/1')await blocked;return p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:selectedAgentHost()==='slow:qemu/1'?old:next}}}});
+ service.observe({dockerFleet:{hosts:[{id:'slow:qemu/1',status:'reachable',inventory:data}]}});assert.equal(service.status().checking,true);
+ const check=service.checkHost('node:qemu/201');assert.equal(check.manualChecking,true);service.checkHost('node:qemu/201');
+ for(let i=0;i<50&&service.status('node:qemu/201').manualChecking;i++)await new Promise(r=>setTimeout(r,1));
+ assert.deepEqual(reads,['node:qemu/201']);assert.equal(service.status('node:qemu/201').rows[0].status,'available');assert.equal(service.status('node:qemu/201').manualChecking,false);
+ release();await service.settled();assert.equal(service.status('node:qemu/201').rows[0].status,'available');assert.equal(service.status('slow:qemu/1').rows[0].status,'current');
+});
+test('a newer selected-host result wins over an older in-flight automatic check for that same host',async()=>{
+ let release,first=true;const block=new Promise(r=>release=r),state={alerts:[]},data={host:{hostname:'media',engineId:'m'},containers:[{id:'c1',name:'web',image:'nginx:latest',imageId:img}]};
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>data,query:async p=>{if(p.startsWith('/images/'))return {RepoDigests:['nginx@'+old]};if(first){first=false;await block;return {Descriptor:{digest:old}}}return {Descriptor:{digest:next}}}});
+ service.observe({dockerFleet:{hosts:[{id:'node:qemu/201',status:'reachable',inventory:data}]}});await new Promise(r=>setTimeout(r,0));service.checkHost('node:qemu/201');
+ for(let i=0;i<50&&service.status('node:qemu/201').manualChecking;i++)await new Promise(r=>setTimeout(r,1));assert.equal(service.status('node:qemu/201').rows[0].status,'available');release();await service.settled();assert.equal(service.status('node:qemu/201').rows[0].status,'available');assert.equal(state.alerts[0].status,'active');
+});
+test('failed guest inventory retains update alerts, explains the guest failure, and can recover on a selected-host retry',async()=>{
+ const state={alerts:[]};let failed=false;const data=snapshot.docker,service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>{if(failed)throw Error('Node agent request timed out private-token');return data},query:async p=>p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:next}}});
+ service.checkHost('node:qemu/201');await service.settled();assert.equal(state.alerts[0].status,'active');failed=true;service.checkHost('node:qemu/201');await service.settled();assert.equal(service.status('node:qemu/201').rows[0].code,'host-inventory-unavailable');assert.match(service.status('node:qemu/201').rows[0].detail,/guest inventory request timed out/);assert.equal(state.alerts[0].status,'active');assert.ok(!JSON.stringify(service.status()).includes('private-token'));
+ failed=false;service.checkHost('node:qemu/201');await service.settled();assert.equal(service.status('node:qemu/201').rows[0].status,'available');
+});
+test('selected-host inventory requires no statistics, volume, network or image-list requests',async()=>{
+ const {readUpdateHost}=await import('../src/docker-image-updates.js'),calls=[];const data=await readUpdateHost(async p=>{calls.push(p);return p==='/info'?{ID:'engine',Name:'media'}:[{Id:'c1',Names:['/web'],ImageID:img,Image:'nginx:latest'}]});assert.deepEqual(calls,['/containers/json?all=1','/info']);assert.equal(data.containers[0].name,'web');assert.equal(data.containers[0].imageId,img);
+});
+test('manual update endpoint queues the exact selected host without waiting for monitor.sample',async()=>{
+ process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');let selected;
+ const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:'owner'};next()},imageUpdates:{checkHost:host=>{selected=host;return {checking:true,manualChecking:true}}},monitor:{sample(){throw Error('Must not wait for the fleet')},invalidate(){}},audit:async()=>{}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{const response=await fetch(`http://127.0.0.1:${server.address().port}/api/docker/updates/check`,{method:'POST',headers:{'Content-Type':'application/json','X-HomeCloud-Docker-Host':'node:qemu/201'},body:'{}'});assert.equal(response.status,200);assert.equal(selected,'node:qemu/201');assert.equal((await response.json()).result.manualChecking,true)}finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});
+test('an inventory failure is visible even before any image rows exist, then clears on recovery',async()=>{
+ const state={alerts:[]};let failed=true;const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>{if(failed)throw Error('private-token');return {host:{hostname:'empty'},containers:[]}}});
+ service.checkHost('');await service.settled();assert.match(service.status('').error,/did not return a usable inventory/);assert.ok(!JSON.stringify(service.status()).includes('private-token'));failed=false;service.checkHost('');await service.settled();assert.equal(service.status('').error,'');assert.deepEqual(service.status('').rows,[]);
+});
+test('completed image batches are visible while the remaining selected-host registry check is pending',async()=>{
+ let release;const block=new Promise(r=>release=r),state={alerts:[]};const data={host:{hostname:'media'},containers:[1,2,3].map(i=>({id:'c'+i,name:'web'+i,image:'app'+i+':latest',imageId:img}))};
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>data,query:async p=>{if(p.startsWith('/images/'))return {RepoDigests:[1,2,3].map(i=>'app'+i+'@'+old)};if(p.includes('app3'))await block;return {Descriptor:{digest:next}}}});service.checkHost('node:qemu/201');
+ for(let i=0;i<50&&service.status('node:qemu/201').rows.length<2;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(service.status('node:qemu/201').rows.length,2);assert.deepEqual(service.status('node:qemu/201').progress,{stage:'registry',completed:2,total:3});assert.equal(service.status('node:qemu/201').manualChecking,true);release();await service.settled();assert.equal(service.status('node:qemu/201').rows.length,3);
+});
+test('fresh automatic guest inventory also clears an earlier manual inventory error',async()=>{
+ const state={alerts:[]},service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>{throw Error('Node agent request timed out')},query:async p=>p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:next}}});
+ service.checkHost('node:qemu/201');await service.settled();assert.ok(service.status('node:qemu/201').error);service.observe({dockerFleet:{hosts:[{id:'node:qemu/201',status:'reachable',inventory:snapshot.docker}]}},true);await service.settled();assert.equal(service.status('node:qemu/201').error,'');assert.equal(service.status('node:qemu/201').rows[0].status,'available');
+});

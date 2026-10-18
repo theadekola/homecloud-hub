@@ -328,8 +328,22 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/docker/updates/:id/progress',req=>updateProgress.read(req.user.sub,selectedAgentHost()||'direct',req.params.id,req.query.operation),'owner');
  action('post','/docker/updates/:id/install','owner','docker.container.install-update',async req=>{
   const host=selectedAgentHost()||'direct',row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);
-  const tracking=req.body.operationId?updateProgress.start(req.user.sub,host,req.params.id,req.body.operationId):null;
-  try{const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:host,onProgress:(percent,stage)=>tracking?.report(percent,stage)});imageUpdates.installed(host,req.params.id,result);tracking?.finish();return result}catch(error){tracking?.fail();throw error}
+  const operationId=req.body.operationId;
+  if(req.body.background===true){
+   const existing=updateProgress.read(req.user.sub,host,req.params.id,operationId).progress;
+   if(existing)return {jobId:operationId,message:'Installation already accepted. Follow its progress for the result.'};
+   if(!row||row.status!=='available')throw httpError('Recheck available updates first',409);
+   const tracking=updateProgress.start(req.user.sub,host,req.params.id,operationId),input={...req.body,containerId:req.params.id};
+   void agentContext.run({host:host==='direct'?'':host},async()=>{
+    let result;
+    try{result=await imageUpdateInstaller(row,input,{hostId:host,onProgress:tracking.report});imageUpdates.installed(host,req.params.id,result);tracking.finish(result);try{await monitor.invalidate()}catch{}}
+    catch(error){tracking.fail(error.message);try{await audit(req,'docker.container.install-update.result',req.params.id,{error:error.message},'failed')}catch{}return}
+    try{await audit(req,'docker.container.install-update.result',req.params.id,{result},'success')}catch{}
+   });
+   return {jobId:operationId,message:'Installation accepted. Progress and the verified result remain available if this page reloads.'};
+  }
+  const tracking=operationId?updateProgress.start(req.user.sub,host,req.params.id,operationId):null;
+  try{const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:host,onProgress:(percent,stage)=>tracking?.report(percent,stage)});imageUpdates.installed(host,req.params.id,result);tracking?.finish(result);return result}catch(error){tracking?.fail(error.message);throw error}
  },true);
  action('post','/docker/container','operator','docker.container.create',req=>dockerCreateContainer(req.body));
  action('post','/docker/image/build','operator','docker.image.build',req=>dockerBuildImage(req.body));

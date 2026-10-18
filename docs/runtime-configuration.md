@@ -45,3 +45,15 @@ An owner can open Settings → Integrations → Configure AI, or Configure AI on
 Assistant queries send current measurements and user text to the selected fixed OpenAI endpoint. Requests disable response storage. Responses uses `/v1/responses`; Chat Completions uses `/v1/chat/completions`. Model discovery uses `/v1/models` and does not generate a completion. Credentials and raw upstream error bodies are never returned or logged. Existing configurations without an API type continue using Responses. Disconnect disables the saved connection, including environment fallback.
 
 Official API references: [Models](https://developers.openai.com/api/reference/resources/models/methods/list), [Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+
+## Connection test feedback
+
+Configuration dialogs show testing, success and failure feedback beside their
+action buttons. Results receive focus and scroll into view. Testing a draft keeps
+the form open for Save Configuration; testing an already saved connection uses
+the existing success message and automatic close. Invalid protocol values show a
+required choice instead of silently displaying a different first option.
+
+TrueNAS uses `current` for JSON-RPC and `legacy` for the older API. Existing
+`TRUENAS_API_MODE=jsonrpc` environment or saved values are accepted as an alias
+for `current`, including when testing or saving an unchanged protocol.

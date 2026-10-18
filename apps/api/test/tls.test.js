@@ -12,7 +12,7 @@ const available=spawnSync(executable,['version']).status===0;
 await test('TLS connectors authenticate, surface provider errors and support both TrueNAS protocols',{skip:!available},async()=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-tls-test-'));const key=path.join(directory,'key.pem'),cert=path.join(directory,'cert.pem');
  const generated=spawnSync(executable,['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
- const seen=[];let rejected=false,denied=false,unavailable=false;
+ const seen=[];let rejected=false,denied=false,unavailable=false,invalidResponse=false;
  const server=https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async(req,res)=>{
    let raw='';for await(const chunk of req)raw+=chunk;seen.push({path:req.url,method:req.method,headers:req.headers,body:raw?JSON.parse(raw):null});
    res.setHeader('Content-Type','application/json');
@@ -23,6 +23,7 @@ await test('TLS connectors authenticate, surface provider errors and support bot
  const wss=new WebSocketServer({server,verifyClient:(_info,done)=>done(!unavailable,404)});
  wss.on('connection',(ws,req)=>ws.on('message',raw=>{
    const data=JSON.parse(raw.toString());seen.push(data);
+   if(invalidResponse)return ws.send('null');
    if(data.msg==='connect')return ws.send(JSON.stringify({msg:'connected',session:'test'}));
    const legacy=data.msg==='method';
    if(data.method==='auth.login_with_api_key')return ws.send(JSON.stringify(legacy?{msg:'result',id:data.id,result:!rejected}:{jsonrpc:'2.0',id:data.id,result:!rejected}));
@@ -47,6 +48,7 @@ await test('TLS connectors authenticate, surface provider errors and support bot
     rejected=true;await check({},/rejected API authentication/);rejected=false;
     denied=true;await check({},/permission to call system.info/);denied=false;
     unavailable=true;await check({},/WebSocket endpoint/);unavailable=false;
+    invalidResponse=true;await check({},/invalid TrueNAS API response/);invalidResponse=false;
     delete process.env.TRUENAS_TLS_CA;try{await check({TRUENAS_CA_PEM:''},/not trusted/);}finally{process.env.TRUENAS_TLS_CA=cert;}
     const before=seen.filter(r=>r.method==='auth.login_with_api_key').length;
     await check({TRUENAS_URL:base.replace('localhost','127.0.0.1')},/hostname mismatch/);

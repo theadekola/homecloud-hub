@@ -111,6 +111,7 @@ async function truenasCall(method,params=[],env=runtimeEnvironment()){
     ws.on('open',()=>legacy?ws.send(JSON.stringify({msg:'connect',version:'1',support:['1']})):send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]));
     ws.on('message',raw=>{
       let message;try{message=JSON.parse(raw.toString())}catch{return finish(Object.assign(new Error('Invalid TrueNAS response'),{truenasFailure:'response'}));}
+      if(!message||typeof message!=='object'||Array.isArray(message))return finish(Object.assign(new Error('Invalid TrueNAS response'),{truenasFailure:'response'}));
       if(legacy&&message.msg==='ping'){ws.send(JSON.stringify({msg:'pong',id:message.id}));return;}
       if(legacy&&message.msg==='connected'){send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]);return;}
       if(legacy&&message.msg==='failed')return finish(Object.assign(new Error('TrueNAS legacy protocol rejected'),{truenasFailure:'protocol'}));

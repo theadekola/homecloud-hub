@@ -104,3 +104,7 @@ test('completed image batches are visible while the remaining selected-host regi
  for(let i=0;i<50&&service.status('node:qemu/201').rows.length<2;i++)await new Promise(r=>setTimeout(r,1));
  assert.equal(service.status('node:qemu/201').rows.length,2);assert.deepEqual(service.status('node:qemu/201').progress,{stage:'registry',completed:2,total:3});assert.equal(service.status('node:qemu/201').manualChecking,true);release();await service.settled();assert.equal(service.status('node:qemu/201').rows.length,3);
 });
+test('fresh automatic guest inventory also clears an earlier manual inventory error',async()=>{
+ const state={alerts:[]},service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>{throw Error('Node agent request timed out')},query:async p=>p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:next}}});
+ service.checkHost('node:qemu/201');await service.settled();assert.ok(service.status('node:qemu/201').error);service.observe({dockerFleet:{hosts:[{id:'node:qemu/201',status:'reachable',inventory:snapshot.docker}]}},true);await service.settled();assert.equal(service.status('node:qemu/201').error,'');assert.equal(service.status('node:qemu/201').rows[0].status,'available');
+});

@@ -77,8 +77,8 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
    if(started!==version)return;
    persistence.mutate(s=>{
     for(const priorRow of previous.values())if(valid(priorRow.hostId)&&!keys.has(priorRow.hostId+':'+priorRow.containerId)&&(reachable.has(priorRow.hostId)||retired(priorRow.hostId))){const prefix=`docker-image:${priorRow.hostId}:${priorRow.containerId}:`;for(const alert of s.alerts||[])if(alert.key?.startsWith(prefix)&&alert.status!=='resolved'){alert.status='resolved';alert.resolvedAt=new Date(now()).toISOString()}}
-    const accepted=results.filter(r=>valid(r.hostId)),checkedAt=new Date(now()).toISOString(),hostChecked={...s.dockerImageUpdates?.hostChecked};for(const h of affected)if(valid(h))hostChecked[h]=checkedAt;
-    s.dockerImageUpdates={...s.dockerImageUpdates,hostChecked,rows:[...(s.dockerImageUpdates?.rows||[]).filter(r=>!affected.has(r.hostId)||!valid(r.hostId)),...accepted],...(!onlyHost?{lastChecked:checkedAt}:{})};s.alerts??=[];
+    const accepted=results.filter(r=>valid(r.hostId)),checkedAt=new Date(now()).toISOString(),hostChecked={...s.dockerImageUpdates?.hostChecked},hostErrors={...s.dockerImageUpdates?.hostErrors};for(const h of affected)if(valid(h)){hostChecked[h]=checkedAt;if(reachable.has(h))delete hostErrors[h]}
+    s.dockerImageUpdates={...s.dockerImageUpdates,hostChecked,hostErrors,rows:[...(s.dockerImageUpdates?.rows||[]).filter(r=>!affected.has(r.hostId)||!valid(r.hostId)),...accepted],...(!onlyHost?{lastChecked:checkedAt}:{})};s.alerts??=[];
     for(const row of results.filter(r=>valid(r.hostId))){
      if(!['available','current'].includes(row.status))continue;
      const prefix=`docker-image:${row.hostId}:${row.containerId}:`,key=prefix+row.remoteDigest;

@@ -104,18 +104,19 @@ async function truenasCall(method,params=[],env=runtimeEnvironment()){
     const ws=new WebSocket(target,{ca:env.TRUENAS_CA_PEM|| (env.TRUENAS_TLS_CA?fs.readFileSync(env.TRUENAS_TLS_CA):undefined),rejectUnauthorized:true,maxPayload:32*1024*1024});
     let finished=false;
     const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);ws.close();error?reject(error):resolve(result);};
-    const timer=setTimeout(()=>{finish(new Error('TrueNAS request timed out'));ws.terminate();},Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);
-    ws.on('error',error=>finish(error));ws.on('close',()=>{if(!finished)finish(new Error('TrueNAS closed the connection'));});
+    const timer=setTimeout(()=>{finish(Object.assign(new Error('TrueNAS request timed out'),{code:'ETIMEDOUT'}));ws.terminate();},Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);
+    ws.on('unexpected-response',(_request,response)=>{response.resume();finish(Object.assign(new Error('TrueNAS WebSocket upgrade rejected'),{providerStatus:response.statusCode}));});
+    ws.on('error',error=>finish(error));ws.on('close',()=>{if(!finished)finish(Object.assign(new Error('TrueNAS closed the connection'),{truenasFailure:'closed'}));});
     const send=(id,method,params)=>ws.send(JSON.stringify(legacy?{msg:'method',id:String(id),method,params}:{jsonrpc:'2.0',id,method,params}));
     ws.on('open',()=>legacy?ws.send(JSON.stringify({msg:'connect',version:'1',support:['1']})):send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]));
     ws.on('message',raw=>{
-      let message;try{message=JSON.parse(raw.toString())}catch{return finish(new Error('Invalid TrueNAS response'));}
+      let message;try{message=JSON.parse(raw.toString())}catch{return finish(Object.assign(new Error('Invalid TrueNAS response'),{truenasFailure:'response'}));}
       if(legacy&&message.msg==='ping'){ws.send(JSON.stringify({msg:'pong',id:message.id}));return;}
       if(legacy&&message.msg==='connected'){send(1,'auth.login_with_api_key',[env.TRUENAS_API_KEY]);return;}
-      if(legacy&&message.msg==='failed')return finish(new Error('TrueNAS legacy protocol rejected'));
+      if(legacy&&message.msg==='failed')return finish(Object.assign(new Error('TrueNAS legacy protocol rejected'),{truenasFailure:'protocol'}));
       if(Number(message.id)!==1&&Number(message.id)!==2)return;
-      if(message.error)return finish(Object.assign(new Error(Number(message.id)===1?'TrueNAS authentication rejected':message.error.data?.reason||message.error.reason||message.error.message||'TrueNAS API error'),{code:message.error.code}));
-      if(Number(message.id)===1){if(message.result!==true)return finish(new Error('TrueNAS authentication rejected'));send(2,legacy?method.replace('pool.snapshot.','zfs.snapshot.'):method,params);}
+      if(message.error)return finish(Object.assign(new Error(Number(message.id)===1?'TrueNAS authentication rejected':message.error.data?.reason||message.error.reason||message.error.message||'TrueNAS API error'),{code:message.error.code,providerErrno:message.error.data?.error??message.error.data?.errno??message.error.error,truenasFailure:Number(message.id)===1?'authentication':'request'}));
+      if(Number(message.id)===1){if(message.result!==true)return finish(Object.assign(new Error('TrueNAS authentication rejected'),{truenasFailure:'authentication'}));send(2,legacy?method.replace('pool.snapshot.','zfs.snapshot.'):method,params);}
       else finish(null,message.result);
     });
   });

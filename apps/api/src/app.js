@@ -147,10 +147,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    res.json({ok:true,cluster:publicCluster(clusterConfig())});
  });
  const connectionScope=()=>crypto.createHash('sha256').update(JSON.stringify([clusterConfig(),dockerConfig(),['truenas'].map(id=>configuration.resolve(id))])).digest('hex');
- const cachedReads=new Set(['/docker','/storage','/network','/backups','/schedules','/retention','/proxmox/storage','/storage/disks','/storage/datasets','/storage/snapshots']);
+ const cachedReads=new Set(['/backups/jobs','/restore','/dashboard','/monitoring','/proxmox','/proxmox/tasks','/docker','/storage','/network','/backups','/schedules','/retention','/proxmox/storage','/storage/disks','/storage/datasets','/storage/snapshots']);
  const forceRead=req=>req?.query?.refresh==='1'||req?.get?.('X-HomeCloud-Refresh')==='1';
  const sampleView=async req=>{if(!monitor.isRefreshing)return monitor.sample(forceRead(req));if(forceRead(req))void monitor.sample(true).catch(()=>{});const s=await monitor.sample();return {...s,refreshing:!!s.refreshing||monitor.isRefreshing()};};
- const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>{res.set('Cache-Control','no-store');if(!cachedReads.has(path))return res.json(await handler(req));const url=new URL(req.originalUrl,'http://local');url.searchParams.delete('refresh');url.searchParams.sort();const key=JSON.stringify([req.user?.sub,req.user?.role,connectionScope(),selectedAgentHost(),url.pathname+url.search]);res.json(await readCache.run(key,()=>handler(req),{force:forceRead(req)}));});
+ const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>{res.set('Cache-Control','no-store');if(!cachedReads.has(path))return res.json(await handler(req));const url=new URL(req.originalUrl,'http://local');url.searchParams.delete('refresh');url.searchParams.sort();const key=JSON.stringify([req.user?.sub,req.user?.role,connectionScope(),selectedAgentHost(),url.pathname+url.search]);res.json(await readCache.run(key,()=>handler(req),{force:forceRead(req),background:true}));});
 
  app.get('/api/ssh/connections',authorize('admin'),(req,res)=>{try{res.json(publicSavedSSH(req.user.sub));}catch(e){res.status(500).json({error:'Saved connections unavailable'});}});
  const approvalHosts=new Map();
@@ -198,7 +198,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    catch{return {inventory:null,id:selectedAgentHost(),errors:['Selected Docker host is unavailable. Inspect its node agent; no other host was substituted.']};}
  };
  const providerReads=async requests=>{
-   const s=await sampleView();const response={errors:[],connectors:s.services,refreshing:!!s.refreshing,providerInventory:{}};
+   const s=await sampleView();const response={errors:[],connectors:s.services,refreshing:false,providerInventory:{}};
 
    await Promise.all(requests.map(async([key,provider,handler])=>{
      response[key]=[];response.providerInventory[key]={configured:providers[provider].configured(),complete:false};
@@ -217,7 +217,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
 
  read('/proxmox',async req=>{if(forceRead(req))void monitor.sample(true).catch(()=>{});const config=clusterConfig();return {...await snapshot('proxmox',forceRead(req)),cluster:config.url?{name:config.name,url:config.url}:null};});
 
- read('/proxmox/storage',()=>storageInventory());
+ const readStorage=req=>readCache.run('storage-inventory:'+connectionScope(),()=>storageInventory(),{force:forceRead(req)});
+ const readBackupJobs=req=>readCache.run('backup-jobs:'+connectionScope(),()=>backupJobs(),{force:forceRead(req)});
+ const readArchives=req=>readCache.run('backup-archives:'+connectionScope(),()=>backupArchives(),{force:forceRead(req)});
+ read('/proxmox/storage',req=>readStorage(req));
  read('/proxmox/storage/configuration',()=>storageConfiguration());
  read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
  action('put','/network/dns/:node','admin','network.dns.configure',req=>networkDnsWrite(req.params.node,req.body),true);
@@ -258,12 +261,12 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/truenas',()=>snapshot('truenas'));
 
 
- read('/storage',async req=>{const s=await sampleView(req),errors=[];let proxmox=[],proxmoxComplete=false,coverage={complete:true,expectedNodes:[],readNodes:[],missingNodes:[]};
-   if(providers.proxmox.configured())try{const result=await storageInventory();proxmox=result.resources;coverage=result.coverage;proxmoxComplete=result.coverage.complete;errors.push(...result.errors);}catch(e){coverage.complete=false;errors.push(e.message);}
+ read('/storage',async req=>{const [s,storageResult]=await Promise.all([sampleView(req),providers.proxmox.configured()?readStorage(req).then(result=>({result}),error=>({error})):null]),errors=[];let proxmox=[],proxmoxComplete=false,coverage={complete:true,expectedNodes:[],readNodes:[],missingNodes:[]};
+   if(providers.proxmox.configured())try{if(storageResult?.error)throw storageResult.error;const result=storageResult.result;proxmox=result.resources;coverage=result.coverage;proxmoxComplete=result.coverage.complete;errors.push(...result.errors);}catch(e){coverage.complete=false;errors.push(e.message);}
    if(providers.truenas.configured()&&(!s.truenas||(s.truenas.errors||[]).some(e=>/^pool\.(query|dataset\.query):/.test(e)))){coverage.complete=false;errors.push('TrueNAS pool capacity readings are incomplete');}
-   const selected=await selectedDocker(s,forceRead(req));errors.push(...selected.errors);
+   const selected=req.query.view==='pools'?{inventory:null,id:selectedAgentHost()||'direct',errors:[]}:await selectedDocker(s,forceRead(req));errors.push(...selected.errors);
    const pools=[...proxmox.map(p=>({...p,provider:'proxmox'})),...(s.truenas?.pools||[]).map(pool=>({...pool,node:s.truenas?.info?.hostname||'TrueNAS',location:`TrueNAS pool ${pool.name}`,availabilityReason:'Managed by TrueNAS. Proxmox and Docker use this storage through their configured mounts or virtual disks.'}))];
-   return {pools,providerInventory:{proxmox:{configured:providers.proxmox.configured(),complete:proxmoxComplete},truenas:{configured:providers.truenas.configured(),complete:!!s.truenas&&!(s.truenas.errors||[]).some(e=>/^pool\.(query|dataset\.query):/.test(e))}},summary:storageSummary(pools,coverage),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},volumes:selected.inventory?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt,refreshing:!!s.refreshing};});
+   return {pools,providerInventory:{proxmox:{configured:providers.proxmox.configured(),complete:proxmoxComplete},truenas:{configured:providers.truenas.configured(),complete:!!s.truenas&&!(s.truenas.errors||[]).some(e=>/^pool\.(query|dataset\.query):/.test(e))}},summary:storageSummary(pools,coverage),datasets:s.truenas?.datasets||[],snapshots:s.truenas?.snapshots||[],disks:s.truenas?.disks||[],dockerHost:{id:selected.id,name:selected.inventory?.host?.hostname||null},volumes:selected.inventory?.volumes||[],jobs:s.truenas?.jobs||[],alerts:(s.alerts||[]).filter(a=>['proxmox','truenas'].includes(a.provider)&&a.status!=='resolved'),errors,services:s.services.filter(x=>['proxmox','truenas','docker'].includes(x.provider)),sampledAt:s.sampledAt,refreshing:providers.truenas.configured()&&s.services.some(x=>x.provider==='truenas'&&x.status==='pending')};});
  read('/storage/disks',async req=>{const s=await sampleView(req),errors=[];let resources=[];if(s.refreshing)errors.push('Some provider measurements are still loading.');if(providers.proxmox.configured())try{const result=await diskInventory();resources=result.resources;errors.push(...result.errors);}catch(e){errors.push(e.message);}return {resources:[...resources,...(s.truenas?.disks||[]).map(d=>({...d,id:'truenas:'+d.id,provider:'truenas'}))],errors:[...errors,...(s.truenas?.errors||[])],sampledAt:new Date().toISOString(),refreshing:!!s.refreshing};});
 
  read('/storage/disks/:node/smart',req=>diskSmart(req.params.node,req.query.disk));
@@ -352,9 +355,11 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    if(results.some(r=>!r.ok))throw httpError(`Stack operation partially failed: ${JSON.stringify(results)}`,502);return {containers:results};
  },true);
  read('/docker/events',async req=>{const hours=integer(req.query.hours||1,'Hours',1,168),until=Math.floor(Date.now()/1000);return {events:await docker(`/events?since=${until-hours*3600}&until=${until}`),since:until-hours*3600,until};});
- read('/backups',async()=>{
-   const result=await providerReads([['jobs','proxmox',backupJobs]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
-   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
+ read('/backups/jobs',req=>providerReads([['jobs','proxmox',()=>readBackupJobs(req)]]));
+ read('/backups',async req=>{
+   const archiveWork=providers.proxmox.configured()?readArchives(req).then(value=>({value}),error=>({error})):null;
+   const result=await providerReads([['jobs','proxmox',()=>readBackupJobs(req)]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
+   if(providers.proxmox.configured())try{const archiveResult=await archiveWork;if(archiveResult.error)throw archiveResult.error;const archives=archiveResult.value;result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
    return result;
  });
  read('/schedules',()=>providerReads([['items','proxmox',backupJobs],['truenas','truenas',()=>truenas('pool.snapshottask.query')]]));
@@ -368,9 +373,9 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/retention/run','admin','proxmox.retention.prune',async req=>{
    const {node,storage,rule}=req.body;return {node,task:await pve(`/nodes/${encode(required(node,'Node'))}/storage/${encode(required(storage,'Backup storage'))}/prunebackups?${new URLSearchParams({'prune-backups':retention(rule),...(req.body.vmid?{vmid:String(integer(req.body.vmid,'VM ID',100))}:{})})}`,{method:'DELETE'})};
  },true);
- read('/restore',async()=>{
+ read('/restore',async req=>{
    const result=await providerReads([['snapshots','truenas',async()=>(await snapshot('truenas')).snapshots]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
-   if(providers.proxmox.configured())try{const archives=await backupArchives();result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
+   if(providers.proxmox.configured())try{const archives=await readArchives(req);result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
    return result;
  });
  action('post','/restore/:id/run','admin','proxmox.restore',req=>restoreArchive(req.params.id,req.body),true);

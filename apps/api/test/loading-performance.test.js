@@ -28,6 +28,22 @@ test('read coalescing isolates keys, does not cache errors, and rejects late pub
 test('forced inventory reads replace ordinary cached values and partial snapshots are never cached',async()=>{
  const cache=createReadCache();assert.equal(await cache.run('one',async()=>1),1);assert.equal(await cache.run('one',async()=>2),1);assert.equal(await cache.run('one',async()=>2,{force:true}),2);await cache.run('partial',async()=>({refreshing:true}));assert.equal(await cache.run('partial',async()=>3),3);
 });
+test('report revisits return recent data while sharing background work; explicit refresh waits and expiry never serves stale data',async()=>{
+ let time=0,calls=0;const cache=createReadCache({ttl:10,staleMs:100,now:()=>time}),gate=deferred();
+ await cache.run('report',async()=>({rows:['old']}));time=20;
+ const read=()=>{calls++;return gate.promise};
+ const first=await cache.run('report',read,{background:true}),second=await cache.run('report',read,{background:true});
+ assert.deepEqual(first,{rows:['old'],refreshing:true});assert.deepEqual(second,first);assert.equal(calls,1);
+ let done=false;const forced=cache.run('report',read,{force:true,background:true}).then(v=>{done=true;return v});await tick();assert.equal(done,false);
+ gate.resolve({rows:['new']});assert.deepEqual(await forced,{rows:['new']});assert.deepEqual(await cache.run('report',read),{rows:['new']});
+ time=200;const next=deferred();let expiredDone=false;const expired=cache.run('report',()=>next.promise,{background:true}).then(v=>{expiredDone=true;return v});await tick();assert.equal(expiredDone,false);next.resolve({rows:['fresh']});await expired;
+});
+test('completed provider readings become visible during an unrelated slow refresh without resolving alerts early',async()=>{
+ let round=0,slow=false;const gate=deferred(),state=memory();
+ const monitor=createMonitor({proxmox:{configured:()=>true,read:async()=>({nodes:[],round:++round})}},state,async()=>[],async()=>slow?gate.promise:{hosts:[]});
+ await monitor.sample(true);slow=true;const updating=monitor.sample(true);await tick();
+ try{const partial=await monitor.sample();assert.equal(partial.proxmox.round,2);assert.equal(partial.refreshing,true);assert.equal(state.get().metrics.length,1);}finally{gate.resolve({hosts:[]});await updating;}
+});
 test('optional filesystem checks have a bounded first wait, reuse work and isolate connection identities',async()=>{
  const gate=deferred();let reads=0;const reader=createGuestFilesystemReader(v=>v,{budget:5}),guests=[{node:'n',vmid:100}];const query=async(p,options)=>{reads++;assert.equal(options.timeoutMs,5000);return gate.promise};
  const initial=await reader(guests,query,'one');assert.equal(initial.get('100'),undefined);await reader(guests,query,'one');assert.equal(reads,1);gate.resolve({used:20});await tick();assert.deepEqual((await reader(guests,query,'one')).get('100'),{used:20});const other=deferred();try{assert.equal((await reader(guests,()=>other.promise,'two')).get('100'),undefined);}finally{other.resolve(null)}

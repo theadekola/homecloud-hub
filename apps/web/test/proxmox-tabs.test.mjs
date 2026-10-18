@@ -161,3 +161,14 @@ test('shared configuration dialogs focus and restore controls without scrolling 
   assert.deepEqual(calls.at(-1).options,{preventScroll:true});
  }finally{page.dom.window.HTMLElement.prototype.focus=focus;await page.close();}
 });
+
+test('backup jobs load before archive discovery and partial archives retain verified counts and destination warnings',async()=>{
+ let resolveArchives,opened=0;const archives=new Promise(r=>{resolveArchives=r}),jobs=[{id:'daily',comment:'Daily backup',storage:'backup-ssd',enabled:1}];
+ const page=await mounted('pages/ProxmoxBackups.tsx',{role:'viewer',hours:'24',onTasks(){},onStorage(){opened++}},async p=>p==='/backups/jobs'?{jobs,providerInventory:{jobs:{configured:true,complete:true}},errors:[]}:p==='/backups'?archives:p==='/proxmox/storage'?{resources:[{node:'n1',name:'backup-ssd',status:'online',content:'backup'},{node:'n2',name:'backup-ssd',status:'not-assigned',applicable:false,content:'backup'}]}:p.startsWith('/proxmox/tasks')?{tasks:[],errors:[]}:guests);
+ try{const metric=label=>[...page.container.querySelectorAll('.backup-stats .card')].find(e=>e.querySelector('small')?.textContent===label)?.querySelector('strong')?.textContent;
+ assert.equal(metric('Total Backup Jobs'),'1');assert.ok(page.container.querySelector('.backup-table').textContent.includes('Daily backup'));assert.match(page.container.querySelector('.backup-scope-warning').textContent,/backup-ssd.*n2/);
+ await page.click(button(page,'Inspect backup destinations'));assert.equal(opened,1);
+ await act(async()=>{resolveArchives({jobs,points:[{id:'archive',storage:'backup-ssd',size:100}],errors:['n2/media-storage is inactive'],providerInventory:{jobs:{configured:true,complete:true}},archiveInventory:{configured:true,complete:false}});await new Promise(r=>setTimeout(r,0))});
+ assert.equal(metric('Total Backup Jobs'),'1');assert.equal(metric('Backup Archives'),'1');assert.match(page.container.textContent,/Verified archives \/ inventory incomplete/);assert.match(page.container.textContent,/n2\/media-storage is inactive/);
+ }finally{resolveArchives({jobs,points:[],errors:[]});await page.close()}
+});

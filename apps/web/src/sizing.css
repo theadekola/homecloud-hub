@@ -375,3 +375,5 @@
 .truenas-certificate-guide th,.truenas-certificate-guide td{white-space:normal;overflow-wrap:anywhere;text-align:left;vertical-align:top}
 .truenas-certificate-guide th:first-child{width:35%}
 .truenas-certificate-guide .truenas-ip-instruction{padding:10px;border-left:3px solid #6366f1;background:#18233b}
+
+.backup-scope-warning{margin:14px 0;padding:14px;border:1px solid #78612c;border-radius:10px;background:#292316;overflow-wrap:anywhere}.backup-scope-warning p{margin:8px 0}

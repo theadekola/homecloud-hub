@@ -28,6 +28,9 @@ try{
   assert.equal(storage.body.dockerHost.id,host);assert.equal(network.body.dockerHost.name,'selected-engine');
   assert.equal((await call('/storage')).body.volumes[0].name,'direct-volume');
  });
+ await test('pool-only storage reports do not wait for or require the selected Docker host',async()=>{
+  const r=await call('/storage?view=pools','missing:host');assert.equal(r.status,200);assert.deepEqual(r.body.volumes,[]);assert.deepEqual(r.body.errors,[]);assert.equal(r.body.dockerHost.id,'missing:host');
+ });
  await test('offline selections return explicit errors and never substitute the direct Engine',async()=>{
   const r=await call('/storage','missing:host');assert.equal(r.status,200);assert.deepEqual(r.body.volumes,[]);assert.ok(r.body.errors.some(e=>e.includes('no other host')));
  });

@@ -118,7 +118,7 @@ test('Docker exposes all seven resource tabs and preserves summary navigation',a
 
 test('Storage Pools skips offline history and filtering selects an online visible pool',async()=>{
  const calls=[],GiB=1024**3;const pools=[{id:'a/off',name:'off',node:'a',provider:'proxmox',status:'offline',type:'dir'},{id:'b/local',name:'local',node:'b',provider:'proxmox',status:'online',type:'dir',capacity:GiB,used:GiB/2,available:GiB/2,usage:50}];
- const page=await mounted('pages/Storage.tsx',{},async p=>{calls.push(p);if(p==='/auth/me')return {user:{role:'viewer'}};if(p==='/storage')return {pools,summary:{pools:2,online:1,capacity:GiB,used:GiB/2,available:GiB/2,distribution:[{...pools[1],key:'proxmox:b/local'}]},snapshots:[],alerts:[],services:[],errors:[]};if(p.startsWith('/proxmox/tasks'))return {tasks:[]};return {history:[],content:[],hosts:[]}});
+ const page=await mounted('pages/Storage.tsx',{},async p=>{calls.push(p);if(p==='/auth/me')return {user:{role:'viewer'}};if(p==='/storage?view=pools')return {pools,summary:{pools:2,online:1,capacity:GiB,used:GiB/2,available:GiB/2,distribution:[{...pools[1],key:'proxmox:b/local'}]},snapshots:[],alerts:[],services:[],errors:[]};if(p.startsWith('/proxmox/tasks'))return {tasks:[]};return {history:[],content:[],hosts:[]}});
  try{assert.ok(calls.some(p=>p.startsWith('/proxmox/storage/b/local')));assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));const node=page.container.querySelector('[aria-label="Storage node"]');await act(async()=>{node.value='a';node.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}))});assert.ok(!calls.some(p=>p.startsWith('/proxmox/storage/a/off')));await page.click(page.container.querySelector('button[aria-label^="Inspect "]'));assert.ok(page.container.querySelector('.storage-inline-inspect').textContent.includes('Live history and contents are unavailable'))}finally{await page.close()}
 });
 
@@ -558,7 +558,7 @@ test('storage power icons preserve the target without opening inspection',async(
  const writes=[];const page=await mounted('pages/Storage.tsx',{},async(p,init)=>{
   if(init?.method){writes.push({path:p,body:JSON.parse(init.body)});return {}}
   if(p==='/auth/me')return {user:{role:'owner'}};
-  if(p==='/storage')return {pools:[{id:'node/store',node:'node',name:'store',provider:'proxmox',status:'disabled',type:'dir'}],summary:{},errors:[]};
+  if(p==='/storage?view=pools')return {pools:[{id:'node/store',node:'node',name:'store',provider:'proxmox',status:'disabled',type:'dir'}],summary:{},errors:[]};
   return {tasks:[],history:[],content:[]};
  });
  try{
@@ -609,7 +609,7 @@ test('Overview directs guest access repairs to central Connections',async()=>{
 
 test('storage shows host assignments and supported uses without enabling storage on an unassigned node',async()=>{
  const pools=[{id:'node01/backup-ssd',node:'node01',name:'backup-ssd',provider:'proxmox',status:'online',type:'dir',path:'/mnt/backup',content:'backup',assignedNodes:['node01'],scopeVerified:true},{id:'node02/backup-ssd',node:'node02',name:'backup-ssd',provider:'proxmox',status:'not-assigned',applicable:false,type:'dir',path:'/mnt/backup',content:'backup',assignedNodes:['node01'],availabilityReason:'Assigned to node01; not assigned to node02.'},{id:'tn-pool',node:'nas-vm',name:'media-pool',provider:'truenas',type:'ZFS',status:'ONLINE',location:'TrueNAS pool media-pool'}];
- const page=await mounted('pages/Storage.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/storage'?{pools,summary:{notAssigned:1},providerInventory:{truenas:{configured:true}}}:{tasks:[],history:[],content:[]});
+ const page=await mounted('pages/Storage.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/storage?view=pools'?{pools,summary:{notAssigned:1},providerInventory:{truenas:{configured:true}}}:{tasks:[],history:[],content:[]});
  try{assert.equal(page.container.querySelectorAll('tbody tr').length,3);const foreign=[...page.container.querySelectorAll('tbody tr')].find(row=>row.textContent.includes('not assigned to node02'));assert.match(foreign.textContent,/Not assigned/);assert.match(foreign.textContent,/Supports: Backups/);assert.ok(!foreign.querySelector('button[aria-label^="Enable"]'));assert.ok(!foreign.querySelector('button[aria-label^="Disable"]'));
  const select=page.container.querySelector('[aria-label="Storage provider"]');await act(async()=>{select.value='truenas';select.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}));});assert.equal(page.container.querySelectorAll('tbody tr').length,1);assert.match(page.container.querySelector('tbody').textContent,/nas-vm/);assert.match(page.container.querySelector('tbody').textContent,/TrueNAS pool media-pool/);
  }finally{await page.close()}

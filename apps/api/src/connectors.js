@@ -1,3 +1,4 @@
+import {dockerPullProgress} from './docker-pull-progress.js';
 import {publicComposeLabels} from './docker-public.js';
 import {createGuestFilesystemReader} from './guest-filesystem-cache.js';
 import {createHash} from 'node:crypto';
@@ -20,7 +21,7 @@ export function request(url, init={}, tls={}) {
     const transport=target.protocol==='https:'?https:http;
     const req=transport.request(target,{method:init.method||'GET',headers:{...(init.headers||{}),...(init.body!=null?{'Content-Length':Buffer.byteLength(String(init.body))}:{})},...tls},res=>{
       const chunks=[];let size=0;
-      res.on('data',chunk=>{size+=chunk.length;if(size>32*1024*1024){req.destroy(new Error('Connector response exceeds 32 MiB'));return;}chunks.push(chunk);});
+      res.on('data',chunk=>{if(init.onChunk){try{init.onChunk(chunk)}catch(error){req.destroy(error)}return;}size+=chunk.length;if(size>32*1024*1024){req.destroy(new Error('Connector response exceeds 32 MiB'));return;}chunks.push(chunk);});
       res.on('error',reject);
       res.on('end',()=>{
         const buffer=Buffer.concat(chunks);
@@ -200,11 +201,15 @@ export function dockerConfigured(){return !!dockerConfig().url}
 export async function docker(path,init={}){
   const config=dockerConfig(),dockerUrl=config.url;
   if(!dockerUrl&&!selectedAgentHost()) throw Object.assign(new Error('Docker API is not configured'),{status:503});
-  const res=selectedAgentHost()?await agentRequest(path,init):await request(`${dockerUrl}${path}`,init,dockerTlsConfig(config));
+  const pull=path.startsWith('/images/create?')&&init.method==='POST'&&typeof init.onProgress==='function'?dockerPullProgress(init.onProgress):null;
+  const paired=!!selectedAgentHost();
+  if(pull&&paired&&selectedAgentVersion()<6)throw Object.assign(Error('Update the paired connector in Settings → Connections before installing image updates. Version 6 is required for reliable image downloads.'),{code:'CONNECTOR_UPDATE_REQUIRED',status:409});
+  const res=paired?await agentRequest(path,{...init,...(pull?{onProgress:pull.event}:{})}):await request(`${dockerUrl}${path}`,{...init,...(pull?{onChunk:chunk=>pull.chunk(chunk)}:{})},dockerTlsConfig(config));
   if(!res.ok && res.status!==304) {
     const text=await res.text().catch(()=> '');
     throw Object.assign(new Error(`Docker HTTP ${res.status}${text?`: ${text}`:''}`),{dockerStatus:res.status});
   }
+  if(pull&&!paired)return pull.finish();
   const text=await res.text();
   if(!text)return {};
   if(path.startsWith('/images/create?')||path.startsWith('/build?')||path.startsWith('/events?')){

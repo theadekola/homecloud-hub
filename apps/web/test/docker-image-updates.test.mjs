@@ -36,12 +36,12 @@ test('installation shows server stage percentages, keeps elapsed feedback during
  const page=await mounted('components/DockerUpdates.tsx',{owner:true,onUpdated(){}},async(p,init)=>{
   if(p==='/docker/updates')return {rows:[row],settings:{enabled:true,intervalHours:6}};
   if(p.endsWith('/plan'))return plan;
-  if(p.includes('/progress?')){reads++;assert.equal(init.headers['X-HomeCloud-Docker-Host'],'');if(failPoll)throw Error('Network lost');return {progress:{percent,stage:percent===20?'Pulling image from registry':'Starting and checking container health',status:'running'}}}
+  if(p.includes('/progress?')){reads++;assert.equal(init.headers['X-HomeCloud-Docker-Host'],'');if(failPoll)throw Error('Network lost');return {progress:{percent,stage:percent===20?'Pulling image from registry':'Starting and checking container health',status:'running',updatedAt:new Date(Date.now()-65000).toISOString()}}}
   if(p.endsWith('/install')){installBody=JSON.parse(init.body);return response}return {};
  });
  try{
   await page.click(button(page,'Review & Install'));await page.click(page.container.querySelector('[aria-label="Approve Docker image installation"]'));await page.click(button(page,'Pull & Install Update'));
-  assert.equal(page.container.querySelector('progress').value,20);assert.match(page.container.querySelector('.docker-install-progress').textContent,/Pulling image/);assert.ok(button(page,'Installing · 20%').disabled);assert.equal(page.container.querySelector('.connection-success'),null);
+  assert.equal(page.container.querySelector('progress').value,20);assert.match(page.container.querySelector('.docker-install-progress').textContent,/not reported new layer activity/);assert.match(page.container.querySelector('.docker-install-progress').textContent,/Pulling image/);assert.ok(button(page,'Installing · 20%').disabled);assert.equal(page.container.querySelector('.connection-success'),null);
   failPoll=true;await act(async()=>new Promise(r=>setTimeout(r,1600)));assert.match(page.container.querySelector('.docker-install-progress').textContent,/reconnecting/);assert.match(page.container.querySelector('.docker-install-progress').textContent,/Elapsed 0m [1-9]/);
   failPoll=false;percent=90;await act(async()=>new Promise(r=>setTimeout(r,1600)));assert.equal(page.container.querySelector('progress').value,90);assert.ok(!page.container.querySelector('.docker-install-progress').textContent.includes('reconnecting'));assert.ok(reads>=3);assert.ok(installBody.operationId);
   await act(async()=>{finish({result:{message:'Container updated and running.'}});await new Promise(r=>setTimeout(r,0))});assert.match(page.container.querySelector('.connection-success').textContent,/100%/);

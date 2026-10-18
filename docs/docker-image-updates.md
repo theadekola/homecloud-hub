@@ -33,10 +33,13 @@ digest and available Review & Install action together.
 ### Installation progress
 
 The update dialog shows a live percentage, the active installation stage and
-elapsed time. Percentages represent completed installation milestones, not image
-download bytes: configuration checks, pulling, digest verification, preparing the
-replacement, switching, health verification, and cleanup. Pulling stays at 20%
-until Docker completes the download. The elapsed timer continues while waiting.
+elapsed time. Percentages estimate overall installation progress from configuration checks,
+Docker layer download/extraction records and later verification milestones: configuration checks, pulling, digest verification, preparing the
+replacement, switching, health verification, and cleanup. Pulling starts at 20% and live layer records advance its estimate up to 60%.
+Downloaded MiB, layers ready and time since last download activity are shown.
+Layer totals can change during discovery, so this remains an overall estimate,
+not an exact byte percentage. Digest verification begins at 65%. A minute without
+new layer activity is called out while the request remains pending.
 
 Progress is read from the API every 1.5 seconds and is scoped to the owner,
 selected Docker host, container and unique installation attempt. A failed progress
@@ -54,3 +57,24 @@ form remains available. Cancelling closes only the authentication prompt and
 allows a new attempt. Installation progress remains at 0% until the required
 approval and host authentication are complete; a hidden prompt must not prevent
 users from approving the operation.
+
+### Reliable pulls through paired hosts
+
+After updating HomeCloud, update the relevant paired node connector under
+Settings → Connections using **Update Connector**. Version 6 is required before
+installing image updates through paired hosts. Older connectors receive an
+explicit upgrade-required result before any container is stopped.
+
+The connector keeps the raw Docker pull stream in a temporary directory inside
+the target guest and reads bounded 16 KiB tails. Layer snapshots travel through
+its existing authenticated outbound poll. This avoids oversized QEMU Guest Agent
+responses and keeps registry errors separate from download activity. The temporary
+directory is removed after the attempt. Direct Engine connections consume the
+response stream incrementally instead of buffering the full log.
+
+Downloads have a 15-minute hard deadline, with additional bridge transport grace.
+Failed downloads report registry/network/disk checks and leave the original
+container untouched. The replacement still requires the reviewed image digest,
+fresh configuration/dependency checks, and startup/health verification.
+Connector-update payloads are compressed to fit SSH execution packet limits;
+source hashes, host verification and pairing checks remain enforced.

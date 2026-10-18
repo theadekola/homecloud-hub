@@ -1,5 +1,5 @@
 """Fixed SSH maintenance operation. Never changes pairing or Docker/guest services."""
-import ast,base64,fcntl,hashlib,hmac,json,os,pathlib,shutil,subprocess,sys,tempfile,time
+import zlib,ast,base64,fcntl,hashlib,hmac,json,os,pathlib,shutil,subprocess,sys,tempfile,time
 
 def update(payload,root=pathlib.Path('/'),run=subprocess.run):
     if os.geteuid()!=0: raise RuntimeError('Root or sudo access is required')
@@ -44,7 +44,7 @@ def update(payload,root=pathlib.Path('/'),run=subprocess.run):
     return {'installed':True,'revision':payload['revision'],'backup':str(backup.relative_to(root))}
 
 if __name__=='__main__':
-    try: print(json.dumps(update(json.loads(base64.b64decode(sys.argv[1],validate=True)))))
+    try: print(json.dumps(update(json.loads(zlib.decompress(base64.b64decode(sys.argv[1],validate=True))))))
     except Exception as error:
         # Fixed messages only; never print config, tokens, command output or supplied credentials.
         print(json.dumps({'error':str(error) if isinstance(error,RuntimeError) else 'Connector maintenance failed; check host access and installation.'}));sys.exit(1)

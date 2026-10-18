@@ -42,6 +42,7 @@ export async function ensureNoContainerDependents(container,query=docker){
 export async function installDockerImageUpdate(row,input,{query=docker,hostId='',sleep=ms=>new Promise(r=>setTimeout(r,ms)),healthAttempts=30,onProgress=()=>{}}={}){
  if(!row||row.status!=='available'||row.containerId!==input.containerId||row.imageId!==input.imageId||row.remoteDigest!==input.remoteDigest||!digestPattern.test(input.remoteDigest||''))throw fail('The update changed. Recheck and review it before installing.');
  const lock=hostId+':'+row.containerId;if(locks.has(lock))throw fail('An update is already running for this container.');locks.add(lock);
+ let pullFailure=false;
  let old,newId='',stopped=false,renamed=false,changedPolicy=false,switched=false;const disconnected=[];
  const base='/containers/'+encodeURIComponent(row.containerId),backup='homecloud-backup-'+row.containerId.slice(0,12)+'-'+crypto.randomBytes(4).toString('hex');
  try{
@@ -54,7 +55,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   const ref=old.Config.Labels?.[trackedImageLabel]||old.Config.Image;if(ref!==row.image)throw fail('The container image reference changed. Recheck updates.');
   const repository=imageRepository(row.image),pin=repository+'@'+row.remoteDigest;
   onProgress(20,'Pulling image from registry');
-  await query('/images/create?fromImage='+encodeURIComponent(pin),{method:'POST',timeoutMs:300000});
+  try{await query('/images/create?fromImage='+encodeURIComponent(pin),{method:'POST',timeoutMs:900000,onProgress})}catch(error){pullFailure=true;if(error.code==='CONNECTOR_UPDATE_REQUIRED')throw error;const timed=/timed? ?out|timeout|expired/i.test(error.message||'');throw fail(timed?'Image download timed out. Check the Docker host’s registry access, DNS and free disk space, then retry. The original container was not stopped.':'Image download failed. Check registry access, credentials, DNS and free disk space on the Docker host. The original container was not stopped.',502)}
   onProgress(65,'Verifying downloaded image digest');
   const pulled=await query('/images/'+encodeURIComponent(pin)+'/json');
   if(!pulled.Id||!(pulled.RepoDigests||[]).some(d=>d.endsWith('@'+row.remoteDigest)))throw fail('The pulled image did not match the reviewed registry digest.');
@@ -84,6 +85,6 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
    if(restored&&old){try{if(renamed)await query(base+'/rename?name='+encodeURIComponent(old.Name.replace(/^\//,'')),{method:'POST'});for(const name of disconnected){const n=old.NetworkSettings.Networks[name];await query('/networks/'+encodeURIComponent(name)+'/connect',{method:'POST',body:JSON.stringify({Container:old.Id,EndpointConfig:{...(n.IPAMConfig?{IPAMConfig:n.IPAMConfig}:{}),Aliases:(n.Aliases||[]).filter(a=>a!==old.Id&&a!==old.Id.slice(0,12)),...(n.DriverOpts?{DriverOpts:n.DriverOpts}:{})}})})}if(changedPolicy)await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:old.HostConfig.RestartPolicy||{Name:'no'}})});if(stopped)await query(base+'/start',{method:'POST'})}catch{restored=false}}
    throw fail(restored?'The update failed. The replacement was removed and the original container restored. Mounted data was not removed.':'The update failed and automatic restoration was incomplete. Inspect the original and replacement containers before retrying.',502);
   }
-  throw fail(error.status===409?error.message:'The image could not be pulled or the replacement could not be prepared. The original container was not replaced.',error.status||502);
+  throw fail(error.status===409||pullFailure?error.message:'The image could not be pulled or the replacement could not be prepared. The original container was not replaced.',error.status||502);
  }finally{locks.delete(lock)}
 }

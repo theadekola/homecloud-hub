@@ -23,8 +23,9 @@ export function pollAgent(agent,input){
  if(!Array.isArray(input.hosts)||input.hosts.length>500)fail('Invalid host report');
  const hosts=input.hosts.map(h=>{if((agent.kind==='docker'&&h.id!=='node')||!/^(node|qemu\/\d+|lxc\/\d+)$/.test(h.id))fail('Invalid guest identity');return {id:h.id,name:String(h.name||h.id).slice(0,100),online:h.online===true,error:String(h.error||'').slice(0,400),setup:h.setup===true,status:String(h.status||'unavailable').slice(0,40)}});
  nodes.set(agent.id,{version:Number.isInteger(input.version)&&input.version>0&&input.version<=1000?input.version:1,revision:/^[a-f0-9]{64}$/.test(input.revision||'')?input.revision:null,time:Date.now(),lastSeen:new Date().toISOString(),hosts,network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
+ for(const p of (Array.isArray(input.progress)?input.progress:[]).slice(0,20)){const j=jobs.get(p?.id);if(!j||j.agent!==agent.id||!j.onProgress)continue;for(const e of (Array.isArray(p.events)?p.events:[]).slice(0,256))j.onProgress(e);}
  for(const r of (input.results||[]).slice(0,20)){const j=jobs.get(r.id);if(!j||j.agent!==agent.id)continue;jobs.delete(r.id);if(r.error)j.reject(new Error(String(r.error).slice(0,400)));else if(typeof r.body==='string'&&r.body.length<=2500000&&Number.isInteger(r.status))j.resolve(r);else j.reject(new Error('Invalid agent response'));}
- const pending=[];for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt});if(pending.length===5)break}return {jobs:pending};
+ const pending=[];for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt,...(j.onProgress?{progress:true}:{})});if(pending.length===5)break}return {jobs:pending};
 }
 export function selectedAgentVersion(){const host=agentHosts().find(h=>h.id===selectedAgentHost());return agentNodes().find(n=>n.id===host?.agent)?.version||0;}
 function queueAgentRead(host,payload,duration){return new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Node agent request timed out'))},duration);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),...payload,expiresAt:Date.now()+duration,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});}
@@ -42,8 +43,9 @@ export async function agentRequest(path,init={}){
  if(!/^\/(info|version|containers|images|networks|volumes|system|events|build|distribution)([/?]|$)/.test(path)||/[\r\n]/.test(path)||path.length>4096)fail('Unsupported Docker request');
  const method=init.method||'GET';if(method!=='GET'&&updating.has(host.agent))fail('Connector update is in progress. Retry management actions after verification.',409);if(!['GET','POST','DELETE'].includes(method))fail('Unsupported method');
  const body=init.body==null?'':(Buffer.isBuffer(init.body)?init.body:Buffer.from(String(init.body),'utf8')).toString('base64');if(body.length>1500000)fail('Request exceeds agent size limit');
- const duration=Math.max(1000,Math.min(Number(init.timeoutMs)||(method==='GET'?15000:330000),330000));
- const result=await queueAgentRead(host,{path,method,body},duration);
+ const livePull=method==='POST'&&path.startsWith('/images/create?')&&typeof init.onProgress==='function'&&selectedAgentVersion()>=6;
+ const duration=Math.max(1000,Math.min((Number(init.timeoutMs)||(method==='GET'?15000:330000))+(livePull?30000:0),livePull?930000:330000));
+ const result=await queueAgentRead(host,{path,method,body,...(livePull?{onProgress:init.onProgress}:{})},duration);
  const buffer=Buffer.from(result.body,'base64');return {ok:result.status>=200&&result.status<300,status:result.status,buffer,text:async()=>buffer.toString('utf8'),json:async()=>JSON.parse(buffer.toString('utf8'))};
 }
 

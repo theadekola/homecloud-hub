@@ -140,4 +140,43 @@ class AgentTests(unittest.TestCase):
   with patch.object(agent,'HOSTS',[{'id':'qemu/100','name':'control','online':True}]),patch.object(agent,'CONFIG',{'kind':'proxmox'},create=True),patch.object(agent,'run',side_effect=run),patch.object(agent,'docker_request',return_value={'status':200,'body':base64.b64encode(b'{"ServerVersion":"fixture"}').decode()}),patch.object(agent,'RESCAN',StopEvent()):
    with self.assertRaises(StopScan):agent.scan()
    row=next(h for h in agent.HOSTS if h['id']=='qemu/100');self.assertFalse(row['online']);self.assertIn('guest list unavailable',row['error'])
+ def test_pull_reads_bounded_snapshots_and_compacts_the_final_response(self):
+  event={'id':'layer','status':'Downloading','progressDetail':{'current':1048576,'total':2097152}}
+  snapshots=['pending\n\n'+json.dumps(event)+'\n','0\n200\n'+json.dumps({'id':'layer','status':'Pull complete'})+'\n']
+  def guest(host,script,timeout):
+   if 'tail -c' in script:return snapshots.pop(0)
+   return ''
+  reports=[]
+  with patch.object(agent,'guest_run',side_effect=guest) as run,patch.object(agent.time,'sleep'):
+   result=agent.docker_pull('qemu/100','/images/create?fromImage=nginx',30,reports.append)
+  self.assertEqual(result['status'],200);self.assertLess(len(result['body']),1000);self.assertEqual(reports[0][0]['progressDetail']['current'],1048576)
+  scripts=[call.args[1] for call in run.call_args_list];self.assertIn('--no-buffer',scripts[0]);self.assertTrue(any('tail -c 16384' in script for script in scripts));self.assertTrue(scripts[-1].startswith('rm -rf -- /tmp/homecloud-pull-'))
+ def test_pull_timeouts_and_registry_errors_are_not_reported_as_success(self):
+  for snapshot in ['28\n200\n','0\n200\n'+json.dumps({'error':'registry rejected'})+'\n']:
+   def guest(host,script,timeout):return snapshot if 'tail -c' in script else ''
+   with patch.object(agent,'guest_run',side_effect=guest):
+    if snapshot.startswith('28'):
+     with self.assertRaisesRegex(RuntimeError,'timed out'):agent.docker_pull('node','/images/create?fromImage=nginx',30,lambda e:None)
+    else:self.assertIn('error',json.loads(base64.b64decode(agent.docker_pull('node','/images/create?fromImage=nginx',30,lambda e:None)['body'])))
+ def test_large_live_pull_crosses_a_bounded_guest_bridge(self):
+  import http.server,socketserver,threading,subprocess,shutil
+  if not shutil.which('curl'):self.skipTest('curl is required for local Docker socket fixture')
+  release=threading.Event()
+  class Handler(http.server.BaseHTTPRequestHandler):
+   def log_message(self,*args):pass
+   def do_POST(self):
+    self.send_response(200);self.end_headers()
+    line=json.dumps({'id':'layer','status':'Downloading','progressDetail':{'current':1048576,'total':2097152}}).encode()+b'\n'
+    self.wfile.write(line*1200);self.wfile.flush();release.wait(10)
+    self.wfile.write(json.dumps({'id':'layer','status':'Pull complete'}).encode()+b'\n');self.wfile.flush()
+  class Server(socketserver.TCPServer):pass
+  with tempfile.TemporaryDirectory(prefix='hc-pull-') as directory:
+   server=Server(('127.0.0.1',0),Handler);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start();sizes=[];observed=[]
+   def guest(host,script,timeout):
+    output=subprocess.run(['/bin/sh','-c',script.replace('--unix-socket /var/run/docker.sock','').replace('test -S /var/run/docker.sock','test -d '+directory).replace('http://localhost','http://127.0.0.1:'+str(server.server_address[1]))],capture_output=True,text=True,timeout=timeout,check=True).stdout;sizes.append(len(output));self.assertLess(len(output),64000);return output
+   def progress(events):observed.extend(events);release.set()
+   try:
+    with patch.object(agent,'guest_run',side_effect=guest):result=agent.docker_pull('qemu/100','/images/create?fromImage=nginx',15,progress)
+    self.assertEqual(result['status'],200);self.assertTrue(observed);self.assertLess(len(result['body']),1000);self.assertTrue(release.is_set())
+   finally:release.set();server.shutdown();server.server_close();thread.join(timeout=2)
 if __name__=='__main__':unittest.main()

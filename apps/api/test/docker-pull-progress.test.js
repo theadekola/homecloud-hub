@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import http from 'node:http';
+import {dockerPullProgress} from '../src/docker-pull-progress.js';
+test('Docker pull records report bytes and layer estimates while withholding completion',()=>{
+ const seen=[],p=dockerPullProgress((percent,stage)=>seen.push({percent,stage}));const line=JSON.stringify({id:'abc',status:'Downloading',progressDetail:{current:1048576,total:2097152}})+'\n';p.chunk(Buffer.from(line.slice(0,25)));assert.equal(seen.length,0);p.chunk(Buffer.from(line.slice(25)));assert.equal(seen[0].percent,36);assert.match(seen[0].stage,/1.0 MiB/);p.event({id:'abc',status:'Pull complete'});assert.equal(seen.at(-1).percent,60);assert.match(seen.at(-1).stage,/1\/1 layers ready/);assert.ok(seen.every(x=>x.percent<65));p.finish();
+ const failed=dockerPullProgress();failed.chunk(Buffer.from('{"error":"private-token-registry-error"}\n'));assert.throws(()=>failed.finish(),e=>!e.message.includes('private-token')&&/registry/.test(e.message));
+});
+test('direct Docker pulls publish live progress before the HTTP response ends',async()=>{
+ const old=process.env.DOCKER_API_URL;let finish;const pending=new Promise(r=>finish=r);const server=http.createServer(async(req,res)=>{res.writeHead(200,{'Content-Type':'application/json'});res.write(JSON.stringify({id:'layer',status:'Downloading',progressDetail:{current:10,total:100}})+'\n');await pending;res.end('{"id":"layer","status":"Pull complete"}\n')});await new Promise(r=>server.listen(0,'127.0.0.1',r));process.env.DOCKER_API_URL=`http://127.0.0.1:${server.address().port}`;
+ try{const {docker}=await import('../src/connectors.js');let observed,done=false;const progress=new Promise(r=>observed=r);const request=docker('/images/create?fromImage=nginx',{method:'POST',onProgress:(p,s)=>observed({p,s}),timeoutMs:3000}).then(r=>{done=true;return r});await progress;assert.equal(done,false);finish();assert.deepEqual(await request,[])}finally{finish();server.closeAllConnections();await new Promise(r=>server.close(r));if(old===undefined)delete process.env.DOCKER_API_URL;else process.env.DOCKER_API_URL=old}
+});

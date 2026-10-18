@@ -1,10 +1,10 @@
 # Header notifications
 
-The bell is available throughout the signed-in application. Its badge counts only unresolved alerts visible to the current user, including acknowledged alerts that have not recovered. Recent activity remains in the popup with its own unread indicator and does not increase the bell badge. When no alerts remain unresolved, the bell has no numeric badge even if activity is unread. It refreshes from local persisted state every 10 seconds, after application writes and when the browser regains focus. It does not run a new provider scan each time.
+The bell is available throughout the signed-in application. Its badge counts unacknowledged active alerts visible to the current user and owner-visible pending update notices. Acknowledged alerts do not increase the badge, even while unresolved. Recent activity remains in the popup with its own unread indicator and does not increase the bell badge. When no unacknowledged alerts or pending update notices remain, the bell has no numeric badge even if acknowledged alerts or unread activity remain. It refreshes from local persisted state every 10 seconds, after application writes and when the browser regains focus. It does not run a new provider scan each time.
 
 ## Alerts that need attention
 
-Active and acknowledged alerts remain in the bell until the monitoring engine confirms recovery. Acknowledging an alert or marking activity as read does not resolve it. Partial or missing provider samples do not imply recovery. The count includes all outstanding alerts, with the first 50 displayed in severity order. Owners also see an available update or an updater failure.
+Active and acknowledged alerts remain in the bell until the monitoring engine confirms recovery. Acknowledging an alert or marking activity as read does not resolve it. Partial or missing provider samples do not imply recovery. The popup lists all outstanding alerts, with the first 50 displayed in severity order. Its summary separates items needing attention from acknowledged alerts. Badge counts and acknowledged totals are computed before the preview is limited, so acknowledged alerts outside the first 50 are also excluded. Owners also see an available update or an updater failure.
 
 ## Recent activity
 

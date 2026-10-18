@@ -7,7 +7,7 @@ function fixture(state={alerts:[]}){return {state,feed:createHeaderNotifications
 const request=(route='/api/actions/:provider/:resourceType/:resourceId/:action',extra={})=>({method:'POST',route:{path:route},params:{provider:'proxmox',resourceType:'vm',resourceId:'106',action:'start'},user,...extra});
 test('reading is per user, monotonic and never resolves active or acknowledged alerts',()=>{
  const {state,feed}=fixture({alerts:[{id:'a',title:'CPU high',status:'active'},{id:'b',title:'Offline',status:'acknowledged'}]});feed.capture(request(),200,'queued');
- assert.equal(feed.read(user).badgeCount,2);feed.markRead(user,1);assert.equal(feed.read(user).badgeCount,2);assert.equal(feed.read(user).attention[1].status,'acknowledged');assert.equal(feed.read({sub:'two',role:'viewer'}).unreadCount,1);feed.markRead(user,0);assert.equal(feed.read(user).unreadCount,0);assert.deepEqual(state.alerts.map(a=>a.status),['active','acknowledged']);
+ assert.equal(feed.read(user).badgeCount,1);feed.markRead(user,1);assert.equal(feed.read(user).badgeCount,1);assert.equal(feed.read(user).attention[1].status,'acknowledged');assert.equal(feed.read({sub:'two',role:'viewer'}).unreadCount,1);feed.markRead(user,0);assert.equal(feed.read(user).unreadCount,0);assert.deepEqual(state.alerts.map(a=>a.status),['active','acknowledged']);
  state.alerts[0].status='resolved';assert.equal(feed.read(user).attentionCount,1);for(const cursor of [-1,2,1.5,'1',null])assert.throws(()=>feed.markRead(user,cursor),{status:400});
 });
 test('activity excludes credential bodies and private actions from unrelated users',()=>{
@@ -38,10 +38,10 @@ test('unread recent activity never contributes to the bell badge',()=>{
  const {state,feed}=fixture();feed.capture(request(),200);
  assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).unreadCount,1);assert.equal(feed.read(user).activity.length,1);
  state.alerts.push({id:'a',title:'Offline',status:'active'});assert.equal(feed.read(user).badgeCount,1);
- state.alerts[0].status='acknowledged';assert.equal(feed.read(user).badgeCount,1);
+ state.alerts[0].status='acknowledged';assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).acknowledgedCount,1);assert.equal(feed.read(user).attention[0].status,'acknowledged');
  state.alerts[0].status='resolved';assert.equal(feed.read(user).badgeCount,0);assert.equal(feed.read(user).unreadCount,1);
 });
 
 test('attention summary separates monitoring alerts from updates before preview truncation',()=>{
- const state={alerts:Array.from({length:60},(_,i)=>({id:String(i),status:i%2?'active':'acknowledged',severity:'critical'}))};const feed=createHeaderNotifications({get:()=>state,mutate:fn=>fn(state)},()=>[{id:'node1',name:'node1',update:{available:true,version:5}}]);const result=feed.read(owner,{enabled:true,available:true});assert.equal(result.attention.length,50);assert.equal(result.attentionCount,62);assert.equal(result.alertCount,60);assert.equal(result.updateCount,2);assert.equal(result.criticalCount,60);assert.equal(feed.read(user).attentionCount,60);
+ const state={alerts:Array.from({length:60},(_,i)=>({id:String(i),status:i%2?'active':'acknowledged',severity:'critical'}))};const feed=createHeaderNotifications({get:()=>state,mutate:fn=>fn(state)},()=>[{id:'node1',name:'node1',update:{available:true,version:5}}]);const result=feed.read(owner,{enabled:true,available:true});assert.equal(result.attention.length,50);assert.equal(result.attentionCount,62);assert.equal(result.acknowledgedCount,30);assert.equal(result.badgeCount,32);assert.equal(result.alertCount,60);assert.equal(result.updateCount,2);assert.equal(result.criticalCount,60);assert.equal(feed.read(user).attentionCount,60);
 });

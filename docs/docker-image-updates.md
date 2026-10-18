@@ -29,3 +29,20 @@ Paired hosts need the connector bundled with the current HomeCloud release to re
 Update results use a three-column desktop card grid, two columns on tablets and
 one column on phones. Each card keeps its image reference, status, registry
 digest and available Review & Install action together.
+
+### Installation progress
+
+The update dialog shows a live percentage, the active installation stage and
+elapsed time. Percentages represent completed installation milestones, not image
+download bytes: configuration checks, pulling, digest verification, preparing the
+replacement, switching, health verification, and cleanup. Pulling stays at 20%
+until Docker completes the download. The elapsed timer continues while waiting.
+
+Progress is read from the API every 1.5 seconds and is scoped to the owner,
+selected Docker host, container and unique installation attempt. A failed progress
+read retries without starting another installation. Failed verification shows the
+restoration stage and never reaches 100%. A successful result shows 100% and the
+existing success message before closing automatically. An unconfirmed install
+response asks the owner to check the container before retrying. No updates start
+from progress reads. Old progress is temporary and does not contain credentials
+or container environment values.

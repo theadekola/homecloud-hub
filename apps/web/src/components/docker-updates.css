@@ -9,3 +9,15 @@
 .docker-update-card>small{margin-top:auto;overflow-wrap:anywhere}
 @media(max-width:1099px){.docker-update-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:699px){.docker-update-grid{grid-template-columns:minmax(0,1fr)}.docker-update-card .volume-toolbar>.btn{width:auto}}
+
+.docker-install-progress{padding:16px;border:1px solid #355776;border-radius:10px;background:#102439;min-width:0;display:grid;gap:10px}
+.docker-install-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.docker-install-progress-heading b{min-width:0;overflow-wrap:anywhere}
+.docker-install-progress-heading strong{flex:none;font-size:20px;font-variant-numeric:tabular-nums}
+.docker-install-progress progress{width:100%;height:14px;accent-color:#7075ff;border:0;border-radius:7px;overflow:hidden;background:#25374d}
+.docker-install-progress progress::-webkit-progress-bar{background:#25374d;border-radius:7px}
+.docker-install-progress progress::-webkit-progress-value{background:#7075ff;border-radius:7px;transition:width .3s}
+.docker-install-progress progress::-moz-progress-bar{background:#7075ff;border-radius:7px}
+.docker-install-progress p{display:flex;align-items:center;gap:8px;font-size:13px}
+.docker-install-progress.failed{border-color:#af5b62}.docker-install-progress.failed progress{accent-color:#d76b78}
+@media(prefers-reduced-motion:reduce){.docker-install-progress .spin{animation:none}.docker-install-progress progress::-webkit-progress-value{transition:none}}

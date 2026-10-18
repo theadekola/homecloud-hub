@@ -1,5 +1,6 @@
 import {connectionActions} from './connection-actions.js';
 import {dockerImageUpdates} from './docker-image-updates.js';
+import {createDockerUpdateProgress} from './docker-update-progress.js';
 import {installDockerImageUpdate,updatePlan,ensureNoContainerDependents} from './docker-install-update.js';
 import {createGuestConnectionReader} from './guest-connections.js';
 import {guestPermissionRepair} from './guest-permissions.js';
@@ -319,7 +320,13 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('put','/docker/updates/settings','owner','docker.updates.settings',req=>imageUpdates.settings(req.body));
  action('post','/docker/updates/check','owner','docker.updates.check',async()=>{const state=await monitor.sample();return imageUpdates.observe(state,true)});
  read('/docker/updates/:id/plan',async req=>{const row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);if(!row||row.status!=='available')throw httpError('Recheck available updates first',409);const c=await dockerUpdateQuery('/containers/'+encodeURIComponent(req.params.id)+'/json'),image=await dockerUpdateQuery('/images/'+encodeURIComponent(c.Image)+'/json'),plan=updatePlan(c,image);await ensureNoContainerDependents(c,dockerUpdateQuery);return {containerId:c.Id,name:plan.name,image:row.image,imageId:c.Image,remoteDigest:row.remoteDigest,configDigest:plan.binding,running:plan.running,mounts:(c.Mounts||[]).map(m=>({type:m.Type,target:m.Destination,readOnly:!m.RW})),networks:Object.keys(plan.networks),compose:!!c.Config.Labels?.['com.docker.compose.project'],environmentCount:c.Config.Env?.length||0};},'owner');
- action('post','/docker/updates/:id/install','owner','docker.container.install-update',async req=>{const row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:selectedAgentHost()||'direct'});imageUpdates.installed(selectedAgentHost()||'direct',req.params.id,result);return result;},true);
+ const updateProgress=createDockerUpdateProgress();
+ read('/docker/updates/:id/progress',req=>updateProgress.read(req.user.sub,selectedAgentHost()||'direct',req.params.id,req.query.operation),'owner');
+ action('post','/docker/updates/:id/install','owner','docker.container.install-update',async req=>{
+  const host=selectedAgentHost()||'direct',row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);
+  const tracking=req.body.operationId?updateProgress.start(req.user.sub,host,req.params.id,req.body.operationId):null;
+  try{const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:host,onProgress:(percent,stage)=>tracking?.report(percent,stage)});imageUpdates.installed(host,req.params.id,result);tracking?.finish();return result}catch(error){tracking?.fail();throw error}
+ },true);
  action('post','/docker/container','operator','docker.container.create',req=>dockerCreateContainer(req.body));
  action('post','/docker/image/build','operator','docker.image.build',req=>dockerBuildImage(req.body));
  read('/docker/image/:id',async req=>publicDockerImage(await docker(`/images/${encode(req.params.id)}/json`)));

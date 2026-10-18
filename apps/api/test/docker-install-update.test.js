@@ -32,3 +32,9 @@ test('namespace providers and legacy volume/link sources cannot be replaced unde
  }
  const f=fixture(),query=f.query;let lists=0;f.query=async(p,i)=>{if(p==='/containers/json?all=1')return ++lists===1?[]:[{Id:'sidecar'}];if(p==='/containers/sidecar/json')return {HostConfig:{NetworkMode:'container:'+oldId}};return query(p,i)};await assert.rejects(()=>installDockerImageUpdate(row,input(),f),/deployment together/);assert.ok(!f.calls.some(c=>c.p.includes('/stop?')||c.p.startsWith('/containers/create')));
 });
+
+test('installation progress follows real checkpoints and never reports completion during failed verification',async()=>{
+ const stages=[],f=fixture();await installDockerImageUpdate(row,input(),{...f,onProgress:(percent,stage)=>stages.push({percent,stage})});assert.deepEqual(stages.map(s=>s.percent),[5,10,20,65,75,80,90,95]);assert.match(stages[2].stage,/Pulling image/);assert.match(stages[3].stage,/downloaded image/);
+ const failed=[],g=fixture({unhealthy:true});await assert.rejects(()=>installDockerImageUpdate(row,input(),{...g,onProgress:(percent,stage)=>failed.push({percent,stage})}),/original container restored/);assert.ok(failed.every(s=>s.percent<100));assert.match(failed.at(-1).stage,/Restoring original/);
+ let release;const download=new Promise(r=>release=r),h=fixture(),query=h.query,seen=[];h.query=async(p,init)=>{if(p.startsWith('/images/create?'))await download;return query(p,init)};const running=installDockerImageUpdate(row,input(),{...h,onProgress:p=>seen.push(p)});await new Promise(r=>setTimeout(r,0));assert.equal(seen.at(-1),20);assert.ok(!h.calls.some(c=>c.p.includes('/stop?')));release();await running;
+});

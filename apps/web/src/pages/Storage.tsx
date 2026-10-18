@@ -25,7 +25,7 @@ const enc=encodeURIComponent;
 const online=(r:any)=>['online','ONLINE'].includes(r.status);
 export default function Storage(){
  const [rowsPerPage,setRowsPerPage]=useState(8);
- const live=useApi<any>('/storage',null),session=useApi<any>('/auth/me',null),tasks=useApi<any>('/proxmox/tasks?hours=24',{tasks:[]});
+ const live=useApi<any>('/storage?view=pools',null),session=useApi<any>('/auth/me',null),tasks=useApi<any>('/proxmox/tasks?hours=24',{tasks:[]});
  const d=live.data,pools=d?.pools||[],summary=d?.summary||{},admin=['owner','admin'].includes(session.data?.user?.role),operator=admin||session.data?.user?.role==='operator';
  const [provider,setProvider]=useState('all'),[availability,setAvailability]=useState('all');
  const [search,setSearch]=useState(''),[type,setType]=useState('all'),[node,setNode]=useState('all'),[selected,setSelected]=useState(''),[page,setPage]=useState(0),[modal,setModal]=useState(''),[inspecting,setInspecting]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');

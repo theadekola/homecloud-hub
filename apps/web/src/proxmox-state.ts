@@ -10,3 +10,10 @@ export function inventoryComplete(data:any,error?:string){
  return !(data.providerInventory||data.archiveInventory)||sources.length>0&&sources.every(source=>source.complete===true);
 }
 export function archiveInventoryComplete(data:any,error?:string){return !!data&&!error&&!data.errors?.length&&(!data.archiveInventory||data.archiveInventory.configured===true&&data.archiveInventory.complete===true);}
+
+// A failed archive store must not hide a successfully read jobs list.
+export function sourceInventoryComplete(data:any,key:string,error?:string){
+ if(!data||error)return false;
+ const source=data.providerInventory?.[key];
+ return source?source.configured===true&&source.complete===true:inventoryComplete(data,error);
+}

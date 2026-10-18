@@ -52,7 +52,7 @@ test('cached measurements remain available while a provider refresh is blocked',
  const monitor=createMonitor({proxmox:{configured:()=>true,read:async()=>{if(blocked)await new Promise(resolve=>{release=resolve;});return {nodes:[],storage:[],errors:[]};}}},{get:()=>state,mutate:fn=>fn(state)},async()=>[]);
  const first=await monitor.sample(true);blocked=true;
  const refreshing=monitor.sample(true);
- assert.equal(await monitor.sample(),first);
+ const current=await monitor.sample();assert.deepEqual(current.proxmox,first.proxmox);assert.equal(current.refreshing,true);assert.equal(state.metrics.length,1);
  release();await refreshing;
  assert.notEqual(await monitor.sample(),first);
 });

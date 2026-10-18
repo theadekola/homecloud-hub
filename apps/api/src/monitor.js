@@ -45,7 +45,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
   }));row.pending=work;readings.set(name,row);return work;
  }
  async function sample(force=false){
-  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});latest.alerts=persistence.get().alerts;return latest;}
+  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});latest.alerts=persistence.get().alerts;if(inFlight&&progress){const current={...latest,...progress,refreshing:true};return {...current,hosts:hosts(current)};}return latest;}
   if(!inFlight){
    const ticket=generation,snapshot=empty();progress=snapshot;
    for(const [name,source] of Object.entries(sources))snapshot.services.push({id:name,name,provider:name,status:source.configured()?'pending':'not-configured',response:null});

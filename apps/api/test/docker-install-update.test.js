@@ -34,11 +34,32 @@ test('namespace providers and legacy volume/link sources cannot be replaced unde
 });
 
 test('installation progress follows real checkpoints and never reports completion during failed verification',async()=>{
- const stages=[],f=fixture();await installDockerImageUpdate(row,input(),{...f,onProgress:(percent,stage)=>stages.push({percent,stage})});assert.deepEqual(stages.map(s=>s.percent),[5,10,20,65,75,80,90,95]);assert.match(stages[2].stage,/Pulling image/);assert.match(stages[3].stage,/downloaded image/);
+ const stages=[],f=fixture();await installDockerImageUpdate(row,input(),{...f,onProgress:(percent,stage)=>stages.push({percent,stage})});assert.deepEqual(stages.map(s=>s.percent),[5,10,20,65,75,80,90,95,98]);assert.match(stages[2].stage,/Pulling image/);assert.match(stages[3].stage,/downloaded image/);
  const failed=[],g=fixture({unhealthy:true});await assert.rejects(()=>installDockerImageUpdate(row,input(),{...g,onProgress:(percent,stage)=>failed.push({percent,stage})}),/original container restored/);assert.ok(failed.every(s=>s.percent<100));assert.match(failed.at(-1).stage,/Restoring original/);
  let release;const download=new Promise(r=>release=r),h=fixture(),query=h.query,seen=[];h.query=async(p,init)=>{if(p.startsWith('/images/create?'))await download;return query(p,init)};const running=installDockerImageUpdate(row,input(),{...h,onProgress:p=>seen.push(p)});await new Promise(r=>setTimeout(r,0));assert.equal(seen.at(-1),20);assert.ok(!h.calls.some(c=>c.p.includes('/stop?')));release();await running;
 });
 test('download errors explain the failure without stopping the original container or reporting success',async()=>{
  for(const message of ['Node agent request timed out','Registry access denied']){const f=fixture(),query=f.query;f.query=async(p,i)=>{if(p.startsWith('/images/create?'))throw Error(message);return query(p,i)};await assert.rejects(()=>installDockerImageUpdate(row,input(),f),e=>/Image download/.test(e.message)&&/original container was not stopped/.test(e.message));assert.ok(!f.calls.some(c=>c.p.includes('/stop?')||c.p.startsWith('/containers/create')))}
  const f=fixture(),query=f.query;f.query=async(p,i)=>{if(p.startsWith('/images/create?'))throw Object.assign(Error('Update the paired connector'),{code:'CONNECTOR_UPDATE_REQUIRED',status:409});return query(p,i)};await assert.rejects(()=>installDockerImageUpdate(row,input(),f),/Update the paired connector/);
+});
+test('successful verification removes only the unused old image after removing its container',async()=>{
+ const f=fixture();const result=await installDockerImageUpdate(row,input(),f);
+ assert.equal(result.imageCleanup.status,'removed');const deletion=f.calls.findIndex(c=>c.p==='/images/'+encodeURIComponent(imageId)+'?force=false&noprune=true');
+ assert.ok(deletion>f.calls.findIndex(c=>c.p==='/containers/'+oldId+'?v=false'));
+ assert.ok(deletion>f.calls.findIndex(c=>c.p==='/containers/'+newId+'/json'));
+ assert.ok(!f.calls.some(c=>c.p.includes('/prune')||c.p.includes('force=true')));
+});
+test('old images used by running or stopped containers, or remaining tags, are retained',async()=>{
+ for(const shared of ['running','exited','tag']){
+  const f=fixture(),query=f.query;let removed=false;
+  f.query=async(p,i)=>{if(p==='/containers/'+oldId+'?v=false')removed=true;if(removed&&p==='/containers/json?all=1'&&shared!=='tag')return [{Id:'other',ImageID:imageId,State:shared}];if(removed&&p==='/images/'+encodeURIComponent(imageId)+'/json'&&shared==='tag')return {...oldImage,RepoTags:['nginx:keep']};return query(p,i)};
+  const result=await installDockerImageUpdate(row,input(),f);assert.equal(result.imageCleanup.status,'retained');assert.ok(!f.calls.some(c=>c.init?.method==='DELETE'&&c.p.startsWith('/images/')));
+ }
+});
+test('cleanup failures preserve the verified replacement and failed updates never remove old images',async()=>{
+ for(const phase of ['tag','container','image']){
+  const f=fixture(),query=f.query;f.query=async(p,i)=>{if(phase==='tag'&&p.includes('/tag?')||phase==='container'&&p==='/containers/'+oldId+'?v=false'||phase==='image'&&i?.method==='DELETE'&&p.startsWith('/images/'))throw Object.assign(Error('private registry token'),{dockerStatus:409});return query(p,i)};
+  const result=await installDockerImageUpdate(row,input(),f);assert.equal(result.containerId,newId);assert.equal(result.imageCleanup.status,'retained');assert.ok(!JSON.stringify(result).includes('private registry token'));assert.ok(!f.calls.some(c=>c.p==='/containers/'+newId+'?force=1&v=false'));
+ }
+ const f=fixture({unhealthy:true});await assert.rejects(()=>installDockerImageUpdate(row,input(),f));assert.ok(!f.calls.some(c=>c.init?.method==='DELETE'&&c.p.startsWith('/images/')));
 });

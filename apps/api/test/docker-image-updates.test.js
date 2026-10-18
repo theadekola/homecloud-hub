@@ -53,3 +53,15 @@ test('installation progress is read-only, owner-only and isolated from other use
   release();assert.equal((await installation).status,200);assert.equal((await (await progress()).json()).progress.percent,100);
  }finally{release();if(installation)await installation;server.closeAllConnections();await new Promise(r=>server.close(r))}
 });
+test('registry failures explain their cause without leaking raw messages',async()=>{
+ const {registryCheckFailure}=await import('../src/docker-image-updates.js');
+ for(const [error,code] of [[{dockerStatus:429},'registry-rate-limit'],[{dockerStatus:401},'registry-auth'],[{message:'x509 private-token'},'registry-tls'],[{message:'lookup registry: no such host private-token'},'registry-dns'],[{message:'Request expired private-token'},'registry-timeout'],[{dockerStatus:404},'registry-image-missing'],[{message:'Invalid Docker path private-token'},'connector-update'],[{dockerStatus:500},'registry-unavailable']]){
+  const result=registryCheckFailure(error);assert.equal(result.code,code);assert.equal(result.status,'unknown');assert.ok(!JSON.stringify(result).includes('private-token'));
+ }
+});
+test('transient registry errors retry once with longer paired transport deadlines; auth and rate limits do not retry',async()=>{
+ for(const status of [500,401,429]){
+  const state={alerts:[]},calls=[];let failures=0;const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},sleep:async()=>{},query:async(p,init)=>{calls.push({p,init});if(p.startsWith('/images/'))return {RepoDigests:['nginx@'+old]};if(++failures===1)throw Object.assign(Error('private-token'),{dockerStatus:status});return {Descriptor:{digest:next}}}});
+  service.observe(snapshot,true);await service.settled();assert.equal(failures,status===500?2:1);assert.equal(service.status().rows[0].status,status===500?'available':'unknown');assert.equal(calls[0].init.timeoutMs,20000);assert.equal(calls[1].init.timeoutMs,45000);assert.ok(!JSON.stringify(service.status()).includes('private-token'));
+ }
+});

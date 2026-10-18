@@ -197,3 +197,15 @@ test('delayed clipboard reads cannot paste into an inactive terminal',async()=>{
 });
 
 test('closing the SSH success screen releases a session not yet handed to its parent',async()=>{const calls=[];const page=await mounted('components/SSHAccess.tsx',{target:'node:pve',host:'192.0.2.1',onConnected(){assert.fail('Cancelled success screen cannot open a session')}},async(p,init)=>{calls.push({p,init});if(p==='/ssh/fingerprint')return {fingerprint:'SHA256:fixture'};if(p==='/ssh/connect')return {id:'new-session'};return {}},true,false,['/'],'SSHLogin');await act(async()=>{await new Promise(r=>setTimeout(r,300))});const form=page.container.querySelector('form');form.querySelector('[name=password]').value='fixture-password';await act(async()=>{form.dispatchEvent(new page.dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick()});assert.ok(page.container.querySelector('.connection-success'));await page.close();assert.ok(calls.some(c=>c.p==='/ssh/session/new-session'&&c.init?.method==='DELETE'));});
+
+test('SSH approval appears while saved connection lookup is pending and cancellation does not block the next approval',async()=>{
+ let finishLookup,lookupSignal,rejected=0,reads=0;const waiting=new Promise(r=>finishLookup=r);
+ const page=await mounted('components/SSHAccess.tsx',{},async(p,init)=>{if(p==='/ssh/connections'){reads++;if(reads===1){lookupSignal=init.signal;return waiting}return {}}return {fingerprint:'SHA256:'+'a'.repeat(43),host:'192.0.2.5'}},true,false,['/'],'SSHApproval');
+ try{
+  await act(async()=>{window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{path:'/docker/updates/id/install',body:{},method:'POST',target:'vm:node01:100',resolve(){},reject(){rejected++}}}));await tick()});
+  assert.match(page.container.querySelector('[role=dialog]').textContent,/Preparing host authentication/);assert.equal(page.container.querySelector('form'),null);
+  await page.click(page.container.querySelector('[aria-label="Close dialog"]'));assert.equal(rejected,1);assert.equal(lookupSignal.aborted,true);
+  await act(async()=>{window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{path:'/docker/updates/id/install',body:{},method:'POST',target:'vm:node01:101',resolve(){},reject(){}}}));await tick()});assert.match(page.container.querySelector('[role=dialog]').textContent,/vm:node01:101/);assert.ok(page.container.querySelector('form'));
+  await act(async()=>{finishLookup({});await tick()});assert.match(page.container.querySelector('[role=dialog]').textContent,/vm:node01:101/);
+ }finally{finishLookup({});await page.close()}
+});

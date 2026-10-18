@@ -46,3 +46,11 @@ existing success message before closing automatically. An unconfirmed install
 response asks the owner to check the container before retrying. No updates start
 from progress reads. Old progress is temporary and does not contain credentials
 or container environment values.
+
+Host authentication prompts appear above the update review dialog. A prompt
+opens immediately while saved SSH connection details load, with an eight-second
+limit on that optional lookup. If lookup fails, the manual SSH authentication
+form remains available. Cancelling closes only the authentication prompt and
+allows a new attempt. Installation progress remains at 0% until the required
+approval and host authentication are complete; a hidden prompt must not prevent
+users from approving the operation.

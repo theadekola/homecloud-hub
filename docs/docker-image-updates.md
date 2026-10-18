@@ -80,3 +80,9 @@ Connector-update payloads are compressed to fit SSH execution packet limits;
 source hashes, host verification and pairing checks remain enforced.
 
 Registry checks allow 20 seconds for local image inspection and 45 seconds for each registry lookup, including paired transport time. Transient DNS, timeout and server/connection failures receive one bounded retry. Authentication, missing tags, TLS and rate-limit failures are reported separately without exposing raw registry messages or credentials. A healthy Docker connection does not establish registry reachability.
+
+### Selected-host checks and retained alerts
+
+**Check for Updates** reads the selected Docker host directly, independently of the background fleet scan. It reads only the container list and Engine identity, without waiting for statistics, volumes, networks or unrelated hosts. The request queues background work immediately; the page shows the inventory stage followed by completed/total image counts and publishes finished image checks in batches. Repeated clicks share the same selected-host work. A selected-host recheck remains available while automatic fleet checks run.
+
+A healthy parent Proxmox connector heartbeat does not prove that its guest Docker inventory was read. When guest inventory is unavailable, prior update alerts remain unresolved and installation remains unavailable until a fresh registry observation succeeds. The page explains guest inventory failures separately from registry failures. A newer selected-host result cannot be overwritten by an older fleet scan. Other hosts’ rows and alerts are preserved.

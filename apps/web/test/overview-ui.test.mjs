@@ -90,3 +90,12 @@ test('partial backups remain visible and node problems group into scoped destina
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[{node:'n1',volid:'local:backup/one',storage:'local'}],jobs:[],errors:issues.map(i=>i.message),archiveInventory:{configured:true,complete:false,issues}}:sample());
  try{const card=page.container.querySelector('.backup-status-widget');assert.equal(card.querySelector('.backup-number strong').textContent,'1');assert.match(card.textContent,/Verified backup archives/);assert.equal(card.querySelectorAll('.backup-node-actions a').length,2);assert.equal(card.querySelector('.backup-other-issues'),null);const select=page.container.querySelector('[aria-label="Select node"]');await act(async()=>{select.value='n1';select.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}));});assert.equal(card.querySelectorAll('.backup-node-actions a').length,1);assert.equal(card.querySelector('.backup-node-actions a').getAttribute('href'),'/backups?tab=Destinations&node=n1');assert.ok(!card.textContent.includes('n2 nas denied'));}finally{await page.close()}
 });
+
+test('a failed backup refresh preserves known archive and job counts with stale status',async()=>{
+ let failed=false;const page=await mounted('pages/Overview.tsx',{},async p=>{
+  if(p==='/auth/me')return {user:{role:'viewer'}};
+  if(p==='/backups'){if(failed)throw Error('Backup inventory timed out');return {points:[{node:'n1',storage:'usb',volid:'usb:backup/one'}],jobs:[{enabled:1}],archiveInventory:{configured:true,complete:true},providerInventory:{jobs:{configured:true,complete:true}}}}
+  return sample();
+ });
+ try{failed=true;await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/Last known.*refresh failed/);const card=page.container.querySelector('.backup-status-widget');assert.match(card.textContent,/1 configured jobs/);assert.match(card.textContent,/Backup inventory timed out/);assert.ok(stat(page,'Backups').classList.contains('needs-attention'))}finally{await page.close()}
+});

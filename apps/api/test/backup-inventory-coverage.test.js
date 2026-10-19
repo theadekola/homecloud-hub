@@ -57,3 +57,18 @@ test('node and archive failures identify the affected nodes for targeted backup 
  for(const issue of result.coverage.issues)assert.ok(result.errors.includes(issue.message));
  assert.equal(result.coverage.issues.find(i=>i.node==='archives').storage,'local');
 });
+
+test('a stalled archive read returns healthy archives within the overall deadline and ignores late replies',async()=>{
+ let release;const stalled=new Promise(resolve=>release=resolve);
+ const result=await backupArchives(async(path,options)=>{
+  assert.ok(options.timeoutMs>0&&options.timeoutMs<=12000);
+  if(path==='/nodes')return [{node:'node01',status:'online'},{node:'node02',status:'online'}];
+  if(path==='/storage')return [{storage:'usb',shared:1},{storage:'media',nodes:'node02'}];
+  if(path.endsWith('/storage?content=backup'))return [{storage:'usb',active:1,shared:1},...(path.includes('/node02/')?[{storage:'media',active:1}]:[])];
+  if(path.includes('/media/'))return stalled;
+  return [{volid:'usb:backup/one.vma.zst',vmid:100}];
+ },{timeoutMs:100});
+ assert.equal(result.points.length,2);assert.equal(result.coverage.checkedStorage,2);assert.equal(result.coverage.complete,false);
+ assert.deepEqual(result.coverage.issues.map(i=>[i.node,i.storage,i.code]),[['node02','media','archive-read-failed']]);assert.match(result.errors[0],/timed out/);
+ release([{volid:'media:backup/late'}]);await new Promise(resolve=>setImmediate(resolve));assert.equal(result.points.length,2);
+});

@@ -83,3 +83,12 @@ test('Docker inventory disappearing during token rotation does not unmount a run
  const page=await mounted('pages/Docker.tsx',{},async(p,init)=>{if(p==='/auth/me')return {user:{sub:'owner-one',role:'owner'}};if(p==='/docker'){if(blocked)await wait;return data}if(p==='/docker/hosts')return {hosts:[],directEnabled:true};if(p==='/docker/updates')return {rows:[row],settings:{enabled:true,intervalHours:6}};if(p.endsWith('/plan'))return plan;if(p.endsWith('/install'))return {result:{jobId:JSON.parse(init.body).operationId}};if(p.includes('/progress?'))return {progress:{percent:40,status:'running',stage:'Downloading layers'}};return {}},true,false,'default','/docker?tab=Updates');
  try{await page.click(button(page,'Review & Install'));await page.click(page.container.querySelector('[aria-label="Approve Docker image installation"]'));await page.click(button(page,'Pull & Install Update'));blocked=true;localStorage.setItem('homecloud_access_token','rotated-token');await page.render({});assert.ok(page.container.querySelector('[role=dialog]'));assert.match(page.container.querySelector('.docker-install-progress').textContent,/Downloading layers/)}finally{release();await page.close()}
 });
+
+test('inaccessible background progress unlocks the popup without permitting a duplicate installation',async()=>{
+ let writes=0;const page=await mounted('components/DockerUpdates.tsx',{owner:true,onUpdated(){}},async(p,init)=>{
+  if(p==='/docker/updates')return {rows:[row],settings:{enabled:true,intervalHours:6}};if(p.endsWith('/plan'))return plan;
+  if(p.endsWith('/install')){writes++;return {result:{jobId:JSON.parse(init.body).operationId}}}
+  throw Object.assign(Error('Forbidden'),{status:403});
+ });
+ try{await page.click(button(page,'Review & Install'));await page.click(page.container.querySelector('[aria-label="Approve Docker image installation"]'));await page.click(button(page,'Pull & Install Update'));assert.equal(writes,1);assert.match(page.container.querySelector('.modal [role=alert]').textContent,/may still be running/);assert.ok(button(page,'Pull & Install Update').disabled);assert.equal(page.container.querySelector('.connection-success'),null);await page.click(page.container.querySelector('.modal button[aria-label="Close dialog"]'));assert.equal(page.container.querySelector('[role=dialog]'),null)}finally{await page.close()}
+});

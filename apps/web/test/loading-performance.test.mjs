@@ -41,3 +41,8 @@ test('timed-out report reads show a retryable error and keep the last available 
  const original=window.setTimeout;let expire;
  try{await page.render([['a','/storage']]);window.setTimeout=(fn,ms,...args)=>ms===30000?(expire=fn,1):original.call(window,fn,ms,...args);await act(async()=>{page.container.querySelector('button').click();await tick()});await act(async()=>{expire();await tick()});assert.match(page.container.textContent,/Last report/);assert.match(page.container.textContent,/timed out.*Refresh/);}finally{window.setTimeout=original;await page.close()}
 });
+
+test('a write during a pending first read immediately reloads mounted reports without waiting for polling',async()=>{
+ const first=deferred();let calls=0,signal;const page=await harness((p,o)=>{calls++;if(calls===1){signal=o.signal;return first.promise}return Promise.resolve({value:'Updated inventory'})});
+ try{await page.render([['a','/storage',0],['b','/storage',0]]);await page.event('homecloud-api-write');assert.equal(signal.aborted,true);assert.equal(calls,2);assert.equal(page.container.querySelectorAll('span')[0].textContent,'Updated inventory');await act(async()=>{first.resolve({value:'Obsolete inventory'});await tick()});assert.ok(!page.container.textContent.includes('Obsolete inventory'))}finally{first.resolve({});await page.close()}
+});

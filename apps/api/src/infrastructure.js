@@ -36,22 +36,34 @@ export async function runBackupJob(id,{query=pve,write=pveWrite}={}){
   return {node:job.node,task:await write(`/nodes/${encode(job.node)}/vzdump`,'POST',options)};
 }
 export async function toggleBackupJob(id){const job=await pve(`/cluster/backup/${encode(id)}`);await pveWrite(`/cluster/backup/${encode(id)}`,'PUT',{enabled:job.enabled===0||job.enabled===false?1:0});}
-export async function backupArchives(query=pve){
-  const nodes=await query('/nodes');
+export async function backupArchives(query=pve,{timeoutMs=20000}={}){
+  // Bound the whole scan, not just each sequential provider request. A slow
+  // destination must not discard archives already read from healthy stores.
+  const deadline=Date.now()+timeoutMs;
+  const read=async path=>{
+    const remaining=Math.min(12000,deadline-Date.now());
+    if(remaining<=0)throw Error('Backup inventory scan timed out; retry this destination.');
+    let timer;
+    try{return await Promise.race([Promise.resolve().then(()=>query(path,{timeoutMs:remaining})),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Backup inventory scan timed out; retry this destination.')),remaining)})]);}
+    finally{clearTimeout(timer)}
+  };
+  // Sharing metadata is optional, but must not serialize the node scan.
+  const configWork=read('/storage').then(value=>({value}),error=>({error}));
+  const nodes=await read('/nodes');
   if(!Array.isArray(nodes)||nodes.some(n=>!n||typeof n.node!=='string'||!n.node))throw httpError('Unexpected backup node inventory',502);
   const points=[],errors=[],coverage={nodes:nodes.length,checkedNodes:0,visibleStorage:0,checkedStorage:0,issues:[]};let configs=[];
   if(!nodes.length)errors.push('No Proxmox nodes are visible to the backup inventory. Check the API token permissions.');
-  try{configs=await query('/storage');if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
+  try{const result=await configWork;if(result.error)throw result.error;configs=result.value;if(!Array.isArray(configs))throw Error('Invalid storage configuration');}catch(e){configs=[];errors.push(`Storage sharing configuration: ${e.message}`);}
   await Promise.all(nodes.map(async n=>{
     if(n.status!=='online'){const message=`${n.node}: node is ${n.status||'unavailable'}; its backup archives were not checked.`;errors.push(message);coverage.issues.push({code:'node-unavailable',node:n.node,message});return;}
     let stores;
-    try{stores=await query(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){const message=`${n.node}: ${e.message}`;errors.push(message);coverage.issues.push({code:'node-inventory-failed',node:n.node,message});return;}
+    try{stores=await read(`/nodes/${encode(n.node)}/storage?content=backup`);if(!Array.isArray(stores)||stores.some(s=>!s||typeof s.storage!=='string'||!s.storage))throw Error('Unexpected backup storage inventory');coverage.checkedNodes++;}catch(e){const message=`${n.node}: ${e.message}`;errors.push(message);coverage.issues.push({code:'node-inventory-failed',node:n.node,message});return;}
     coverage.visibleStorage+=stores.length;
     const applicableStores=stores.filter(store=>storageAppliesToNode(configs.find(config=>config.storage===store.storage)||{},n.node));
     coverage.visibleStorage-=stores.length-applicableStores.length;
     await Promise.all(applicableStores.map(async store=>{
       if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){const message=`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`,config=configs.find(c=>c.storage===store.storage),mount=config?.type==='dir'&&[1,true,'1'].includes(config.is_mountpoint);errors.push(message);coverage.issues.push({code:'storage-unavailable',node:n.node,storage:store.storage,message,help:mount?`Confirm ${config.path||'the configured directory'} is mounted on ${n.node}, then retry inventory. Do not disable the mount-point check or write backups into an unmounted directory.`:'Check that this storage is enabled, online and accessible on this node in Proxmox, then retry inventory.'});return;}
-      try{const files=await query(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
+      try{const files=await read(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
         if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');
         coverage.checkedStorage++;
         for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,shared:(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===1||(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===true,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});

@@ -70,10 +70,10 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   const temp='homecloud-update-'+crypto.randomBytes(10).toString('hex');
   const created=await query('/containers/create?name='+temp,{method:'POST',body:JSON.stringify({...plan.config,Image:pulled.Id,Labels:{...plan.config.Labels,[trackedImageLabel]:row.image},HostConfig:plan.host,NetworkingConfig:{EndpointsConfig:plan.networks}})});newId=created.Id;if(!/^[a-f0-9]{12,64}$/.test(newId||''))throw fail('Docker did not return a replacement container identity.');
   onProgress(80,'Switching to the updated container');
-  await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:{Name:'no',MaximumRetryCount:0}})});changedPolicy=true;
-  if(plan.running){await query(base+'/stop?t=30',{method:'POST',timeoutMs:45000});stopped=true}
-  await query(base+'/rename?name='+backup,{method:'POST'});renamed=true;
-  for(const network of Object.keys(plan.networks)){await query('/networks/'+encodeURIComponent(network)+'/disconnect',{method:'POST',body:JSON.stringify({Container:old.Id,Force:false})});disconnected.push(network)}
+  changedPolicy=true;await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:{Name:'no',MaximumRetryCount:0}})});
+  if(plan.running){stopped=true;await query(base+'/stop?t=30',{method:'POST',timeoutMs:45000})}
+  renamed=true;await query(base+'/rename?name='+backup,{method:'POST'});
+  for(const network of Object.keys(plan.networks)){disconnected.push(network);await query('/networks/'+encodeURIComponent(network)+'/disconnect',{method:'POST',body:JSON.stringify({Container:old.Id,Force:false})})}
   await query('/containers/'+newId+'/rename?name='+encodeURIComponent(plan.name),{method:'POST'});
   onProgress(90,plan.running?'Starting and checking container health':'Verifying stopped replacement');
   if(plan.running){await query('/containers/'+newId+'/start',{method:'POST'});let healthy=false,stable=0;
@@ -100,8 +100,27 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   return {containerId:newId,previousId:old.Id,imageId:pulled.Id,imageCleanup,warning,message:plan.running?'Container updated and running. Review its application logs and health.':'Stopped container updated. It remains stopped.'};
  }catch(error){
   if(newId&&!switched){onProgress(95,'Restoring original container after failed verification');let restored=true;
-   try{await query('/containers/'+newId+'?force=1&v=false',{method:'DELETE'})}catch{restored=false}
-   if(restored&&old){try{if(renamed)await query(base+'/rename?name='+encodeURIComponent(old.Name.replace(/^\//,'')),{method:'POST'});for(const name of disconnected){const n=old.NetworkSettings.Networks[name];await query('/networks/'+encodeURIComponent(name)+'/connect',{method:'POST',body:JSON.stringify({Container:old.Id,EndpointConfig:{...(n.IPAMConfig?{IPAMConfig:n.IPAMConfig}:{}),Aliases:(n.Aliases||[]).filter(a=>a!==old.Id&&a!==old.Id.slice(0,12)),...(n.DriverOpts?{DriverOpts:n.DriverOpts}:{})}})})}if(changedPolicy)await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:old.HostConfig.RestartPolicy||{Name:'no'}})});if(stopped)await query(base+'/start',{method:'POST'})}catch{restored=false}}
+   try{await query('/containers/'+newId+'?force=1&v=false',{method:'DELETE'})}catch(error){if(error.dockerStatus!==404)restored=false}
+   if(restored&&old){try{
+    // A failed response does not prove the mutation failed. Inspect actual state
+    // before repairing attempted changes, then verify recovery before claiming it.
+    const current=await query(base+'/json');
+    if(current.Id!==old.Id||current.Image!==old.Image||!current.HostConfig||!current.NetworkSettings?.Networks||typeof current.State?.Running!=='boolean')throw Error('Original state could not be verified');
+    if(renamed&&current.Name!==old.Name)await query(base+'/rename?name='+encodeURIComponent(old.Name.replace(/^\//,'')),{method:'POST'});
+    for(const name of disconnected)if(!Object.hasOwn(current.NetworkSettings.Networks,name)){
+     const n=old.NetworkSettings.Networks[name];await query('/networks/'+encodeURIComponent(name)+'/connect',{method:'POST',body:JSON.stringify({Container:old.Id,EndpointConfig:{...(n.IPAMConfig?{IPAMConfig:n.IPAMConfig}:{}),Aliases:(n.Aliases||[]).filter(a=>a!==old.Id&&a!==old.Id.slice(0,12)),...(n.DriverOpts?{DriverOpts:n.DriverOpts}:{})}})});
+    }
+    const policy=old.HostConfig.RestartPolicy||{Name:'no'};
+    if(changedPolicy)await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:policy})});
+    if(stopped&&old.State.Running&&!current.State.Running)await query(base+'/start',{method:'POST'});
+    const verified=await query(base+'/json'),actualPolicy=verified.HostConfig?.RestartPolicy||{Name:'no'},networks=verified.NetworkSettings?.Networks;
+    if(verified.Id!==old.Id||verified.Image!==old.Image||verified.Name!==old.Name||verified.State?.Running!==old.State.Running||actualPolicy.Name!==policy.Name||(actualPolicy.MaximumRetryCount||0)!==(policy.MaximumRetryCount||0)||!networks)throw Error('Recovery could not be verified');
+    for(const [name,expected] of Object.entries(old.NetworkSettings?.Networks||{})){
+     const network=networks[name];if(!network)throw Error('Original network is missing');
+     if((expected.Aliases||[]).filter(a=>a!==old.Id&&a!==old.Id.slice(0,12)).some(a=>!(network.Aliases||[]).includes(a)))throw Error('Original network aliases were not restored');
+     if(Object.entries(expected.IPAMConfig||{}).some(([key,value])=>value&&network.IPAMConfig?.[key]!==value))throw Error('Original static network address was not restored');
+    }
+   }catch{restored=false}}
    throw fail(restored?'The update failed. The replacement was removed and the original container restored. Mounted data was not removed.':'The update failed and automatic restoration was incomplete. Inspect the original and replacement containers before retrying.',502);
   }
   throw fail(error.status===409||pullFailure?error.message:'The image could not be pulled or the replacement could not be prepared. The original container was not replaced.',error.status||502);

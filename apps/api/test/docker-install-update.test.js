@@ -3,7 +3,25 @@ import {updatePlan,installDockerImageUpdate,ensureNoContainerDependents} from '.
 const oldId='a'.repeat(64),newId='b'.repeat(64),imageId='sha256:'+'c'.repeat(64),newImage='sha256:'+'d'.repeat(64),digest='sha256:'+'e'.repeat(64);
 const container={Id:oldId,Name:'/web',Image:imageId,State:{Status:'running',Running:true},Config:{Image:'nginx:latest',Env:['DEFAULT=old','SECRET=private'],Cmd:['old-default'],Labels:{'com.docker.compose.project':'app'}},HostConfig:{RestartPolicy:{Name:'always'},PortBindings:{'80/tcp':[{HostIp:'',HostPort:'8080'}]},Binds:['/srv/web:/data:ro'],Mounts:[],NetworkMode:'app_default'},Mounts:[{Type:'bind',Source:'/srv/web',Destination:'/data',RW:false},{Type:'volume',Name:'anonymous-original',Destination:'/cache',RW:true}],NetworkSettings:{Networks:{app_default:{Aliases:['web',oldId.slice(0,12)],IPAMConfig:{IPv4Address:'172.20.0.5'}}}}};
 const oldImage={Config:{Env:['DEFAULT=old'],Cmd:['old-default']}};
-function fixture({unhealthy=false,change=false}={}){const calls=[];let originalReads=0,pulled=false;return {calls,sleep:async()=>{},healthAttempts:2,query:async(p,init)=>{calls.push({p,init});if(p.startsWith('/images/create?'))pulled=true;if(p.includes('%40')&&p.endsWith('/json')&&!pulled)throw Object.assign(Error('Not present'),{dockerStatus:404});if(p==='/containers/json?all=1')return [];if(p==='/containers/'+oldId+'/json'){originalReads++;return change&&originalReads>1?{...container,Config:{...container.Config,Env:['CHANGED=yes']}}:structuredClone(container)}if(p==='/images/'+encodeURIComponent(imageId)+'/json')return oldImage;if(p.startsWith('/images/')&&p.endsWith('/json'))return {Id:newImage,RepoDigests:['nginx@'+digest]};if(p.startsWith('/containers/create'))return {Id:newId};if(p==='/containers/'+newId+'/json')return {State:{Running:!unhealthy,Health:{Status:unhealthy?'unhealthy':'healthy'}}};return {}}}}
+function fixture({unhealthy=false,change=false}={}){
+ const calls=[],original=structuredClone(container);let originalReads=0,pulled=false;
+ return {calls,sleep:async()=>{},healthAttempts:2,query:async(p,init)=>{
+  calls.push({p,init});if(p.startsWith('/images/create?'))pulled=true;
+  if(p.includes('%40')&&p.endsWith('/json')&&!pulled)throw Object.assign(Error('Not present'),{dockerStatus:404});
+  if(p==='/containers/json?all=1')return [];
+  if(p==='/containers/'+oldId+'/json'){originalReads++;return change&&originalReads>1?{...original,Config:{...original.Config,Env:['CHANGED=yes']}}:structuredClone(original)}
+  if(p==='/containers/'+oldId+'/update')original.HostConfig.RestartPolicy=JSON.parse(init.body).RestartPolicy;
+  if(p==='/containers/'+oldId+'/stop?t=30')original.State={Status:'exited',Running:false};
+  if(p==='/containers/'+oldId+'/start')original.State={Status:'running',Running:true};
+  if(p.startsWith('/containers/'+oldId+'/rename?'))original.Name='/'+new URL('http://docker'+p).searchParams.get('name');
+  if(p==='/networks/app_default/disconnect')delete original.NetworkSettings.Networks.app_default;
+  if(p==='/networks/app_default/connect')original.NetworkSettings.Networks.app_default=JSON.parse(init.body).EndpointConfig;
+  if(p==='/images/'+encodeURIComponent(imageId)+'/json')return oldImage;
+  if(p.startsWith('/images/')&&p.endsWith('/json'))return {Id:newImage,RepoDigests:['nginx@'+digest]};
+  if(p.startsWith('/containers/create'))return {Id:newId};
+  if(p==='/containers/'+newId+'/json')return {State:{Running:!unhealthy,Health:{Status:unhealthy?'unhealthy':'healthy'}}};return {};
+ }};
+}
 const row={status:'available',containerId:oldId,imageId,image:'nginx:latest',remoteDigest:digest};const input=()=>({containerId:oldId,imageId,remoteDigest:digest,configDigest:updatePlan(container,oldImage).binding});
 test('update preserves mount identities, ports, user overrides, aliases and stopped state without exposing secrets',async()=>{
  const f=fixture();const result=await installDockerImageUpdate(row,input(),f);assert.equal(result.containerId,newId);assert.ok(f.calls.some(c=>c.p.includes('/tag?repo=nginx&tag=latest')));const create=JSON.parse(f.calls.find(c=>c.p.startsWith('/containers/create')).init.body);assert.equal(create.Image,newImage);assert.deepEqual(create.Env,['SECRET=private']);assert.equal(create.Cmd,undefined);assert.equal(create.HostConfig.PortBindings['80/tcp'][0].HostPort,'8080');assert.ok(create.HostConfig.Binds.includes('anonymous-original:/cache:rw'));assert.equal(create.NetworkingConfig.EndpointsConfig.app_default.IPAMConfig.IPv4Address,'172.20.0.5');assert.deepEqual(create.NetworkingConfig.EndpointsConfig.app_default.Aliases,['web']);assert.ok(!JSON.stringify(result).includes('private'));assert.ok(f.calls.some(c=>c.p==='/containers/'+oldId+'?v=false'));assert.ok(!f.calls.some(c=>/v=true/.test(c.p)));
@@ -66,4 +84,30 @@ test('cleanup failures preserve the verified replacement and failed updates neve
 test('an already downloaded reviewed image is verified and installed without another registry pull',async()=>{
  const f=fixture(),query=f.query,progress=[];f.query=async(p,i)=>p.includes('%40')&&p.endsWith('/json')?{Id:newImage,RepoDigests:['nginx@'+digest]}:query(p,i);
  const result=await installDockerImageUpdate(row,input(),{...f,onProgress:(percent,stage)=>progress.push({percent,stage})});assert.equal(result.containerId,newId);assert.ok(!f.calls.some(c=>c.p.startsWith('/images/create?')));assert.match(progress.find(p=>p.percent===65).stage,/already downloaded/);assert.ok(f.calls.some(c=>c.p==='/containers/'+newId+'/start'));
+});
+
+test('rollback repairs mutations whose Docker response was lost and verifies the original before reporting restoration',async()=>{
+ for(const phase of ['policy','stop','rename','disconnect']){
+  const original=structuredClone(container),f=fixture({unhealthy:true}),read=f.query;let lost=false;
+  f.query=async(p,i)=>{
+   const result=await read(p,i);if(p==='/containers/'+oldId+'/json')return structuredClone(original);
+   let action='';
+   if(p==='/containers/'+oldId+'/update'){original.HostConfig.RestartPolicy=JSON.parse(i.body).RestartPolicy;action='policy'}
+   if(p==='/containers/'+oldId+'/stop?t=30'){original.State={Status:'exited',Running:false};action='stop'}
+   if(p.startsWith('/containers/'+oldId+'/rename?')){original.Name='/'+new URL('http://docker'+p).searchParams.get('name');action='rename'}
+   if(p==='/networks/app_default/disconnect'){delete original.NetworkSettings.Networks.app_default;action='disconnect'}
+   if(p==='/networks/app_default/connect')original.NetworkSettings.Networks.app_default=JSON.parse(i.body).EndpointConfig;
+   if(p==='/containers/'+oldId+'/start')original.State={Status:'running',Running:true};
+   if(!lost&&action===phase){lost=true;throw Error('Response lost after Docker applied the change')}
+   return result;
+  };
+  await assert.rejects(()=>installDockerImageUpdate(row,input(),f),/original container restored/);
+  assert.equal(original.Name,container.Name,phase);assert.equal(original.State.Running,true,phase);assert.equal(original.HostConfig.RestartPolicy.Name,'always',phase);assert.ok(original.NetworkSettings.Networks.app_default,phase);
+ }
+});
+
+test('rollback does not claim success when Docker accepts restoration but the original remains stopped',async()=>{
+ const f=fixture({unhealthy:true}),query=f.query;
+ f.query=async(p,i)=>p==='/containers/'+oldId+'/start'?{}:query(p,i);
+ await assert.rejects(()=>installDockerImageUpdate(row,input(),f),/automatic restoration was incomplete/);
 });

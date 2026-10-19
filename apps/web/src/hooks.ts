@@ -8,7 +8,7 @@ const resources=new Map<string,Resource>();
 let eventWindow:Window|undefined;
 const scope=()=>JSON.stringify([window.sessionStorage.getItem('homecloud_access_token')||window.localStorage.getItem('homecloud_access_token')||'',window.localStorage.getItem('homecloud_docker_host')||'']);
 const emit=(entry:Resource)=>entry.listeners.forEach(notify=>notify());
-function invalidate(){for(const entry of resources.values()){entry.updated=0;entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;emit(entry);}}
+function invalidate(){for(const entry of resources.values()){entry.updated=0;entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;emit(entry);}queueMicrotask(()=>{for(const entry of resources.values())if(entry.listeners.size&&entry.scope===scope())void load(entry,true,true);});}
 function clear(){for(const entry of resources.values()){entry.generation++;entry.controller?.abort();entry.hasData=false;entry.data=undefined;entry.error='';entry.updated=0;entry.pending=undefined;entry.loading=false;emit(entry);}resources.clear();}
 function refreshMatching(event:Event){const detail=(event as CustomEvent).detail;if(!Array.isArray(detail?.prefixes))return;for(const entry of resources.values())if(entry.listeners.size&&detail.prefixes.some((p:string)=>entry.path.split('?')[0]===p||entry.path.split('?')[0].startsWith(p+'/')))detail.requests.push(load(entry,true));}
 function refreshSettings(){invalidate();for(const entry of resources.values())if(entry.listeners.size)void load(entry,true);}

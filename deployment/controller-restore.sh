@@ -30,6 +30,7 @@ restore_project="iclusters-restore-$(date -u +%Y%m%d%H%M%S)"
 printf '\nCOMPOSE_PROJECT_NAME=%s\n' "$restore_project" >> .env
 export COMPOSE_PROJECT_NAME="$restore_project"
 docker compose config --quiet
+source deployment/build-env.sh
 docker compose build api
 docker compose up -d --wait --wait-timeout 120 postgres
 docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$stage/content/database.dump"

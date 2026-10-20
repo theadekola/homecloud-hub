@@ -37,5 +37,10 @@ const sessions=await authRequest('/account/sessions',verified.body.accessToken);
 const revoked=await authRequest('/account/sessions/revoke',verified.body.accessToken,{all:true,password:account.password,code:enabled.body.recoveryCodes[1]});assert.equal(revoked.status,200);
 assert.equal((await request('/auth/refresh',{refreshToken:verified.body.refreshToken})).status,401);
 const again=await request('/auth/login',{username:owner.username,password:account.password});const signed=await request('/auth/mfa',{challengeToken:again.body.challengeToken,code:enabled.body.recoveryCodes[2]});assert.equal(signed.status,200);
+// Empty-provider controller probe: bounded concurrency, never a fleet-capacity claim.
+const pages=['/dashboard','/proxmox','/docker','/storage','/network','/backups','/monitoring','/alerts','/settings','/account/security'],latencies=[];
+await Promise.all(Array.from({length:8},async()=>{for(const route of pages){const start=performance.now();const result=await authRequest(route,signed.body.accessToken);assert.equal(result.status,200,route);latencies.push(performance.now()-start)}}));
+latencies.sort((a,b)=>a-b);const probe={scope:'isolated empty-provider controller',requests:latencies.length,concurrency:8,p50Ms:latencies[Math.floor(latencies.length*.5)],p95Ms:latencies[Math.floor(latencies.length*.95)],maximumMs:latencies.at(-1)};
+assert.ok(probe.p95Ms<5000,'Empty-provider page p95 exceeded five seconds');fs.mkdirSync('artifacts/evidence',{recursive:true});fs.writeFileSync('artifacts/evidence/page-read-probe.json',JSON.stringify(probe,null,2));console.log('Bounded controller read probe:',JSON.stringify(probe));
 const changed=await authRequest('/account/password',signed.body.accessToken,{password:account.password,code:enabled.body.recoveryCodes[3],newPassword:'CI-rotated-password-67890'});assert.equal(changed.status,200);assert.equal((await authRequest('/auth/me',signed.body.accessToken)).status,401);
 console.log('Optional MFA enrollment, single-use recovery login, device session revocation and password rotation passed through HTTPS/PostgreSQL.');

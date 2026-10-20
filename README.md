@@ -8,7 +8,9 @@
 
 i-Clusters is a self-hosted infrastructure management application for Proxmox VE, Docker and TrueNAS. It brings inventory, monitoring, supported infrastructure actions, backups, SSH terminals and SFTP into one responsive interface.
 
-Developed by **Adekola Kazeem Ayannuga** through [The Adekola Labs](https://theadekola.online). Application version: **3.0.0**. Licence: [MIT](LICENSE).
+Developed by **The Adekola** for **ATT-Tech**. Application version: **3.1.0-rc.1** (release candidate). Licence: [MIT](LICENSE).
+
+**Release status:** controlled evaluation candidate, with separate controllers per customer. Production provider acceptance, physical-device testing and independent security review remain open. See [release notes](docs/releases/v3.1.0-rc.1.md), [CHANGELOG](CHANGELOG.md), [release policy](docs/release-policy.md) and [acceptance checklist](docs/acceptance-checklist.md).
 
 ## Contents
 
@@ -39,9 +41,9 @@ Developed by **Adekola Kazeem Ayannuga** through [The Adekola Labs](https://thea
 | Notifications | Header activity feed, persistent unresolved-alert badge and configured Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, webhook and IFTTT delivery |
 | Tools | Administrator SSH shell with multiple tabs, copy/paste and SFTP file operations, using target authentication and verified host identity |
 | AI Assistant | Owner-configured OpenAI Responses or Chat Completions, model discovery and connection testing; read-only assistance |
-| Administration | Accounts/roles, audit records, encrypted supported integration configuration, browser appearance and session preferences |
+| Administration | Optional authenticator MFA, recovery codes, revocable device sessions, password changes, accounts/roles, audit records, encrypted supported integration configuration, browser appearance and session preferences |
 
-Missing or inaccessible information is shown as unavailable or partial. It is not replaced with demo data. A queued action is not proof of provider completion. App two-factor authentication, a security scanner, arbitrary workflow automation, generic Docker-volume/database backup execution and Compose file deployment are not implemented. OPNsense and Tailscale integrations are not included.
+Missing or inaccessible information is shown as unavailable or partial. It is not replaced with demo data. A queued action is not proof of provider completion. An independent security scanner, arbitrary workflow automation, generic Docker-volume/database backup execution and Compose file deployment are not implemented. OPNsense and Tailscale integrations are not included.
 
 ## Architecture
 
@@ -86,8 +88,9 @@ LAN HTTPS uses Caddy's local certificate authority. Install its public root cert
 1. Open the HTTPS address printed by the installer.
 2. Enter your name, username, password and the first-use setup code to register the owner account. Registration closes after the first account is created.
 3. Sign in. Administrators create subsequent users from **Users**.
-4. Use the eye icon to show or hide the entered password. **Remember me** controls persistent browser sign-in; it does not save the password.
-5. Choose an inactivity timeout under **Settings → Security → Active Sessions**. The default is 30 minutes for unchecked sign-ins. Remembered sign-ins expire after a fixed 10 days and require a new login. See [browser sessions](docs/browser-sessions.md).
+4. Use the eye icon to show or hide the entered password. **Remember this device** controls persistent browser sign-in; it does not save the password.
+5. Optionally enable MFA under **Settings → Security** and store the one-time recovery codes safely.
+6. Choose an inactivity timeout under **Settings → Security → Active Sessions**. The default is 30 minutes for unchecked sign-ins. Remembered sign-ins expire after a fixed 10 days and require a new login. See [browser sessions](docs/browser-sessions.md).
 
 If you missed the first-use code, run this on the i-Clusters VM and copy only the value after `=`:
 
@@ -154,7 +157,7 @@ The updater checks the configured Git upstream and rebuilds the deployment. Loca
 
 i-Clusters manages provider-reported backup/snapshot operations; it does not turn every Docker volume or database into an independently protected backup. A ZFS snapshot on the same pool is not an off-host backup.
 
-Protect the controller separately: back up PostgreSQL consistently, its `runtime` directory, deployment configuration and signing/encryption keys, certificates and Caddy data as applicable. Encrypted saved credentials require the original key material. Keep backups outside the controller and test restores. Do not run `docker compose down --volumes` on a live installation unless you intend to delete its volumes. See [production recovery](PRODUCTION.md).
+Protect the controller separately: back up PostgreSQL consistently, its `runtime` directory, deployment configuration and signing/encryption keys, certificates and Caddy data as applicable. Encrypted saved credentials require the original key material. Keep backups outside the controller and test restores. Do not run `docker compose down --volumes` on a live installation unless you intend to delete its volumes. Use `sudo homecloud backup /absolute/backup-directory age1YOUR_PUBLIC_RECIPIENT` for an encrypted controller backup. See [controller recovery](deployment/SECURITY-AND-RECOVERY.md) and [production recovery](PRODUCTION.md).
 
 ## Development
 
@@ -212,3 +215,14 @@ Commercial deployment status and remaining release gates: [20 October readiness 
 | [Icon assets](docs/icon-assets.md) | Third-party artwork sources and separate licences |
 
 Use [GitHub Issues](https://github.com/theadekola/homecloud-hub/issues) for reproducible bugs and feature requests. For vulnerabilities, follow [SECURITY.md](SECURITY.md) and avoid public disclosure of exploitable details.
+
+## Release and operating documentation
+
+- [Documentation index](docs/README.md)
+- [Compatibility and scope](docs/compatibility.md)
+- [Operations, retention and incident response](docs/operations.md)
+- [Release policy](docs/release-policy.md) and [release notes](docs/releases/v3.1.0-rc.1.md)
+- [Customer acceptance checklist](docs/acceptance-checklist.md)
+- [Contributing](CONTRIBUTING.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
+
+Developer: **The Adekola** · Company: **ATT-Tech**. The existing repository owner and Ubuntu service/path names remain compatibility identifiers.

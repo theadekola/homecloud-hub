@@ -1,5 +1,7 @@
 # Security and operational scope
 
+Publisher attribution: **ATT-Tech**. Developer: **The Adekola**. Applies to the 3.1.0 release-candidate series; see [release policy](docs/release-policy.md).
+
 i-Clusters controls privileged infrastructure. Use dedicated provider identities and grant only the permissions needed for the selected features. The MIT licence is not a security guarantee.
 
 ## Reporting vulnerabilities
@@ -12,6 +14,9 @@ There is no formal long-term-support or backport commitment. Use the latest revi
 
 ## Implemented controls
 
+- Optional authenticator MFA with encrypted setup keys, replay-resistant TOTP counters, one-time hashed recovery codes and password-verified self-service controls.
+- Device sessions can be revoked on the server, including associated SSH access. Password changes and console recovery invalidate earlier sessions.
+- Browser refresh credentials use Secure, HttpOnly, SameSite=Strict cookies, a same-origin custom-header/origin check, and refresh replay rejection. Short-lived access tokens remain JavaScript-readable; CSP does not remove all XSS risk.
 - bcrypt password hashes; short-lived signed JWT access tokens; unique refresh tokens with rotation and replay rejection.
 - Current account status and role checked on authenticated requests. Roles are viewer, auditor, operator, admin and owner; interface visibility alone is not the authorization boundary.
 - Rate limiting, Helmet headers, configured origins and payload validation. These do not replace a deployment firewall or identity gateway.
@@ -36,7 +41,7 @@ The updater is a privileged host service that fetches configured upstream code a
 
 ## Boundaries and unsupported protections
 
-Application two-factor authentication, intrusion detection and an independent security scanner are not implemented. Browser sign-out does not invalidate already issued access tokens before server expiry, stop submitted jobs or sign out other devices.
+Intrusion detection and an independent authenticated security assessment are not supplied by the application. Successful explicit browser sign-out revokes that device session; legacy sessions without a device identity revoke all sessions. Signing out does not cancel submitted provider jobs. Browser inactivity expiry is a local preference, not a server-wide idle-revocation policy.
 
 Audit records capture submitted operations, failures and returned task identifiers. Provider tasks require later outcome checks. Database administrators can change audit records; the log is not cryptographically immutable. API reachability, successful configuration saves and queued actions are not proof of overall health, successful delivery or completed work.
 
@@ -57,3 +62,7 @@ release is eligible; arbitrary scripts, download URLs and service names cannot
 be supplied by the client. Backups stay root-only on the paired host. Completion
 requires a fresh matching code-revision heartbeat. SSH passwords and raw remote
 output are excluded from update status, notifications and audit details.
+
+## Release validation and response
+
+CI gates tests, deployment, encrypted controller restore, production dependency checks and fixable HIGH/CRITICAL container-image findings. Reports and SBOMs accompany release candidates. Unfixed findings remain in scan reports and require operator review; they are not evidence of zero risk. Independent penetration testing and live provider/device acceptance remain separate gates. See [operations](docs/operations.md) for incident handling and recovery. Only one API controller process is supported per installation; local journals do not coordinate multiple writers.

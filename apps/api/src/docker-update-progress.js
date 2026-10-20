@@ -4,8 +4,8 @@ export function createDockerUpdateProgress({now=Date.now,limit=200,ttl=86400000,
  const entries=new Map(),valid=id=>typeof id==='string'&&/^[a-zA-Z0-9-]{16,80}$/.test(id);
  const key=(user,host,container,id)=>JSON.stringify([user,host,container,id]);
  const persist=()=>{if(file)writeDurableJson(file,{version:1,data:seal(JSON.stringify([...entries]))})};
- if(file){const saved=readDurableJson(file);if(saved){if(saved.version!==1)throw Error('Unsupported Docker operation journal');for(const [k,v] of JSON.parse(unseal(saved.data))){if(v.status==='running'){v.status='interrupted';v.stage='Controller restarted. Review and recover this attempt before retrying.'}entries.set(k,v)}persist()}}
- const locked=v=>['running','interrupted'].includes(v.status);
+ if(file){const saved=readDurableJson(file);if(saved){if(saved.version!==1)throw Error('Unsupported Docker operation journal');for(const [k,v] of JSON.parse(unseal(saved.data))){if(['running','recovering'].includes(v.status)){v.status='interrupted';v.stage='Controller restarted. Review and recover this attempt before retrying.'}entries.set(k,v)}persist()}}
+ const locked=v=>['running','interrupted','recovering'].includes(v.status);
  const prune=()=>{for(const [k,v] of entries)if(now()-v.touched>ttl&&!locked(v))entries.delete(k)};
  const find=(user,host,container,id)=>valid(id)?entries.get(key(user,host,container,id)):null;
  const tracking=entry=>({
@@ -17,6 +17,12 @@ export function createDockerUpdateProgress({now=Date.now,limit=200,ttl=86400000,
  return {
   start(user,host,container,id){if(!valid(id))throw Object.assign(Error('Invalid installation progress identifier.'),{status:400});prune();if(entries.size>=limit){const oldest=[...entries].find(([,v])=>!locked(v));if(oldest)entries.delete(oldest[0]);else throw Object.assign(Error('Too many installations are being tracked. Retry shortly.'),{status:429})}if([...entries.values()].some(v=>locked(v)&&v.host===host&&v.container===container))throw Object.assign(Error('An update is already running or interrupted for this container. Recover the earlier attempt first.'),{status:409});const entry={percent:0,stage:'Checking reviewed configuration',status:'running',startedAt:new Date(now()).toISOString(),touched:now(),host,container};entries.set(key(user,host,container,id),entry);persist();return tracking(entry)},
   read(user,host,container,id){prune();const entry=find(user,host,container,id);if(!entry)return {progress:null};const {touched,host:h,container:c,checkpoint,...progress}=entry;return {progress:{...progress,updatedAt:new Date(touched).toISOString()}}},
-  interrupted(user,host,container,id){const entry=find(user,host,container,id);if(!entry||entry.status!=='interrupted')throw Object.assign(Error('This attempt is not awaiting recovery.'),{status:409});return {checkpoint:entry.checkpoint,tracking:tracking(entry)}},
+  interrupted(user,host,container,id){
+   const entry=find(user,host,container,id);
+   if(!entry||entry.status!=='interrupted')throw Object.assign(Error('This attempt is not awaiting recovery, or recovery is already running.'),{status:409});
+   entry.status='recovering';entry.stage='Recovery is checking this container. Other update attempts are locked.';entry.touched=now();
+   try{persist()}catch(error){entry.status='interrupted';throw error}
+   return {checkpoint:structuredClone(entry.checkpoint),tracking:tracking(entry),release(){if(entry.status==='recovering'){entry.status='interrupted';entry.stage='Recovery could not be verified. Inspect the result before retrying.';entry.touched=now();persist()}}};
+  },
  };
 }

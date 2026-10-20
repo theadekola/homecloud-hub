@@ -33,9 +33,9 @@ Provider inventory and per-provider health are owned by Connections. Advanced ru
 
 ## Security
 
-Security displays enforced policies without presenting deployment-managed protections as editable switches. It shows role policy, token lifetimes, password requirements, current transport observations and the available current-browser session. It does not claim an all-device session inventory, intrusion detection or two-factor implementation.
+Security displays enforced policies without presenting deployment-managed protections as editable switches. It shows role policy, token lifetimes, password requirements, current transport observations and the available current-browser session. It includes optional authenticator MFA, recovery codes, password change and the current user’s revocable device-session inventory. Intrusion detection is not provided.
 
-Sign Out This Browser appears once, under Active Sessions. It removes this browser's stored tokens and does not revoke other devices' existing access tokens. Audit preview/download is available only to roles allowed to read /audit. Preview loads on request; download uses the API's retained-record limit. General and System do not duplicate these session or audit controls.
+Sign Out This Browser appears once, under Active Sessions. It revokes this device’s server session and removes its browser credentials. Legacy sessions without a device identity revoke all sessions. The account controls also support explicit all-device revocation. Audit preview/download is available only to roles allowed to read /audit. Preview loads on request; download uses the API's retained-record limit. General and System do not duplicate these session or audit controls.
 
 ## Delivery and integrations
 

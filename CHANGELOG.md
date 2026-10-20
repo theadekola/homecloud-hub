@@ -18,6 +18,8 @@ Release candidate for controlled evaluation, not a general-availability certific
 
 ### Fixed
 
+- Runtime images update Alpine packages, remove unused bundled npm tooling, rebuild Caddy 2.11.7 with patched Go HTTP/2 dependencies, and replace PostgreSQL’s outdated Go privilege helper with su-exec without changing PostgreSQL major version.
+
 - Concurrent recovery attempts now exclusively claim a Docker operation and block new installations until recovery finishes.
 - Recovery verifies restored restart policy, network aliases and configured static network addresses before reporting success.
 - MFA renewal cannot inherit a later password-reset/revocation generation.

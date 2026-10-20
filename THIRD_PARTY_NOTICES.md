@@ -9,3 +9,7 @@ Dependencies retain their respective licences. The API and web lockfiles and gen
 - React, Node.js, Express, PostgreSQL, Vite, Docker, Proxmox, TrueNAS, Caddy and other names/logos remain their owners' marks. Credits do not imply endorsement.
 
 Preserve dependency/artwork notices in source and distributions. Review any customer-specific assets and modifications separately. The source release workflow does not issue a blanket third-party trademark or artwork rights guarantee.
+
+## Controller image customizations
+
+Caddy retains its upstream 2.11.7 source licence and base-image notices; the local build uses Go 1.27.3 and an explicit golang.org/x/net 0.60.0 update. PostgreSQL remains the upstream 17 image with its entrypoint privilege drop switched to Alpine su-exec. Alpine, Go, Caddy, PostgreSQL, su-exec and their dependencies retain their licences. Vendor/author image labels describe this deployment’s maintainer and do not replace upstream attribution.

@@ -139,4 +139,5 @@ jobs:
           fi
           git archive --format=tar.gz --prefix="iclusters-$version/" "$GITHUB_SHA" > "artifacts/evidence/iclusters-$version.tar.gz"
           (cd artifacts/evidence && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
-          gh release create "$tag" artifacts/evidence/* --target "$GITHUB_SHA" --title "i-Clusters $version" --notes-file "$notes" --prerelease
+          node deployment/release-notes.mjs "$notes" "$GITHUB_REPOSITORY" "$tag" /tmp/iclusters-release-notes.md
+          gh release create "$tag" artifacts/evidence/* --target "$GITHUB_SHA" --title "i-Clusters $version" --notes-file /tmp/iclusters-release-notes.md --prerelease

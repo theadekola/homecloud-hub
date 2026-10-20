@@ -15,6 +15,12 @@ age --decrypt -i "$identity" -o "$stage/backup.tar" "$archive"
 python3 "$(dirname "$0")/safe-extract.py" "$stage/backup.tar" "$stage/content"
 (cd "$stage/content" && sha256sum --check --strict SHA256SUMS)
 python3 "$(dirname "$0")/safe-extract.py" "$stage/content/source.tar" "$target"
+# Restore Git history offline so normal reviewed upgrades remain available.
+git -C "$target" init -b main >/dev/null
+git -C "$target" fetch --no-tags "$stage/content/source.bundle" HEAD
+git -C "$target" reset --mixed FETCH_HEAD >/dev/null
+test "$(git -C "$target" rev-parse HEAD)" = "$(cat "$stage/content/revision")"
+git -C "$target" remote add origin "$(cat "$stage/content/origin")"
 cp -a "$stage/content/.env" "$stage/content/runtime" "$stage/content/docker-compose.yml" "$target/"
 cp -a "$stage/content/Caddyfile" "$target/deployment/Caddyfile"
 if [[ -d $stage/content/secrets ]]; then cp -a "$stage/content/secrets" "$target/"; fi

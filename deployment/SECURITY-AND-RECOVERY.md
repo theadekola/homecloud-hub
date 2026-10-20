@@ -22,7 +22,7 @@ Install `age` from the operating system package repository and keep its private 
 homecloud backup /absolute/off-controller-backup-directory age1YOUR_PUBLIC_RECIPIENT
 ```
 
-This briefly pauses API and HTTPS services for a consistent database/runtime snapshot. It includes the database, runtime configuration, encryption keys, deployed source revision and local HTTPS authority. Transfer the encrypted archive off the controller. This is separate from VM/container backups and does not back up provider application volumes.
+This briefly pauses API and HTTPS services for a consistent database/runtime snapshot. It includes the database, runtime configuration, encryption keys, deployed source revision, offline Git history and local HTTPS authority. Transfer the encrypted archive off the controller. This is separate from VM/container backups and does not back up provider application volumes.
 
 Restore to a NEW directory on an isolated host:
 
@@ -30,7 +30,7 @@ Restore to a NEW directory on an isolated host:
 bash deployment/controller-restore.sh /path/controller.tar.age /path/private-age-identity /new/controller-directory
 ```
 
-The command verifies archive checksums, creates isolated Compose volumes, restores the database and validates saved encryption keys. Prior sessions and recovery codes are invalidated. Application services remain stopped. Isolate provider networks and review domain/ports before starting the restored controller. Sign in with the authenticator, generate new recovery codes, then perform the planned acceptance checks. Never run the CI drill helper on an installation containing real data.
+The command verifies archive checksums, creates isolated Compose volumes, restores offline Git history and the database, and validates saved encryption keys. Prior sessions and recovery codes are invalidated. Application services remain stopped. Isolate provider networks and review domain/ports before starting the restored controller. Sign in with the authenticator, generate new recovery codes, then perform the planned acceptance checks. Never run the CI drill helper on an installation containing real data.
 
 ## Software upgrades
 

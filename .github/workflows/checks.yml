@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -60,8 +62,8 @@ jobs:
         run: |
           npm audit --omit=dev --audit-level=high --workspaces=false --prefix apps/api
           npm audit --omit=dev --audit-level=high --workspaces=false --prefix apps/web
-          (cd apps/api && npm sbom --omit=dev --sbom-format=cyclonedx > /tmp/iclusters-api-sbom.json)
-          (cd apps/web && npm sbom --omit=dev --sbom-format=cyclonedx > /tmp/iclusters-web-sbom.json)
+          (cd apps/api && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-api-sbom.json)
+          (cd apps/web && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-web-sbom.json)
       - uses: actions/upload-artifact@v4
         with:
           name: component-inventory

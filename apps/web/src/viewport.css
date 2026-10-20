@@ -1,0 +1,21 @@
+/* Keep text stable on rotation without blocking user-controlled page zoom. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Safari can zoom focused fields with text below 16px. Cover entry screens,
+   workspace controls and portalled dialogs at every viewport size, including
+   tablets requesting a desktop site. Keep larger inherited text sizes intact.
+   xterm owns its hidden keyboard input and terminal font measurements. */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not(.xterm-helper-textarea),
+select,
+textarea:not(.xterm-helper-textarea),
+[contenteditable=true] {
+  font-size: max(16px, 1em) !important;
+}
+
+/* Avoid double-tap zoom on controls while retaining scrolling and pinch zoom. */
+button, input, select, textarea, a, [role=button] {
+  touch-action: manipulation;
+}

@@ -1,6 +1,6 @@
 # Privacy and data handling
 
-Effective date: 16 October 2026.
+Updated: 20 October 2026. Developer attribution: The Adekola. Company attribution: ATT-Tech.
 
 This document describes the i-Clusters application's data flows. It is not a privacy notice for every independently operated installation. The person or organisation operating an installation decides its access, connected systems, retention, backups and any additional proxy or hosting logs. Contact that operator about data on their instance.
 
@@ -9,11 +9,13 @@ This document describes the i-Clusters application's data flows. It is not a pri
 | Information | Purpose and location |
 | --- | --- |
 | Account name, username, optional email, role, status and password hash | Authentication and access control in the controller's PostgreSQL database; passwords are hashed with bcrypt |
-| Refresh-token hashes, approval and audit records | Session rotation, authorization and recorded application actions in PostgreSQL |
+| Refresh-token hashes, device/session identifiers, user-agent descriptions, expiry/revocation dates, approval and audit records | Session rotation, user-controlled revocation, authorization and recorded actions in PostgreSQL |
+| Encrypted authenticator keys, last-used counters, pending login challenges and hashed one-time recovery codes | Optional MFA authentication and recovery in PostgreSQL |
 | Provider inventory, hostnames, addresses, measurements, alerts and activity | Infrastructure management and local persisted runtime state |
 | Supported integration secrets and saved connection details | Server-side connection configuration; supported credential stores encrypt secret values using deployment key material |
 | SSH/SFTP credentials and terminal/file data | Authenticated operations against the selected target; saved SSH details are managed separately from active sessions |
-| Browser tokens and preferences | Sign-in, selected Docker host, appearance and dashboard preferences in browser local/session storage |
+| Browser access tokens, session markers and preferences; HttpOnly refresh cookie | Sign-in and preferences; short-lived access tokens and preferences use local/session storage, while browser refresh credentials use a Secure, HttpOnly cookie |
+| Encrypted Docker operation journal | Installation checkpoints and recovery, including configuration required to restore the original container |
 | Notification delivery records | Local delivery queue/history, errors and captured alert information |
 
 Infrastructure names, IP addresses, logs, filenames and prompts may contain personal or confidential information. Exports and backups can contain this data. Not every application state field or audit record is encrypted; protect the server and backup storage. Never upload environment files or unredacted logs to public issue reports.
@@ -30,11 +32,11 @@ The bundled application has no built-in advertising or analytics tracking servic
 
 ## Browser storage and sessions
 
-Remember this device uses persistent browser storage for a fixed ten days from successful sign-in; activity and token rotation do not extend the deadline. Unchecked sign-in uses tab session storage and the configured browser inactivity timeout. Signing out clears stored access and refresh tokens in this browser. It does not remove server records, revoke every issued token or sign out other devices. See [browser sessions](docs/browser-sessions.md).
+Remember this device has a fixed ten-day deadline from successful sign-in; activity and rotation do not extend it. Browser refresh credentials use a Secure, HttpOnly, SameSite=Strict cookie. Remembered access/session markers use persistent storage; unchecked access/session markers use tab storage and the configured browser inactivity timeout. Explicit sign-out revokes the current server session and clears browser credentials. Users can revoke other sessions, change their password and manage optional MFA under Settings → Security. Legacy sessions without device identity revoke all sessions on explicit sign-out. Submitted jobs continue independently. Native/legacy API clients can still receive refresh tokens in response bodies. See [browser sessions](docs/browser-sessions.md).
 
 ## Retention, access and deletion
 
-Different stores have different lifetimes. Header activity is bounded and notification previews are limited; audit/database records, exports, backups, configuration files and external deliveries can outlive those views. There is no universal automatic erasure period or complete user-data deletion workflow.
+Different stores have different lifetimes. Header activity is bounded and notification previews are limited; audit/database records, exports, backups, configuration files and external deliveries can outlive those views. Expired MFA challenges are cleaned at startup; device-session rows older than 30 days past expiry are cleaned at startup. These are not universal retention rules. There is no universal automatic erasure period or complete user-data deletion workflow.
 
 The operator should define retention, restrict administrator access, remove unused connections and accounts, and manage database/runtime/backups consistently. Disconnecting an integration stops i-Clusters's use of its saved configuration; it does not erase messages or resources already created on an external service. Browser sign-out is not deletion of server data. Requests for account information, correction or deletion must go to the installation operator, who must also consider applicable obligations and backup retention.
 

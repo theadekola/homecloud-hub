@@ -1,3 +1,5 @@
+> Historical baseline review. Several findings were corrected later. See [current release-candidate assessment](2026-10-20-release-candidate.md) for current status.
+
 # i-Clusters commercial readiness review
 
 Review date: 20 October 2026. Source baseline: `e89e916` on `main`, plus the corrections in this review. This is a source and automated-check assessment, not a penetration-test certificate, service availability measurement or live provider acceptance test.

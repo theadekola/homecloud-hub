@@ -1,5 +1,7 @@
 name: Application and installer checks
 on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -15,6 +17,7 @@ jobs:
           bash -n apps/api/src/agent-assets/install-node-agent.sh
           bash -n apps/api/src/agent-assets/install-docker-agent.sh
           python3 apps/api/test/node-agent-python.test.py
+          node deployment/check-release.mjs
           bash -n install.sh
           bash -n deployment/homecloud-updater
           bash -n deployment/setup-updater.sh
@@ -64,10 +67,41 @@ jobs:
           npm audit --omit=dev --audit-level=high --workspaces=false --prefix apps/web
           (cd apps/api && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-api-sbom.json)
           (cd apps/web && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-web-sbom.json)
-      - uses: actions/upload-artifact@v4
+      - name: Collect component and image identities
+        id: images
+        run: |
+          mkdir -p artifacts/evidence
+          cp /tmp/iclusters-*-sbom.json artifacts/evidence/
+          echo "api=$(docker compose images -q api | head -1)" >> "$GITHUB_OUTPUT"
+          mapfile -t images < <(for service in api web caddy postgres; do docker compose images -q "$service"; done)
+          docker image inspect --format '{{json .}}' "${images[@]}" | jq -s 'map({Id,RepoTags,RepoDigests,Architecture,Os,Created})' > artifacts/evidence/image-identities.json
+      - name: Install scanner and record API image findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          name: component-inventory
-          path: /tmp/iclusters-*-sbom.json
+          version: v0.70.0
+          image-ref: ${{ steps.images.outputs.api }}
+          scanners: vuln
+          format: json
+          output: artifacts/evidence/api-initial-scan.json
+          exit-code: '0'
+          timeout: 10m
+      - name: Scan all runtime images and gate fixable high severity findings
+        run: |
+          result=0
+          for service in api web caddy postgres; do
+            image=$(docker compose images -q "$service" | head -1)
+            test -n "$image" || exit 1
+            trivy image --scanners vuln --format json --output "artifacts/evidence/$service-vulnerabilities.json" --timeout 10m "$image" || result=1
+            trivy image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 --timeout 10m "$image" || result=1
+          done
+          exit "$result"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence
+          path: artifacts/evidence/
+          retention-days: 30
+          if-no-files-found: warn
       - name: Deployment logs and cleanup
         if: always()
         run: |
@@ -75,3 +109,35 @@ jobs:
             docker compose logs --tail=100
             docker compose down --volumes
           fi
+
+  release:
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-evidence
+          path: artifacts/evidence
+      - name: Publish the tested release candidate once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]] || { echo 'Automatic publication is restricted to reviewed release candidates.'; exit 1; }
+          tag="v$version"
+          notes="docs/releases/$tag.md"
+          test -s "$notes"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; its tag and assets were not changed."
+            exit 0
+          fi
+          git archive --format=tar.gz --prefix="iclusters-$version/" "$GITHUB_SHA" > "artifacts/evidence/iclusters-$version.tar.gz"
+          (cd artifacts/evidence && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          node deployment/release-notes.mjs "$notes" "$GITHUB_REPOSITORY" "$tag" /tmp/iclusters-release-notes.md
+          gh release create "$tag" artifacts/evidence/* --target "$GITHUB_SHA" --title "i-Clusters $version" --notes-file /tmp/iclusters-release-notes.md --prerelease

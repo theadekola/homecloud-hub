@@ -4,7 +4,7 @@
 
 - Matching page reads share an in-flight request. Recently loaded data is reused
   for ten seconds when revisiting a page; older data stays visible while it is
-  refreshed. This cache is memory-only and is scoped to the access token, selected
+  refreshed. This cache is memory-only and is scoped to the authenticated account/role, selected
   Docker host and complete request path. Logout and host changes clear it.
 - Successful writes invalidate cached reads. Explicit refreshes bypass freshness
   windows, and resource refresh callers await the shared request. Permission

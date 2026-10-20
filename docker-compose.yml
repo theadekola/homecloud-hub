@@ -2,7 +2,8 @@ name: homecloud-hub
 
 services:
   caddy:
-    image: caddy:2.10-alpine
+    build:
+      context: ./deployment/caddy
     restart: unless-stopped
     depends_on:
       web:
@@ -85,7 +86,8 @@ services:
       - /tmp:size=64m,mode=1777
 
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ./deployment/postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}

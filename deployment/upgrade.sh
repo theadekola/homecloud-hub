@@ -17,12 +17,16 @@ mkdir -m 0700 -p "$recovery"
 previous=$(git rev-parse HEAD)
 printf '%s\n' "$previous" > "$recovery/revision"
 cp -a .env docker-compose.yml deployment/Caddyfile "$recovery/"
-api_image=$(docker compose images -q api | head -1)
-web_image=$(docker compose images -q web | head -1)
-[[ -n $api_image && -n $web_image ]] || { echo 'The existing API/web images are required for rollback.' >&2; exit 1; }
-docker tag "$api_image" "iclusters-rollback-api:$stamp"
-docker tag "$web_image" "iclusters-rollback-web:$stamp"
-printf '{"services":{"api":{"image":"iclusters-rollback-api:%s"},"web":{"image":"iclusters-rollback-web:%s"}}}\n' "$stamp" "$stamp" > "$recovery/images.json"
+for service in api web caddy postgres; do
+ image=$(docker compose images -q "$service" | head -1)
+ [[ -n $image ]] || { echo "The existing $service image is required for rollback." >&2; exit 1; }
+ docker tag "$image" "iclusters-rollback-$service:$stamp"
+done
+python3 - "$stamp" "$recovery/images.json" <<'IMAGES'
+import json,sys
+stamp,target=sys.argv[1:]
+with open(target,'w') as output: json.dump({'services':{service:{'image':f'iclusters-rollback-{service}:{stamp}'} for service in ['api','web','caddy','postgres']}},output)
+IMAGES
 printf '{"operation":"software-upgrade"}\n' > runtime/maintenance.json
 paused=0
 snapshot=0
@@ -40,6 +44,7 @@ rollback(){
    mv runtime "runtime.failed-$stamp"
    mkdir -m 0700 runtime
    cp -a "$recovery/runtime/." runtime/
+   docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 120 postgres
    docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$recovery/database.dump"
    db_result=$?
    docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 180

@@ -1,3 +1,5 @@
+Developer attribution: **The Adekola** · Company attribution: **ATT-Tech**. Updated 20 October 2026.
+
 # Terms of use for the self-hosted application
 
 Effective date: 16 October 2026.
@@ -25,3 +27,7 @@ You choose and provide access to connected providers, notification channels and 
 ## Support and reporting
 
 Use the [repository issue tracker](https://github.com/theadekola/homecloud-hub/issues) for non-sensitive reproducible problems or feature requests. Do not include credentials or private infrastructure data. For security vulnerabilities, follow [SECURITY.md](SECURITY.md). No specific response time is promised.
+
+## Release candidates
+
+Version 3.1.0-rc.1 is an evaluation release candidate. Paid support, hosting, response targets and recovery guarantees require a separate agreement from the actual service operator. The project does not assert a company registration status, statutory compliance certification or universal provider compatibility. Review [release policy](docs/release-policy.md) and complete [acceptance checks](docs/acceptance-checklist.md) before customer production use.

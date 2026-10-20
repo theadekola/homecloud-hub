@@ -14,7 +14,7 @@ export function notificationChannels(env=process.env){
  for(const [id,keys] of Object.entries({slack:['SLACK_WEBHOOK_URL'],teams:['TEAMS_WEBHOOK_URL'],pushover:['PUSHOVER_APP_TOKEN','PUSHOVER_USER_KEY'],gotify:['GOTIFY_URL','GOTIFY_APP_TOKEN'],webhook:['WEBHOOK_URL'],ifttt:['IFTTT_EVENT','IFTTT_WEBHOOK_KEY']}))if(keys.every(k=>env[k]))channels.push(id);
  return channels;
 }
-const textFor=(alert,event)=>`HomeCloud ${event==='resolved'?'RECOVERED':alert.severity?.toUpperCase()||'ALERT'}: ${alert.title}\nSource: ${alert.source}\n${alert.details||''}\n${event==='resolved'?alert.resolvedAt:alert.triggered}`;
+const textFor=(alert,event)=>`i-Clusters ${event==='resolved'?'RECOVERED':alert.severity?.toUpperCase()||'ALERT'}: ${alert.title}\nSource: ${alert.source}\n${alert.details||''}\n${event==='resolved'?alert.resolvedAt:alert.triggered}`;
 export async function sendNotification(channel,text,{env=process.env,fetcher=fetch,transport=nodemailer.createTransport,notification}={}){
  if(notification)text=messageText(notification);
  if(channel==='email'){
@@ -32,7 +32,7 @@ export async function sendNotification(channel,text,{env=process.env,fetcher=fet
  if(channel==='discord'){
   url=new URL(env.DISCORD_WEBHOOK_URL);
   if(url.protocol!=='https:'||url.hostname!=='discord.com'||url.port||!/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+$/.test(url.pathname)||url.username||url.password)throw Error('Use a Discord HTTPS webhook');
-  url.searchParams.set('wait','true');body=notification?{username:'HomeCloud',allowed_mentions:{parse:[]},embeds:[{title:notification.title,description:notification.details,color:notification.color,fields:[{name:'Source',value:notification.source,inline:false},{name:'Status',value:notification.event==='resolved'?'Recovered':notification.severity.toUpperCase(),inline:true}],...(notification.time?{timestamp:notification.time}:{}),footer:{text:'HomeCloud'}}]}:{content:text.slice(0,2000),allowed_mentions:{parse:[]}};
+  url.searchParams.set('wait','true');body=notification?{username:'i-Clusters',allowed_mentions:{parse:[]},embeds:[{title:notification.title,description:notification.details,color:notification.color,fields:[{name:'Source',value:notification.source,inline:false},{name:'Status',value:notification.event==='resolved'?'Recovered':notification.severity.toUpperCase(),inline:true}],...(notification.time?{timestamp:notification.time}:{}),footer:{text:'i-Clusters'}}]}:{content:text.slice(0,2000),allowed_mentions:{parse:[]}};
  }else if(channel==='telegram'){
   if(!/^\d+:[A-Za-z0-9_-]+$/.test(env.TELEGRAM_BOT_TOKEN||''))throw Error('Invalid Telegram bot token');
   url=new URL(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`);body={chat_id:env.TELEGRAM_CHAT_ID,text:text.slice(0,4096)};
@@ -103,7 +103,7 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
  }
  return {deliver,status,async test(channel,{env:override}={}){const testEnvironment=override||environment();if(!notificationChannels(testEnvironment).includes(channel))throw Object.assign(Error('Notification channel is not configured'),{status:400});
   const record={id:crypto.randomUUID(),channel,event:'test',createdAt:new Date(now()).toISOString(),attempts:1};
-  try{await send(channel,'HomeCloud test notification: delivery is connected.',{env:testEnvironment,notification:notificationMessage({title:'Delivery check',source:'HomeCloud',details:'This is a test notification. Automatic alert preferences were not changed.',severity:'info',triggered:new Date(now()).toISOString()},'test')});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
+  try{await send(channel,'i-Clusters test notification: delivery is connected.',{env:testEnvironment,notification:notificationMessage({title:'Delivery check',source:'i-Clusters',details:'This is a test notification. Automatic alert preferences were not changed.',severity:'info',triggered:new Date(now()).toISOString()},'test')});record.sentAt=new Date(now()).toISOString();return {channel,delivered:true};}
   catch(error){record.error=notificationTestError(channel,error);throw Object.assign(Error(record.error),{status:502,notificationTest:true});}
   finally{persistence.mutate(s=>{s.notificationQueue??=[];s.notificationQueue.push(record);const keep=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event!=='test'||keep.has(r.id));});}}};
 }

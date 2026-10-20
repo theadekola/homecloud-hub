@@ -1,6 +1,6 @@
 # Security and operational scope
 
-HomeCloud controls privileged infrastructure. Use dedicated provider identities and grant only the permissions needed for the selected features. The MIT licence is not a security guarantee.
+i-Clusters controls privileged infrastructure. Use dedicated provider identities and grant only the permissions needed for the selected features. The MIT licence is not a security guarantee.
 
 ## Reporting vulnerabilities
 
@@ -17,7 +17,7 @@ There is no formal long-term-support or backport commitment. Use the latest revi
 - Rate limiting, Helmet headers, configured origins and payload validation. These do not replace a deployment firewall or identity gateway.
 - Supported connection/configuration popups are owner-only. Saved secret values are masked on reads and encrypted with AES-256-GCM using deployment key protection. Preserve the original signing/encryption key material for recovery.
 - Resource- and payload-bound approval for sensitive infrastructure actions, with target SSH authentication where supported. SSH host identity must be verified. Do not blindly accept an unverified fingerprint.
-- Proxmox restore targets must use unused guest IDs; HomeCloud does not request force overwrite.
+- Proxmox restore targets must use unused guest IDs; i-Clusters does not request force overwrite.
 - API and PostgreSQL ports are not published by the standard Compose deployment. The API filesystem is read-only apart from designated runtime and temporary mounts. Its container has no host Docker socket mount.
 - Caddy HTTPS, including local CA support for LAN installations. Browser/node trust must be configured correctly. HTTPS transport alone does not certify deployment security.
 - Optional direct Docker access supports verified mTLS; provider-specific trusted CAs are supported. Paired connectors avoid a TCP Docker listener in each guest.
@@ -30,7 +30,7 @@ There is no formal long-term-support or backport commitment. Use the latest revi
 
 Keep access private or use a suitable authenticated gateway. Dedicated Docker credentials can control the host; expose only authenticated encrypted endpoints and restrict their network reach. Limit Proxmox guest command privileges to intended VM paths, including the token's separate ACL where applicable. Inspect the permission impact before granting them.
 
-Protect the Ubuntu host, database, runtime files, `.env`, signing keys, saved connector credentials and backups. Encryption of saved integration secrets does not encrypt every audit/state field or protect against a compromised controller host. Restrict file permissions, use trusted certificates, remove inactive accounts and rotate compromised credentials at the provider as well as in HomeCloud.
+Protect the Ubuntu host, database, runtime files, `.env`, signing keys, saved connector credentials and backups. Encryption of saved integration secrets does not encrypt every audit/state field or protect against a compromised controller host. Restrict file permissions, use trusted certificates, remove inactive accounts and rotate compromised credentials at the provider as well as in i-Clusters.
 
 The updater is a privileged host service that fetches configured upstream code and rebuilds containers. Review changes, protect its checkout and service files, and retain a consistent controller backup. Build numbers and revisions aid identification; they are not signed supply-chain attestations.
 
@@ -40,7 +40,7 @@ Application two-factor authentication, intrusion detection and an independent se
 
 Audit records capture submitted operations, failures and returned task identifiers. Provider tasks require later outcome checks. Database administrators can change audit records; the log is not cryptographically immutable. API reachability, successful configuration saves and queued actions are not proof of overall health, successful delivery or completed work.
 
-Snapshots on a pool are not independent off-host backups. HomeCloud does not supply a generic Docker-volume/database backup runner. Configured external notification channels (including custom webhooks/IFTTT) and AI requests can send sensitive infrastructure information outside the installation. See [PRIVACY.md](PRIVACY.md).
+Snapshots on a pool are not independent off-host backups. i-Clusters does not supply a generic Docker-volume/database backup runner. Configured external notification channels (including custom webhooks/IFTTT) and AI requests can send sensitive infrastructure information outside the installation. See [PRIVACY.md](PRIVACY.md).
 
 ## Validation boundaries
 
@@ -52,7 +52,7 @@ Connector update status and actions require the owner role. The SSH popup uses
 fresh credentials without saving them, a pinned user-verified host fingerprint,
 and explicit consent. A fixed remote script verifies the selected connector's
 pairing ID and token hash locally before writing its own script. The raw pairing
-token is never returned. Only the connector bundled with the running HomeCloud
+token is never returned. Only the connector bundled with the running i-Clusters
 release is eligible; arbitrary scripts, download URLs and service names cannot
 be supplied by the client. Backups stay root-only on the paired host. Completion
 requires a fresh matching code-revision heartbeat. SSH passwords and raw remote

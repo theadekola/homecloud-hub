@@ -16,7 +16,7 @@ async function requestAI(config,resource,body){
   }
   if(!data||typeof data!=='object'||data.error)throw failure('OpenAI returned an invalid response. Retry or check the selected API type.');
   return data;
- }catch(error){if(error.aiError)throw error;if(error.name==='TimeoutError'||error.name==='AbortError')throw failure('OpenAI did not respond within 30 seconds. Check the server network and retry.',504);throw failure('Cannot reach OpenAI. Check the HomeCloud server network, DNS and HTTPS access.');}
+ }catch(error){if(error.aiError)throw error;if(error.name==='TimeoutError'||error.name==='AbortError')throw failure('OpenAI did not respond within 30 seconds. Check the server network and retry.',504);throw failure('Cannot reach OpenAI. Check the i-Clusters server network, DNS and HTTPS access.');}
 }
 export async function listAIModels(config){
  const data=await requestAI(config,'models');if(!Array.isArray(data.data))throw failure('OpenAI returned an invalid model list. Retry or enter a custom model ID.');

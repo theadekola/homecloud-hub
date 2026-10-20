@@ -2,7 +2,7 @@
 
 Effective date: 16 October 2026.
 
-This document describes the HomeCloud application's data flows. It is not a privacy notice for every independently operated installation. The person or organisation operating an installation decides its access, connected systems, retention, backups and any additional proxy or hosting logs. Contact that operator about data on their instance.
+This document describes the i-Clusters application's data flows. It is not a privacy notice for every independently operated installation. The person or organisation operating an installation decides its access, connected systems, retention, backups and any additional proxy or hosting logs. Contact that operator about data on their instance.
 
 ## Information processed
 
@@ -36,8 +36,8 @@ Remember me uses persistent browser storage; unchecked sign-in uses tab session 
 
 Different stores have different lifetimes. Header activity is bounded and notification previews are limited; audit/database records, exports, backups, configuration files and external deliveries can outlive those views. There is no universal automatic erasure period or complete user-data deletion workflow.
 
-The operator should define retention, restrict administrator access, remove unused connections and accounts, and manage database/runtime/backups consistently. Disconnecting an integration stops HomeCloud's use of its saved configuration; it does not erase messages or resources already created on an external service. Browser sign-out is not deletion of server data. Requests for account information, correction or deletion must go to the installation operator, who must also consider applicable obligations and backup retention.
+The operator should define retention, restrict administrator access, remove unused connections and accounts, and manage database/runtime/backups consistently. Disconnecting an integration stops i-Clusters's use of its saved configuration; it does not erase messages or resources already created on an external service. Browser sign-out is not deletion of server data. Requests for account information, correction or deletion must go to the installation operator, who must also consider applicable obligations and backup retention.
 
 ## Security and changes
 
-See [SECURITY.md](SECURITY.md) for controls, limitations and vulnerability reporting. This document will change when application data flows change. Operators providing HomeCloud to other people should publish their own contact details and deployment-specific privacy information rather than presenting this project document as their complete notice.
+See [SECURITY.md](SECURITY.md) for controls, limitations and vulnerability reporting. This document will change when application data flows change. Operators providing i-Clusters to other people should publish their own contact details and deployment-specific privacy information rather than presenting this project document as their complete notice.

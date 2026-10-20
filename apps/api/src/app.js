@@ -114,7 +114,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/connections/proxmox/guest-permissions',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestPermissions.inspect());});
  app.post('/api/connections/proxmox/guest-permissions',authorize('owner'),loginLimiter,async(req,res)=>{
   res.set('Cache-Control','no-store');let result;
-  try{if(!req.secure)throw httpError('Open HomeCloud over HTTPS before entering administrator credentials.');result=await guestPermissions.repair(req.body);}catch(error){req.body.password='';req.body.otp='';await audit(req,'connection.proxmox.guest-permissions','proxmox',{vmids:Array.isArray(req.body.vmids)?req.body.vmids.filter(id=>/^\d+$/.test(String(id))).slice(0,20):[]},'failed');throw error;}
+  try{if(!req.secure)throw httpError('Open i-Clusters over HTTPS before entering administrator credentials.');result=await guestPermissions.repair(req.body);}catch(error){req.body.password='';req.body.otp='';await audit(req,'connection.proxmox.guest-permissions','proxmox',{vmids:Array.isArray(req.body.vmids)?req.body.vmids.filter(id=>/^\d+$/.test(String(id))).slice(0,20):[]},'failed');throw error;}
   finally{req.body.password='';req.body.otp='';}
   resetGuestDiscovery();try{await monitor.invalidate();}catch{}
   await audit(req,'connection.proxmox.guest-permissions','proxmox',{vmids:result.vmids,verified:result.verified,changed:result.changed},'success');res.json(result);

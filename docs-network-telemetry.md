@@ -1,6 +1,6 @@
 # Network interface readings
 
-HomeCloud combines Proxmox interface configuration with read-only telemetry from a version 3 paired node connector. IPv4/IPv6 addresses come from `ip -j address show`. Supported physical link speeds and RX/TX byte counters come from `/sys/class/net`. It does not assign addresses, restart interfaces, apply network configuration or run commands inside guests to collect these readings.
+i-Clusters combines Proxmox interface configuration with read-only telemetry from a version 3 paired node connector. IPv4/IPv6 addresses come from `ip -j address show`. Supported physical link speeds and RX/TX byte counters come from `/sys/class/net`. It does not assign addresses, restart interfaces, apply network configuration or run commands inside guests to collect these readings.
 
 Per-interface rates use two consecutive samples: `(new bytes - old bytes) * 8 / elapsed seconds / 1,000,000` Mbps. Sampling runs every five seconds independently of Docker discovery; the dashboard refreshes on its configured interval. Counter resets, host reboots, interface replacement and long sampling gaps restart measurement. Stale/offline readings are unavailable rather than zero. Virtual bridges/VLANs do not have a negotiated hardware link speed and show **Not applicable**. Node-wide RRD history remains separately labelled.
 
@@ -8,12 +8,12 @@ Configured addresses and live addresses are shown together. A physical port or b
 
 ## Pair a node without a connector
 
-Use HomeCloud's **Pair Proxmox Node** dialog, run its installer on the chosen node and enter the short-lived pairing code. Repeat for each Proxmox node. The connector can report local network readings even when Docker is not installed on the node.
+Use i-Clusters's **Pair Proxmox Node** dialog, run its installer on the chosen node and enter the short-lived pairing code. Repeat for each Proxmox node. The connector can report local network readings even when Docker is not installed on the node.
 
 ## Update an existing paired connector
 
-1. Update HomeCloud from the merged repository changes first.
-2. On each paired Proxmox node, download the current installer using your trusted HomeCloud HTTPS origin:
+1. Update i-Clusters from the merged repository changes first.
+2. On each paired Proxmox node, download the current installer using your trusted i-Clusters HTTPS origin:
 
 ```bash
 installer=$(mktemp)

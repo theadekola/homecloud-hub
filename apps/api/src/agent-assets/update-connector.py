@@ -10,7 +10,7 @@ def update(payload,root=pathlib.Path('/'),run=subprocess.run):
     if paired.get('id')!=payload['id'] or not hmac.compare_digest(hashlib.sha256(str(paired.get('token','')).encode()).hexdigest(),payload['tokenHash']): raise RuntimeError('This SSH host is not the selected paired connector')
     installed=ast.parse(agent.read_bytes())
     versions=[n.value.value for n in installed.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='VERSION' for t in n.targets) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,int)]
-    if versions and max(versions)>payload['version']: raise RuntimeError('Update HomeCloud before updating this newer connector')
+    if versions and max(versions)>payload['version']: raise RuntimeError('Update i-Clusters before updating this newer connector')
     source=base64.b64decode(payload['source'],validate=True)
     if hashlib.sha256(source).hexdigest()!=payload['revision']: raise RuntimeError('Connector checksum mismatch')
     tree=ast.parse(source);compile(tree,str(agent),'exec')

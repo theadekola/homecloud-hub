@@ -4,7 +4,7 @@ import { migrate } from './db.js';
 import { createApp } from './app.js';
 import { monitor } from './monitor.js';
 await migrate();
-const server=createApp().listen(Number(process.env.PORT||6000),'0.0.0.0',()=>console.log('HomeCloud Hub live API listening'));
+const server=createApp().listen(Number(process.env.PORT||6000),'0.0.0.0',()=>console.log('i-Clusters live API listening'));
 const sample=()=>monitor.sample(true).catch(error=>console.error('Monitoring:',error.message));
 sample();
 const timer=setInterval(sample,apiPolicy.monitorIntervalMs);timer.unref();

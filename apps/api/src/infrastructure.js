@@ -29,7 +29,7 @@ export async function createBackupJob(body){
 }
 export async function runBackupJob(id,{query=pve,write=pveWrite}={}){
   const job=await query(`/cluster/backup/${encode(id)}`);
-  if(!job.node)throw httpError('Choose a node-specific job to run from HomeCloud Hub; cluster-wide jobs run through the Proxmox scheduler');
+  if(!job.node)throw httpError('Choose a node-specific job to run from i-Clusters; cluster-wide jobs run through the Proxmox scheduler');
   const options={};
   for(const key of ['vmid','all','exclude','pool','storage','mode','compress','bwlimit','ionice','mailto','mailnotification','prune-backups','protected','notes-template','notification-mode','notification-target','fleecing','performance','pbs-change-detection-mode'])if(job[key]!=null)options[key]=job[key];
   if(!options.vmid&&!options.all&&!options.pool)throw httpError('Job has no guest selection');

@@ -12,4 +12,4 @@ See manifest.json for each asset's exact source and license identifier. License 
 
 Brand names and trademarks remain the property of their respective owners. The icon collection license does not grant trademark rights.
 
-HomeCloud product logo and empty-state illustrations are original project artwork. Interface action icons continue to use the existing Lucide dependency.
+The i-Clusters product mark is adapted from the project owner's supplied artwork. Legacy HomeCloud artwork and empty-state illustrations remain project artwork. Interface action icons continue to use the existing Lucide dependency.

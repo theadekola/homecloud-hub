@@ -1,0 +1,45 @@
+/* i-Clusters identity. Appearance preferences still control the workspace. */
+.brand .brand-icon{background:transparent;border-radius:0;width:40px;height:40px;flex-shrink:0}
+.brand .brand-icon img{width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 3px 7px #008cff33)}
+.brand b{font-size:19px;letter-spacing:-.6px;overflow:hidden;text-overflow:ellipsis}
+.about-logo{background:radial-gradient(circle,#166baf33,transparent 70%)!important;border:0!important}
+.about-logo img{width:94px;height:94px;object-fit:contain}
+.login-page{position:relative;isolation:isolate;overflow:hidden;min-height:100dvh;padding:36px 20px;background:radial-gradient(ellipse at 85% 0%,#1a418c66,transparent 48%),radial-gradient(ellipse at 5% 75%,#0867a524,transparent 45%),linear-gradient(145deg,#0b1b40,#060d20 72%);color:#eef5ff}
+.login-page::before{content:"";position:absolute;z-index:-1;inset:40% -70% -65%;background-image:linear-gradient(#38a8ff15 1px,transparent 1px),linear-gradient(90deg,#38a8ff15 1px,transparent 1px);background-size:64px 64px;transform:perspective(500px) rotateX(58deg);pointer-events:none;mask-image:linear-gradient(transparent,#0008)}
+.login-page .login-card{width:min(480px,100%);padding:34px 40px 26px;gap:20px;background:linear-gradient(145deg,#12254bd9,#09142ce8);border:1px solid #395c946e;border-radius:26px;box-shadow:0 0 0 1px #79b8ff0d,0 30px 90px #0006;backdrop-filter:blur(16px)}
+.login-page .login-logo{display:flex;flex-direction:column;justify-content:center;gap:6px;margin:0;text-align:center}
+.login-page .login-logo img{width:100px;height:100px;object-fit:contain;filter:drop-shadow(0 7px 15px #00b9ff25)}
+.login-page .login-logo strong{font-size:38px;line-height:1.2;letter-spacing:-1.7px;color:#eff6ff}
+.login-page .login-logo strong span{color:#48c6f4}
+.login-page .login-card h1{font-size:20px;font-weight:500;text-align:center;letter-spacing:-.3px;margin:0;color:#e2edff}
+.login-page .login-card>p.muted{text-align:center;margin:-10px 0 4px;font-size:13px;color:#a6bbd9}
+.login-page .login-card label span{font-size:14px;color:#dfebff;font-weight:500}
+.login-page .login-card input:not([type=checkbox]){width:100%;min-width:0;min-height:50px;background:#07152e99;color:#f0f6ff;border:1px solid #38547d;border-radius:11px;padding:12px 14px;box-shadow:inset 0 1px 3px #0002;font-size:15px}
+.login-page input::placeholder{color:#8297b7;opacity:1}
+.login-page input:focus-visible{outline:2px solid #45b9ff;outline-offset:3px}
+.login-page .login-password{display:flex;position:relative}
+.login-page .login-password input{padding-right:52px!important}
+.login-page .login-password .icon-btn{position:absolute;right:5px;top:5px;width:40px;height:40px;border:0;background:transparent;color:#9eb5d6}
+.login-page .login-remember{flex-direction:row;align-items:center;gap:10px;margin:0}
+.login-page .login-remember input{accent-color:#2985ef;width:19px;height:19px}
+.login-page .login-remember span{font-size:13px!important}
+.login-page small.muted,.login-page .small.muted{font-size:12px;line-height:1.55;color:#a9bad4}
+.login-page .login-card>.btn.primary{justify-content:center;gap:12px;min-height:51px;font-size:16px;font-weight:600;border:1px solid #76caff55;border-radius:11px;background:linear-gradient(110deg,#349eea,#2860ed);color:#fff;box-shadow:0 5px 24px #1878ed2c}
+.login-page .login-card>.btn.primary:hover{filter:brightness(1.1)}
+.login-page .login-card>.btn.primary:disabled{opacity:.6;cursor:wait}
+.login-support{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;font-size:12px;padding-top:16px;border-top:1px solid #37507777}
+.login-support a,.brand-links a{color:#79c6ff;text-decoration:none}
+.login-support a:hover,.brand-links a:hover{text-decoration:underline}
+.login-support span{color:#a9bad4;line-height:1.5}
+.brand-links{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;font-size:11px;padding-top:4px}
+.login-page .login-error{background:#3d182a;border-color:#a34b68;color:#ffccda;font-size:14px;line-height:1.5}
+@media(max-width:520px){.login-page{padding:24px 16px}.login-page .login-card{padding:27px 24px 22px;border-radius:22px;gap:18px}.login-page .login-logo img{width:86px;height:86px}.login-page .login-logo strong{font-size:34px}.login-page .login-card h1{font-size:19px}}
+@media(prefers-reduced-transparency:reduce){.login-page .login-card{backdrop-filter:none;background:#0c1c39}}
+
+/* The branded entry screen stays dark even when the workspace uses Light. */
+.login-page{color-scheme:dark}
+:root[data-theme] .login-page .login-card input:not([type=checkbox]):not([type=range]){background:#07152e99!important;color:#f0f6ff!important;border-color:#38547d!important}
+:root[data-theme] .login-page .muted{color:#a9bad4}
+:root[data-theme] .login-page input::placeholder{color:#8297b7}
+:root[data-theme] .login-page .login-password .icon-btn{background:transparent;color:#9eb5d6;border:0;border-radius:8px}
+:root[data-appearance] .login-page .login-card input:not([type=checkbox]):not([type=range]),:root[data-appearance] .login-page .login-card>.btn.primary{border-radius:11px}

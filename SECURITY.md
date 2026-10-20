@@ -22,7 +22,7 @@ There is no formal long-term-support or backport commitment. Use the latest revi
 - Caddy HTTPS, including local CA support for LAN installations. Browser/node trust must be configured correctly. HTTPS transport alone does not certify deployment security.
 - Optional direct Docker access supports verified mTLS; provider-specific trusted CAs are supported. Paired connectors avoid a TCP Docker listener in each guest.
 - Node connectors use short-lived one-use pairing codes, hashed controller-side credentials and restricted supported requests. The node service runs with privileged host access; protect and update the host. Revoke an unused connector and uninstall its local service separately.
-- Browser password visibility controls do not persist passwords. Remember me chooses token storage. Browser inactivity sign-out defaults to 30 minutes and clears local tokens; it is not server-side token revocation.
+- Browser password visibility controls do not persist passwords. Remember this device persists sign-in for a fixed 10 days, enforced by server-signed tokens and browser expiry. Activity and refresh cannot extend it. Unchecked sessions use browser inactivity sign-out (30 minutes by default), which clears local tokens but is not server-side idle revocation.
 - Docker read-only inspection omits environment variables, arbitrary labels and volume-driver options. Missing metric samples do not count as recovery of metric alerts.
 - The AI assistant cannot execute actions. Requests use the configured fixed OpenAI endpoint and disable response storage; third-party policies still apply.
 

@@ -21,7 +21,7 @@ The default web port is **6002**, mapped to Caddy's internal HTTPS port 443. The
 
 For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to i-Clusters's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.0.0` optionally pins an existing Git tag. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
 
-Save the **first-use setup code** printed during installation. Open i-Clusters, enter your name, email, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/homecloud-hub/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
+Save the **first-use setup code** printed during installation. Open i-Clusters, enter your name, username, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/homecloud-hub/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
 
 If you missed the setup code in the installation output, retrieve it **on the Ubuntu VM where i-Clusters is installed**:
 
@@ -29,7 +29,7 @@ If you missed the setup code in the installation output, retrieve it **on the Ub
 sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
 ```
 
-The output looks like `SETUP_TOKEN=your-setup-code`. Copy **only the value after `=`** into the registration screen's **Setup code** field, without the `SETUP_TOKEN=` prefix. Fill in your name, email, password and matching confirmation, then click **Register owner account**. Sign in with the new account afterward. Keep the setup code private.
+The output looks like `SETUP_TOKEN=your-setup-code`. Copy **only the value after `=`** into the registration screen's **Setup code** field, without the `SETUP_TOKEN=` prefix. Fill in your name, username, password and matching confirmation, then click **Register owner account**. Sign in with the new account afterward. Keep the setup code private.
 
 Application files live in `/opt/homecloud-hub`; integration credentials are configured in its `.env` or the Proxmox form. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
 

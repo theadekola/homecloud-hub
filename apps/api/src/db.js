@@ -16,6 +16,24 @@ export async function migrate() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_login TIMESTAMPTZ
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+    ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_ci ON users(lower(username));
+    DO $$
+    DECLARE account RECORD; base TEXT; candidate TEXT; suffix INTEGER;
+    BEGIN
+      LOCK TABLE users IN EXCLUSIVE MODE;
+      FOR account IN SELECT id,email FROM users WHERE username IS NULL ORDER BY created_at,id LOOP
+        base := left(regexp_replace(lower(split_part(COALESCE(account.email,'user'),'@',1)), '[^a-z0-9_.-]', '_', 'g'),48);
+        IF length(base)<3 THEN base := 'user_' || base; END IF;
+        candidate := base; suffix := 1;
+        WHILE EXISTS(SELECT 1 FROM users WHERE lower(username)=candidate) LOOP
+          candidate := base || '_' || suffix; suffix := suffix+1;
+        END LOOP;
+        UPDATE users SET username=candidate WHERE id=account.id;
+      END LOOP;
+    END $$;
+    ALTER TABLE users ALTER COLUMN username SET NOT NULL;
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

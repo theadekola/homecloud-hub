@@ -43,3 +43,11 @@
 :root[data-theme] .login-page input::placeholder{color:#8297b7}
 :root[data-theme] .login-page .login-password .icon-btn{background:transparent;color:#9eb5d6;border:0;border-radius:8px}
 :root[data-appearance] .login-page .login-card input:not([type=checkbox]):not([type=range]),:root[data-appearance] .login-page .login-card>.btn.primary{border-radius:11px}
+.app-loading{display:flex;align-items:center;justify-content:center;gap:12px;color:#b9d5ff;min-height:80px}
+.login-page>.app-loading{flex-direction:column}
+.app-loading .spin,.login-card>.btn .spin,.network-loading .spin{animation:iclusters-loading .9s linear infinite}
+@keyframes iclusters-loading{to{transform:rotate(360deg)}}
+.network-loading{position:fixed;z-index:40;right:20px;bottom:20px;display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid #3d679b;border-radius:24px;background:#0c203c;color:#cde8ff;box-shadow:0 4px 18px #0003;font-size:13px;pointer-events:none}
+@media(prefers-reduced-motion:reduce){.app-loading .spin,.login-card>.btn .spin,.network-loading .spin{animation:none}}
+
+.login-page .login-remember input{flex-shrink:0}

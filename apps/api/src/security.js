@@ -32,7 +32,8 @@ export async function auth(req, res, next) {
     if(claims.sid){const session=await accountQuery('SELECT id FROM auth_sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>NOW()',[claims.sid,claims.sub]);if(!session.rowCount)throw Error('Session revoked');}
     req.user={sid:claims.sid,sessionExp:claims.sessionExp,remember:claims.remember===true,sub:result.rows[0].id,email:result.rows[0].email||result.rows[0].username,username:result.rows[0].username,name:result.rows[0].name,role:result.rows[0].role};
     next();
-  } catch {
+  } catch(error) {
+    if(error.status===503)return res.status(503).json({error:'Account verification is temporarily unavailable. Try again shortly.'});
     return res.status(401).json({ error: 'Invalid or expired access token' });
   }
 }

@@ -22,3 +22,20 @@ assert.equal(refreshed.status,200);assert.equal(refreshed.body.rememberUntil,log
 assert.equal((await request('/auth/refresh',{refreshToken:login.body.refreshToken})).status,401);
 assert.equal((await request('/auth/login',{email:owner.email,password:account.password})).status,200);
 console.log('First-use registration, concurrent owner protection and sign-in passed through HTTPS web port 6002 and internal API port 6000.');
+// Optional MFA, recovery login, server revocation and password rotation against
+// the real database. Never print setup keys, passwords, tokens or recovery codes.
+const {totp}=await import('../apps/api/src/mfa.js');
+const authRequest=async(path,token,body)=>{const response=await fetch(base+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()}};
+const setup=await authRequest('/account/mfa/setup',refreshed.body.accessToken,{password:account.password});assert.equal(setup.status,200);
+const enabled=await authRequest('/account/mfa/enable',refreshed.body.accessToken,{password:account.password,code:totp(setup.body.secret,Math.floor(Date.now()/30000))});assert.equal(enabled.status,200);assert.equal(enabled.body.recoveryCodes.length,10);
+assert.equal((await authRequest('/auth/me',refreshed.body.accessToken)).status,401);
+const challenge=await request('/auth/login',{username:owner.username,password:account.password,remember:true});assert.equal(challenge.body.mfaRequired,true);assert.equal(challenge.body.accessToken,undefined);
+assert.equal((await request('/auth/mfa',{challengeToken:challenge.body.challengeToken,code:'wrong'})).status,401);
+const verified=await request('/auth/mfa',{challengeToken:challenge.body.challengeToken,code:enabled.body.recoveryCodes[0]});assert.equal(verified.status,200);
+assert.equal((await authRequest('/account/security',verified.body.accessToken)).body.recoveryCodesRemaining,9);
+const sessions=await authRequest('/account/sessions',verified.body.accessToken);assert.ok(sessions.body.sessions.some(s=>s.current));
+const revoked=await authRequest('/account/sessions/revoke',verified.body.accessToken,{all:true,password:account.password,code:enabled.body.recoveryCodes[1]});assert.equal(revoked.status,200);
+assert.equal((await request('/auth/refresh',{refreshToken:verified.body.refreshToken})).status,401);
+const again=await request('/auth/login',{username:owner.username,password:account.password});const signed=await request('/auth/mfa',{challengeToken:again.body.challengeToken,code:enabled.body.recoveryCodes[2]});assert.equal(signed.status,200);
+const changed=await authRequest('/account/password',signed.body.accessToken,{password:account.password,code:enabled.body.recoveryCodes[3],newPassword:'CI-rotated-password-67890'});assert.equal(changed.status,200);assert.equal((await authRequest('/auth/me',signed.body.accessToken)).status,401);
+console.log('Optional MFA enrollment, single-use recovery login, device session revocation and password rotation passed through HTTPS/PostgreSQL.');

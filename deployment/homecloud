@@ -10,25 +10,15 @@ case "$command" in
   stop) systemctl stop homecloud-hub;;
   restart) docker compose up -d --wait --wait-timeout 180;;
   config) "${EDITOR:-nano}" .env;;
-  update)
-    [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Tracked files have local changes; commit or revert them before updating.' >&2; exit 1; }
-    git symbolic-ref --quiet HEAD >/dev/null || { echo 'This installation is pinned to a ref. Check out the desired release manually before rebuilding.' >&2; exit 1; }
-    git pull --ff-only
-    # Preserve original public ports when upgrading older installations.
-    grep -q '^WEB_PORT=' .env || echo 'WEB_PORT=80' >> .env
-    grep -q '^HTTPS_PORT=' .env || echo 'HTTPS_PORT=443' >> .env
-    if ! grep -q '^SETUP_TOKEN=' .env; then
-      printf '\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 16)" >> .env
-    fi
-    python3 deployment/configure-https.py
-    docker compose config --quiet
-    source deployment/build-env.sh
-    docker compose build --pull
-    docker compose up -d --wait --wait-timeout 180
-    install -m 0755 deployment/homecloud /usr/local/bin/homecloud
-    install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
-    bash deployment/setup-updater.sh
-    systemctl daemon-reload
+  backup) bash deployment/controller-backup.sh "${2:?Backup directory required}" "${3:?age public recipient required}";;
+  recover-account)
+    username=${2:?Username required}
+    read -rsp 'New password: ' account_password; echo
+    read -rsp 'Confirm password: ' account_confirm; echo
+    [[ $account_password == "$account_confirm" ]] || { echo 'Passwords do not match.' >&2; exit 1; }
+    printf '%s\n' "$account_password" | docker compose exec -T api node scripts/recover-account.mjs "$username" "${3:-}"
+    unset account_password account_confirm
     ;;
-  *) echo 'Usage: sudo homecloud {status|logs|start|stop|restart|config|update}';;
+  update) bash deployment/upgrade.sh;;
+  *) echo 'Usage: sudo homecloud {status|logs|start|stop|restart|config|update|backup|recover-account}';;
 esac

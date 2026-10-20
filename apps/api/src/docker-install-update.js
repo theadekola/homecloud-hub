@@ -39,7 +39,7 @@ export async function ensureNoContainerDependents(container,query=docker){
   if([h.NetworkMode,h.PidMode,h.IpcMode].some(v=>String(v||'').startsWith('container:')&&matches(v))||(h.VolumesFrom||[]).some(matches)||(h.Links||[]).some(matches))throw fail('Another container shares this container’s namespace or lifecycle. Update the deployment together using its original tool.');
  }));
 }
-export async function installDockerImageUpdate(row,input,{query=docker,hostId='',sleep=ms=>new Promise(r=>setTimeout(r,ms)),healthAttempts=30,onProgress=()=>{}}={}){
+export async function installDockerImageUpdate(row,input,{query=docker,hostId='',sleep=ms=>new Promise(r=>setTimeout(r,ms)),healthAttempts=30,onProgress=()=>{},onCheckpoint=()=>{}}={}){
  if(!row||row.status!=='available'||row.containerId!==input.containerId||row.imageId!==input.imageId||row.remoteDigest!==input.remoteDigest||!digestPattern.test(input.remoteDigest||''))throw fail('The update changed. Recheck and review it before installing.');
  const lock=hostId+':'+row.containerId;if(locks.has(lock))throw fail('An update is already running for this container.');locks.add(lock);
  let pullFailure=false;
@@ -68,7 +68,10 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   await ensureNoContainerDependents(fresh,query);
   onProgress(75,'Preparing replacement container');
   const temp='homecloud-update-'+crypto.randomBytes(10).toString('hex');
+  const checkpoint={oldId:old.Id,oldImage:old.Image,oldName:plan.name,backupName:backup,tempName:temp,newImage:pulled.Id,plan,configHash:fingerprint(old.Config),hostHash:fingerprint({...old.HostConfig,RestartPolicy:null})};
+  onCheckpoint(checkpoint);
   const created=await query('/containers/create?name='+temp,{method:'POST',body:JSON.stringify({...plan.config,Image:pulled.Id,Labels:{...plan.config.Labels,[trackedImageLabel]:row.image},HostConfig:plan.host,NetworkingConfig:{EndpointsConfig:plan.networks}})});newId=created.Id;if(!/^[a-f0-9]{12,64}$/.test(newId||''))throw fail('Docker did not return a replacement container identity.');
+  checkpoint.newId=newId;onCheckpoint(checkpoint);
   onProgress(80,'Switching to the updated container');
   changedPolicy=true;await query(base+'/update',{method:'POST',body:JSON.stringify({RestartPolicy:{Name:'no',MaximumRetryCount:0}})});
   if(plan.running){stopped=true;await query(base+'/stop?t=30',{method:'POST',timeoutMs:45000})}

@@ -34,6 +34,27 @@ export async function migrate() {
       END LOOP;
     END $$;
     ALTER TABLE users ALTER COLUMN username SET NOT NULL;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step BIGINT NOT NULL DEFAULT -1;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_pending_secret TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_pending_expires TIMESTAMPTZ;
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id UUID PRIMARY KEY, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL,
+      revoked_at TIMESTAMPTZ, device TEXT NOT NULL DEFAULT 'Browser'
+    );
+    CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(user_id);
+    CREATE TABLE IF NOT EXISTS mfa_recovery_codes (
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, code_hash TEXT NOT NULL,
+      PRIMARY KEY(user_id,code_hash)
+    );
+    CREATE TABLE IF NOT EXISTS mfa_login_challenges (
+      token_hash TEXT PRIMARY KEY, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_version INTEGER NOT NULL, remember BOOLEAN NOT NULL DEFAULT FALSE,
+      expires_at TIMESTAMPTZ NOT NULL, attempts INTEGER NOT NULL DEFAULT 0
+    );
+    DELETE FROM mfa_login_challenges WHERE expires_at<NOW();
+    DELETE FROM auth_sessions WHERE expires_at<NOW()-INTERVAL '30 days';
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

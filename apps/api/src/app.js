@@ -1,6 +1,10 @@
+import {sessionResponse,refreshCredential,browserSession} from './browser-sessions.js';
+import {accountSecurityRouter} from './account-security.js';
+import {beginMfaLogin,completeMfaLogin} from './mfa.js';
 import {truenasTestError} from './truenas-test-error.js';
 import {connectionActions} from './connection-actions.js';
 import {dockerImageUpdates} from './docker-image-updates.js';
+import {recoverDockerUpdate} from './docker-update-recovery.js';
 import {createDockerUpdateProgress} from './docker-update-progress.js';
 import {installDockerImageUpdate,updatePlan,ensureNoContainerDependents} from './docker-install-update.js';
 import {createGuestConnectionReader} from './guest-connections.js';
@@ -24,7 +28,7 @@ import {streamShellOutput} from './ssh-stream.js';
 import {flag,creationOptions,registerCreation,completeCreationHa} from './guest-create-options.js';
 import {bootstrapGuest} from './guest-bootstrap.js';
 import {targetSSHHost} from './ssh-target.js';
-import {writeShellInput,actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH,sftpOperation,deleteSavedSSH} from './ssh-access.js';
+import {closeSessionAccess,writeShellInput,actionTarget,consumeGrant,connectSSH,shellSession,closeShell,publicSavedSSH,sftpOperation,deleteSavedSSH} from './ssh-access.js';
 import {providerDiagnostics} from './diagnostics.js';
 import {notifier} from './notifications.js';
 import {storagePerformance} from './storage-performance.js';
@@ -33,7 +37,7 @@ import {snapshotInventory,guestSnapshot} from './snapshots.js';
 import {datasetInventory,datasetCreateInput,datasetRoot,datasetPermissionsInput} from './datasets.js';
 import {diskInventory,diskSmart} from './disks.js';
 import {fileURLToPath} from 'node:url';
-import {readFileSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 import {agentRequest,agentContext,selectedAgentHost,agentHosts,agentNodes,createPairing,pairingStatus,pairNode,authenticateAgent,pollAgent,revokeAgent,installAgentHost} from './node-agents.js';
 import {dockerStore,dockerConfig,publicDocker,validateDocker,dockerTlsConfig} from './docker-config.js';
 import os from 'node:os';
@@ -60,7 +64,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
 
  const app=express(),readCache=createReadCache();
  app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
@@ -85,17 +89,22 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:buildInfo.version,time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
+   browserSession(req);
    const email=required(req.body.username??req.body.email,'Username'),password=req.body.password;
    if(typeof password!=='string'||!password.length)throw httpError('Password is required');
    const user=await verifyPassword(email,password);if(user)req.activityUser={sub:user.id,role:user.role};if(!user)return res.status(401).json({error:'Invalid credentials'});
 
+   if(user.two_factor_enabled)return res.json(await beginMfaLogin(db,user,req.body.remember===true));
    await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);
-   res.json({user:{id:user.id,email:user.email,username:user.username,name:user.name,role:user.role},...await issueTokens(user,{remember:req.body.remember===true})});
+   sessionResponse(req,res,{user:{id:user.id,email:user.email,username:user.username,name:user.name,role:user.role},...await issueTokens(user,{remember:req.body.remember===true,device:req.get('User-Agent')})});
  });
- app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch(e){res.status(e.status===503?503:401).json({error:e.status===503?e.message:'Refresh token rejected'});}});
+ app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{sessionResponse(req,res,await rotateRefreshToken(refreshCredential(req)));}catch(e){res.status(e.status===503?503:401).json({error:e.status===503?e.message:'Refresh token rejected'});}});
 
+ app.post('/api/auth/mfa',loginLimiter,async(req,res)=>{try{browserSession(req);const {user,remember}=await completeMfaLogin(db,req.body.challengeToken,req.body.code);req.activityUser={sub:user.id,role:user.role};await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);sessionResponse(req,res,{user:{id:user.id,username:user.username,name:user.name,role:user.role},...await issueTokens(user,{remember,device:req.get('User-Agent')})});}catch(e){res.status(e.status||503).json({error:e.status?e.message:'Account verification is temporarily unavailable.'});}});
  app.get('/api/auth/me',authenticate,(req,res)=>res.json({user:req.user}));
- app.use('/api',authenticate);
+ app.use('/api',authenticate);
+ app.use('/api',(req,res,next)=>{if(!['GET','HEAD'].includes(req.method)&&process.env.DATA_DIR&&existsSync(process.env.DATA_DIR+'/maintenance.json'))return res.status(503).json({error:'Controller maintenance is in progress. Retry after it completes.'});next();});
+ app.use('/api/account',accountSecurityRouter({db,audit,limiter:loginLimiter,onSessionRevoked:closeSessionAccess}));
  app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
  app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts().filter(h=>h.online||h.status==='connected'),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
@@ -157,7 +166,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const approvalHosts=new Map();
  app.delete('/api/ssh/connections',authorize('admin'),(req,res)=>{deleteSavedSSH(req.user.sub,req.body.target);res.json({ok:true});});
  app.post('/api/ssh/fingerprint',authorize('operator'),async(req,res)=>{try{const action=req.body.action===true;if(action){const approval=await resolveActionApproval(req.body.path,req.body.body,req.body.method,{dockerHost:req.body.dockerHost,query:pve});if(!approval||approval.target!==req.body.target)throw httpError('SSH approval does not match the actual target for this action',403);}if(!action&&!['admin','owner'].includes(req.user.role))return res.status(403).json({error:'Shell access requires admin access'});const host=action?await targetSSHHost(req.body.target,pve):req.body.host;try{await connectSSH({host,port:req.body.port,target:req.body.target,username:'host-key-probe',password:'unused'},req.user.sub);}catch(e){if(e.fingerprint){for(const [key,value] of approvalHosts)if(value.expires<Date.now())approvalHosts.delete(key);if(action)approvalHosts.set(`${req.user.sub}:${req.body.target}`,{host,port:Number(req.body.port||22),fingerprint:e.fingerprint,expires:Date.now()+300000});return res.json({host,fingerprint:e.fingerprint});}throw e;}res.status(400).json({error:'Host verification unavailable'});}catch(e){res.status(e.status||400).json({error:e.message});}});
- app.post('/api/ssh/connect',authorize('operator'),async(req,res)=>{try{if(req.body.mode==='authorize'){const approval=await resolveActionApproval(req.body.path,req.body.body,req.body.method,{dockerHost:req.body.dockerHost,query:pve});if(!approval||approval.target!==req.body.target)throw httpError('SSH approval does not match the actual target for this action',403);const host=await targetSSHHost(req.body.target,pve),binding=approvalHosts.get(`${req.user.sub}:${req.body.target}`);if(!binding||binding.expires<Date.now()||binding.host!==host||req.body.host!==host||binding.port!==Number(req.body.port||22)||binding.fingerprint!==req.body.fingerprint)return res.status(403).json({error:'Verify the actual target SSH host before approving this action'});}else if(!['admin','owner'].includes(req.user.role))return res.status(403).json({error:'Shell access requires admin access'});res.json(await connectSSH(req.body,req.user.sub));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
+ app.post('/api/ssh/connect',authorize('operator'),async(req,res)=>{try{if(req.body.mode==='authorize'){const approval=await resolveActionApproval(req.body.path,req.body.body,req.body.method,{dockerHost:req.body.dockerHost,query:pve});if(!approval||approval.target!==req.body.target)throw httpError('SSH approval does not match the actual target for this action',403);const host=await targetSSHHost(req.body.target,pve),binding=approvalHosts.get(`${req.user.sub}:${req.body.target}`);if(!binding||binding.expires<Date.now()||binding.host!==host||req.body.host!==host||binding.port!==Number(req.body.port||22)||binding.fingerprint!==req.body.fingerprint)return res.status(403).json({error:'Verify the actual target SSH host before approving this action'});}else if(!['admin','owner'].includes(req.user.role))return res.status(403).json({error:'Shell access requires admin access'});res.json(await connectSSH(req.body,req.user.sub,req.user.sid));}catch(e){res.status(e.status||400).json({error:e.message,fingerprint:e.fingerprint});}});
  app.post('/api/ssh/sftp/:id',authorize('admin'),async(req,res)=>{try{res.json(await sftpOperation(req.params.id,req.user.sub,req.body));}catch(e){res.status(e.status||422).json({error:e.message});}});
  app.get('/api/ssh/session/:id/output',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});streamShellOutput(req,res,s);});
  app.get('/api/ssh/session/:id',authorize('admin'),(req,res)=>{const s=shellSession(req.params.id,req.user.sub);if(s.mode!=='shell')return res.status(400).json({error:'Not a shell session'});if(s.releaseOutput)return res.status(409).json({error:'Shell output is already streaming'});const output=s.output;s.output='';res.json({output,closed:s.closed});});
@@ -325,8 +334,9 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('put','/docker/updates/settings','owner','docker.updates.settings',req=>imageUpdates.settings(req.body));
  action('post','/docker/updates/check','owner','docker.updates.check',()=>imageUpdates.checkHost(selectedAgentHost()));
  read('/docker/updates/:id/plan',async req=>{const row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);if(!row||row.status!=='available')throw httpError('Recheck available updates first',409);const c=await dockerUpdateQuery('/containers/'+encodeURIComponent(req.params.id)+'/json'),image=await dockerUpdateQuery('/images/'+encodeURIComponent(c.Image)+'/json'),plan=updatePlan(c,image);await ensureNoContainerDependents(c,dockerUpdateQuery);return {containerId:c.Id,name:plan.name,image:row.image,imageId:c.Image,remoteDigest:row.remoteDigest,configDigest:plan.binding,running:plan.running,mounts:(c.Mounts||[]).map(m=>({type:m.Type,target:m.Destination,readOnly:!m.RW})),networks:Object.keys(plan.networks),compose:!!c.Config.Labels?.['com.docker.compose.project'],environmentCount:c.Config.Env?.length||0};},'owner');
- const updateProgress=createDockerUpdateProgress();
+ const updateProgress=createDockerUpdateProgress({file:operationJournalFile});
  read('/docker/updates/:id/progress',req=>updateProgress.read(req.user.sub,selectedAgentHost()||'direct',req.params.id,req.query.operation),'owner');
+ action('post','/docker/updates/:id/recover','owner','docker.container.recover-update',async req=>{const host=selectedAgentHost()||'direct',entry=updateProgress.interrupted(req.user.sub,host,req.params.id,req.body.operationId);const result=await recoverDockerUpdate(entry.checkpoint,{query:dockerUpdateQuery});if(result.reconciled)entry.tracking.finish(result);else entry.tracking.fail(result.message,{recovered:true});return result;},true);
  action('post','/docker/updates/:id/install','owner','docker.container.install-update',async req=>{
   const host=selectedAgentHost()||'direct',row=imageUpdates.status(selectedAgentHost()).rows.find(r=>r.containerId===req.params.id);
   const operationId=req.body.operationId;
@@ -337,14 +347,14 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const tracking=updateProgress.start(req.user.sub,host,req.params.id,operationId),input={...req.body,containerId:req.params.id};
    void agentContext.run({host:host==='direct'?'':host},async()=>{
     let result;
-    try{result=await imageUpdateInstaller(row,input,{hostId:host,onProgress:tracking.report});imageUpdates.installed(host,req.params.id,result);tracking.finish(result);try{await monitor.invalidate()}catch{}}
+    try{result=await imageUpdateInstaller(row,input,{hostId:host,onProgress:tracking.report,onCheckpoint:tracking.checkpoint});imageUpdates.installed(host,req.params.id,result);tracking.finish(result);try{await monitor.invalidate()}catch{}}
     catch(error){tracking.fail(error.message);try{await audit(req,'docker.container.install-update.result',req.params.id,{error:error.message},'failed')}catch{}return}
     try{await audit(req,'docker.container.install-update.result',req.params.id,{result},'success')}catch{}
-   });
+   }).catch(error=>{console.error('Docker installation journal could not be updated:',error.message)});
    return {jobId:operationId,message:'Installation accepted. Progress and the verified result remain available if this page reloads.'};
   }
   const tracking=operationId?updateProgress.start(req.user.sub,host,req.params.id,operationId):null;
-  try{const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:host,onProgress:(percent,stage)=>tracking?.report(percent,stage)});imageUpdates.installed(host,req.params.id,result);tracking?.finish(result);return result}catch(error){tracking?.fail(error.message);throw error}
+  try{const result=await imageUpdateInstaller(row,{...req.body,containerId:req.params.id},{hostId:host,onProgress:(percent,stage)=>tracking?.report(percent,stage),onCheckpoint:value=>tracking?.checkpoint(value)});imageUpdates.installed(host,req.params.id,result);tracking?.finish(result);return result}catch(error){tracking?.fail(error.message);throw error}
  },true);
  action('post','/docker/container','operator','docker.container.create',req=>dockerCreateContainer(req.body));
  action('post','/docker/image/build','operator','docker.image.build',req=>dockerBuildImage(req.body));
@@ -457,8 +467,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/notifications',()=>notificationService.status(),'owner');
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);if(preferences.notifyDockerUpdates===undefined&&get().notificationPreferences?.notifyDockerUpdates!==undefined)preferences.notifyDockerUpdates=get().notificationPreferences.notifyDockerUpdates;mutate(s=>s.notificationPreferences=preferences);return preferences;});
  action('post','/notifications/test','owner','notification.test',req=>notificationService.test(required(req.body.channel,'Channel')));
- read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:false,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',rememberedSessionLifetime:'10d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:false,apiKeys:false,networkManagement:false}));
- read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and nine configurable notification delivery channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
+ read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:true,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',rememberedSessionLifetime:'10d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:true,apiKeys:false,networkManagement:false}));
+ read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:true,notifications:'in-app and nine configurable notification delivery channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
 
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};

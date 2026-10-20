@@ -5,6 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -18,6 +20,9 @@ jobs:
           bash -n deployment/setup-updater.sh
           bash deployment/test-updater.sh
           bash -n deployment/homecloud
+          bash -n deployment/upgrade.sh deployment/controller-backup.sh deployment/controller-restore.sh deployment/check-controller-recovery.sh
+          python3 deployment/test-safe-extract.py
+          sudo bash deployment/test-upgrade.sh
           bash -n deployment/build-env.sh
           bash -n deployment/network.sh
           bash deployment/test-network.sh
@@ -48,6 +53,21 @@ jobs:
           docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/homecloud-ci-root.crt
           curl --fail --show-error --cacert /tmp/homecloud-ci-root.crt https://localhost:6002/api/health
           NODE_EXTRA_CA_CERTS=/tmp/homecloud-ci-root.crt node deployment/check-registration.mjs
+      - name: Encrypted controller recovery drill
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y age
+          sudo env ICLUSTERS_CI_DRILL=1 bash deployment/check-controller-recovery.sh
+      - name: Dependency security and component inventory
+        run: |
+          npm audit --omit=dev --audit-level=high --workspaces=false --prefix apps/api
+          npm audit --omit=dev --audit-level=high --workspaces=false --prefix apps/web
+          (cd apps/api && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-api-sbom.json)
+          (cd apps/web && npm sbom --omit=dev --workspaces=false --package-lock-only --sbom-format=cyclonedx > /tmp/iclusters-web-sbom.json)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: component-inventory
+          path: /tmp/iclusters-*-sbom.json
       - name: Deployment logs and cleanup
         if: always()
         run: |

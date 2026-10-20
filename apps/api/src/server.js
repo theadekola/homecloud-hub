@@ -1,11 +1,14 @@
 import 'dotenv/config';
+import path from 'node:path';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {apiPolicy} from './api-policy.js';
 import { migrate } from './db.js';
 import { createApp } from './app.js';
 import { monitor } from './monitor.js';
 await migrate();
-const server=createApp().listen(Number(process.env.PORT||6000),'0.0.0.0',()=>console.log('i-Clusters live API listening'));
-const sample=()=>monitor.sample(true).catch(error=>console.error('Monitoring:',error.message));
+const server=createApp({operationJournalFile:path.join(process.env.DATA_DIR||fileURLToPath(new URL('../runtime',import.meta.url)),'docker-operation-journal.json')}).listen(Number(process.env.PORT||6000),'0.0.0.0',()=>console.log('i-Clusters live API listening'));
+const sample=()=>{if(process.env.DATA_DIR&&fs.existsSync(path.join(process.env.DATA_DIR,'maintenance.json')))return;return monitor.sample(true).catch(error=>console.error('Monitoring:',error.message));};
 sample();
 const timer=setInterval(sample,apiPolicy.monitorIntervalMs);timer.unref();
 for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{clearInterval(timer);server.close(()=>process.exit(0));});

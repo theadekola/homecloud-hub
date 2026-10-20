@@ -13,3 +13,5 @@ test('remembered sessions have a fixed ten-day deadline that refresh and activit
 test('remembered deadline survives reloads and a waking tab signs out when it has elapsed',async()=>{
  const s=await fixture();try{s.setTokens('saved','refresh',true,Date.now()+1000);localStorage.setItem('homecloud_remember_until',String(Date.now()-1));let expired=0;window.addEventListener('homecloud-session-expired',()=>expired++);const stop=s.startSessionActivity();assert.equal(s.getAccessToken(),'');assert.equal(expired,1);stop();}finally{s.close()}
 });
+
+test('browser cookie sessions remove legacy refresh credentials from JavaScript storage',async()=>{const s=await fixture();try{s.setTokens('old','old-private-refresh',true);s.setTokens('new',undefined,undefined,undefined,true);assert.equal(s.getRefreshToken(),'');assert.equal(s.usesCookieSession(),true);assert.equal(localStorage.getItem('homecloud_refresh_token'),null);assert.equal(s.getAccessToken(),'new');s.clearTokens();assert.equal(s.usesCookieSession(),false)}finally{s.close()}});

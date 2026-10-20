@@ -65,7 +65,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           if(existing.key?.startsWith('docker-image:'))continue;
-          if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}continue;}
+          if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}else if(typeof row?.content==='string'&&!row.content.split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;existing.resolution='no-longer-backup-destination';existing.details='This storage is no longer configured for backup content. This does not mean its filesystem mount was repaired.';}continue;}
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           // A no-heartbeat placeholder disappears when real Docker hosts are discovered.
           // Resolve its exact connector alert only from a fresh online node report.

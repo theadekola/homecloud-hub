@@ -1,13 +1,24 @@
 import {startSessionActivity} from './session';
-import Shell from './pages/Shell';
+
 import {useApi} from './hooks';
 import {SSHApproval} from './components/SSHAccess';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { api, clearTokens, getAccessToken } from './api';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard'; import Proxmox from './pages/Proxmox'; import Docker from './pages/Docker'; import Storage from './pages/Storage'; import Network from './pages/Network'; import Backups from './pages/Backups';    import Monitoring from './pages/Monitoring'; import Alerts from './pages/Alerts'; import AI from './pages/AI'; import Users from './pages/Users'; import Settings from './pages/Settings';
+const Dashboard=lazy(()=>import('./pages/Dashboard'));
+const Proxmox=lazy(()=>import('./pages/Proxmox'));
+const Docker=lazy(()=>import('./pages/Docker'));
+const Storage=lazy(()=>import('./pages/Storage'));
+const Network=lazy(()=>import('./pages/Network'));
+const Backups=lazy(()=>import('./pages/Backups'));
+const Monitoring=lazy(()=>import('./pages/Monitoring'));
+const Alerts=lazy(()=>import('./pages/Alerts'));
+const AI=lazy(()=>import('./pages/AI'));
+const Users=lazy(()=>import('./pages/Users'));
+const Settings=lazy(()=>import('./pages/Settings'));
+const Shell=lazy(()=>import('./pages/Shell'));
 
 export default function App(){
  const [connectionError,setConnectionError]=useState('');
@@ -17,7 +28,7 @@ export default function App(){
  if(connectionError)return <div className="login-page"><div><p role="alert">{connectionError}</p><button className="btn primary" onClick={check}>Retry connection</button></div></div>;
  if(authenticated===null)return <div className="login-page"><div className="muted">Loading i-Clusters…</div></div>;
  if(!authenticated)return <Login onLogin={()=>setAuthenticated(true)}/>;
- return <><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/proxmox" element={<Proxmox/>}/><Route path="/docker" element={<Docker/>}/><Route path="/storage" element={<Storage/>}/><Route path="/network" element={<Network/>}/><Route path="/backups" element={<Backups/>}/><Route path="/schedules" element={<BackupRedirect tab="Schedules"/>}/><Route path="/retention" element={<BackupRedirect tab="Retention Policies"/>}/><Route path="/restore" element={<BackupRedirect tab="Restore Points"/>}/><Route path="/monitoring" element={<Monitoring/>}/><Route path="/alerts" element={<Alerts/>}/><Route path="/ai" element={<AI/>}/><Route path="/users" element={<RoleGate roles={['auditor','operator','admin','owner']}><Users/></RoleGate>}/><Route path="/audit" element={<Navigate to="/users?tab=Audit%20Logs" replace/>}/><Route path="/tools/sftp" element={<RoleGate roles={['admin','owner']}><Shell key="sftp" mode="sftp"/></RoleGate>}/><Route path="/tools/shell" element={<RoleGate roles={['admin','owner']}><Shell key="shell"/></RoleGate>}/><Route path="/settings" element={<Settings/>}/><Route path="*" element={<div className="card"><h1>Page not found</h1><p>This address does not match a page.</p><Link className="btn primary" to="/">Back to Dashboard</Link></div>}/></Route></Routes><SSHApproval/></>
+ return <><Suspense fallback={null}><Routes><Route element={<Layout/>}><Route path="/" element={<Dashboard/>}/><Route path="/proxmox" element={<Proxmox/>}/><Route path="/docker" element={<Docker/>}/><Route path="/storage" element={<Storage/>}/><Route path="/network" element={<Network/>}/><Route path="/backups" element={<Backups/>}/><Route path="/schedules" element={<BackupRedirect tab="Schedules"/>}/><Route path="/retention" element={<BackupRedirect tab="Retention Policies"/>}/><Route path="/restore" element={<BackupRedirect tab="Restore Points"/>}/><Route path="/monitoring" element={<Monitoring/>}/><Route path="/alerts" element={<Alerts/>}/><Route path="/ai" element={<AI/>}/><Route path="/users" element={<RoleGate roles={['auditor','operator','admin','owner']}><Users/></RoleGate>}/><Route path="/audit" element={<Navigate to="/users?tab=Audit%20Logs" replace/>}/><Route path="/tools/sftp" element={<RoleGate roles={['admin','owner']}><Shell key="sftp" mode="sftp"/></RoleGate>}/><Route path="/tools/shell" element={<RoleGate roles={['admin','owner']}><Shell key="shell"/></RoleGate>}/><Route path="/settings" element={<Settings/>}/><Route path="*" element={<div className="card"><h1>Page not found</h1><p>This address does not match a page.</p><Link className="btn primary" to="/">Back to Dashboard</Link></div>}/></Route></Routes></Suspense><SSHApproval/></>
 }
 
 function BackupRedirect({tab}:{tab:string}){const location=useLocation();const query=new URLSearchParams(location.search);query.set('tab',tab);return <Navigate to={`/backups?${query}`} replace/>;}

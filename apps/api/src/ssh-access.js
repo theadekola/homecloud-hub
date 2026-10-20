@@ -18,7 +18,7 @@ export function actionTarget(req){
  return null;
 }
 const binding=(user,method,path,body,scope)=>crypto.createHash('sha256').update(JSON.stringify([user,method,path,body,scope])).digest('hex');
-export function issueGrant(user,method,path,body,scope=approvalTargetForPath(path,body,method)||''){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{binding:binding(user,method,path,body,scope),expires:Date.now()+60000});return token;}
+export function issueGrant(user,method,path,body,scope=approvalTargetForPath(path,body,method)||'',sessionId){const token=crypto.randomBytes(32).toString('hex');grants.set(token,{user,sessionId,binding:binding(user,method,path,body,scope),expires:Date.now()+60000});return token;}
 export function consumeGrant(token,user,method,path,body,scope=approvalTargetForPath(path,body,method)||''){const g=grants.get(token);grants.delete(token);return !!g&&g.expires>Date.now()&&g.binding===binding(user,method,path,body,scope);}
 export async function verifyApprovalPrivilege(client,password){
  const probe=(command,stdin)=>new Promise((resolve,reject)=>{
@@ -30,7 +30,7 @@ export async function verifyApprovalPrivilege(client,password){
  if(typeof password!=='string'||password.length>2048||/[\r\n]/.test(password))throw failure('Enter a valid fresh SSH and sudo password');
  if(await probe("/usr/bin/sudo -k -S -p '' -- /usr/bin/id -u",password+'\n')!=='0')throw failure('Protected actions require root or verified sudo access on this target',403);
 }
-export async function connectSSH(input,user){
+export async function connectSSH(input,user,sessionId){
  if(input.mode==='authorize'&&(input.saved||input.useSavedPassword))throw failure('Action approval requires a freshly entered target password',403);
  if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:input.mode==='sftp'?'sftp':'shell'};}
  if(input.useSavedPassword){const existing=savedSSH(user,input.target);if(!existing||existing.host!==input.host||existing.port!==Number(input.port||22)||existing.username!==input.username)throw failure('Enter a password for the changed connection');input={...input,password:existing.password};}
@@ -42,13 +42,13 @@ export async function connectSSH(input,user){
  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',e=>{client.end();reject(fingerprint&&input.fingerprint!==fingerprint?Object.assign(failure('Verify the target SSH host fingerprint before connecting',409),{fingerprint}):failure(e.level==='client-authentication'?'SSH login failed. Check the username and password for this target. The account must allow SSH password login.':'SSH connection failed: '+e.message,422))});client.connect({host:input.host,port,username:input.username,password:input.password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>{fingerprint='SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'');return input.fingerprint===fingerprint;}})});
  if(input.mode==='authorize'){
   try{await verifyApprovalPrivilege(client,input.password);
-   const approval=await resolveActionApproval(input.path,input.body,input.method,{dockerHost:input.dockerHost});if(!approval)throw failure('Invalid action path');if(approval.target!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body,approval.scope)};
+   const approval=await resolveActionApproval(input.path,input.body,input.method,{dockerHost:input.dockerHost});if(!approval)throw failure('Invalid action path');if(approval.target!==input.target)throw failure('SSH target does not match this action');return {token:issueGrant(user,input.method,input.path,input.body,approval.scope,sessionId)};
   }finally{client.end();}
  }
  let stream;try{stream=await new Promise((resolve,reject)=>input.mode==='sftp'?client.sftp((e,s)=>e?reject(e):resolve(s)):client.shell({term:'xterm-256color',cols:100,rows:28},(e,s)=>e?reject(e):resolve(s)));}catch(e){client.end();throw e;}
  if(input.save===false&&input.mode!=='authorize')deleteSavedSSH(user,input.target);
  if(input.save===true){const vault=connectionVault(),all=vault.read()||{};all[`${user}:${input.target}`]={host:input.host,port,username:input.username,password:input.password,fingerprint:input.fingerprint};vault.save(all);}
- const id=crypto.randomUUID(),s={user,client,stream,mode:input.mode==='sftp'?'sftp':'shell',output:'',touched:Date.now(),closed:false};sessions.set(id,s);const decoder=new StringDecoder('utf8'),closed=()=>{if(s.closed)return;s.output=(s.output+decoder.end()).slice(-262144);s.closed=true;s.onOutput?.();};if(s.mode==='shell')stream.on('data',d=>{s.output=(s.output+decoder.write(d)).slice(-262144);s.onOutput?.();});stream.on('close',()=>{closed();client.end()});client.on('error',closed);client.on('close',closed);return {id};
+ const id=crypto.randomUUID(),s={user,sessionId,client,stream,mode:input.mode==='sftp'?'sftp':'shell',output:'',touched:Date.now(),closed:false};sessions.set(id,s);const decoder=new StringDecoder('utf8'),closed=()=>{if(s.closed)return;s.output=(s.output+decoder.end()).slice(-262144);s.closed=true;s.onOutput?.();};if(s.mode==='shell')stream.on('data',d=>{s.output=(s.output+decoder.write(d)).slice(-262144);s.onOutput?.();});stream.on('close',()=>{closed();client.end()});client.on('error',closed);client.on('close',closed);return {id};
 }
 export function shellSession(id,user){const s=sessions.get(id);if(!s||s.user!==user||shellExpired(s))throw failure('Shell session unavailable',404);if(s.mode==='sftp')s.touched=Date.now();return s;}
 export function closeShell(id,user){const s=shellSession(id,user);s.releaseOutput?.();if(s.mode==='sftp')s.stream.end();else s.stream.close();s.client.end();sessions.delete(id);}
@@ -73,3 +73,5 @@ export function writeShellInput(session,input){
  if(input!==undefined&&(typeof input!=='string'||input.length>8192))throw failure('Shell input must be text of at most 8192 characters');
  if(typeof input==='string')session.stream.write(input);
 }
+
+export function closeSessionAccess(user,sessionId){for(const [id,s] of sessions)if(s.user===user&&(!sessionId||s.sessionId===sessionId)){s.releaseOutput?.();s.client.end();sessions.delete(id)}for(const [id,g] of grants)if(g.user===user&&(!sessionId||g.sessionId===sessionId))grants.delete(id)}

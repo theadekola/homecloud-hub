@@ -12,7 +12,7 @@ import {
 import { useState,useEffect,useRef } from 'react';
 import UpdateButton from './UpdateButton';
 import { useApi,configureRefresh } from '../hooks';
-import { clearTokens } from '../api';
+import { api,clearTokens } from '../api';
 
 const sections = [
   { title: 'OVERVIEW', items: [['Dashboard','/',LayoutDashboard]] },
@@ -65,7 +65,7 @@ export default function Layout() {
     return ()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',key);};
   },[mobile,menuOpen]);
   const showLabels=mobile||!collapsed;
-  const signOut=()=>{clearTokens();window.location.assign('/');};
+  const signOut=async()=>{try{await api('/account/logout',{method:'POST',body:'{}'});clearTokens();window.location.assign('/')}catch(e:any){window.alert(e.message||'Sign-out could not be confirmed. Retry when connected.')}};
   return <div className="app-shell">
     {mobile&&menuOpen&&<button className="nav-backdrop" aria-label="Close navigation" onClick={closeMenu}/>}
     <aside id="primary-navigation" ref={menuRef} className={`sidebar${!mobile&&collapsed?' collapsed':''}${mobile&&menuOpen?' mobile-open':''}`} inert={mobile&&!menuOpen} role={mobile&&menuOpen?'dialog':undefined} aria-modal={mobile&&menuOpen?true:undefined} aria-label="Main navigation">

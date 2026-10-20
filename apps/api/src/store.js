@@ -1,3 +1,4 @@
+import {writeDurableJson,readDurableJson} from './durable-json.js';
 import {upgradeBrandSettings} from './product-brand.js';
 import {retireProviders} from './retired-providers.js';
 import fs from 'node:fs';
@@ -9,10 +10,10 @@ const file=path.join(directory,'live-state.json');
 const defaults={schema:3,settings:{siteName:'i-Clusters',description:'Your infrastructure, connected.',refresh:30},rules:[],alerts:[],metrics:[]};
 let state=structuredClone(defaults);
 if(fs.existsSync(file)){
-  const saved=JSON.parse(fs.readFileSync(file,'utf8'));
+  const saved=readDurableJson(file);
   if(saved.schema===3)state={...state,...saved};
 }
 const prior=JSON.stringify(state);upgradeBrandSettings(state.settings);retireProviders(state);if(JSON.stringify(state)!==prior)save();
 export function get(){return state;}
-export function save(){const temporary=`${file}.tmp`;fs.writeFileSync(temporary,JSON.stringify(state,null,2));fs.renameSync(temporary,file);}
+export function save(){writeDurableJson(file,state);}
 export function mutate(fn){const previous=state;state=structuredClone(state);try{fn(state);save();return state;}catch(error){state=previous;throw error;}}

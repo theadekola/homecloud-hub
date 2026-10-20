@@ -1,21 +1,21 @@
 export function setDockerHost(id:string){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent?.(new Event('homecloud-connection'));}
-import {getAccessToken,getRefreshToken,setTokens,clearTokens} from './session';
+import {getAccessToken,getRefreshToken,setTokens,clearTokens,usesCookieSession} from './session';
 export {getAccessToken,setTokens,clearTokens} from './session';
 const API = import.meta.env.VITE_API_URL || '';
 let refreshInFlight:Promise<boolean>|null=null;
 function refreshAccessToken(){
   if(!refreshInFlight)refreshInFlight=(async()=>{
-    const refreshToken=getRefreshToken();
-    if(!refreshToken){clearTokens();return false;}
-    const response=await fetch(`${API}/api/auth/refresh`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken})});
-    if(!response.ok){if(response.status===401&&getRefreshToken()===refreshToken)clearTokens();throw Object.assign(new Error(response.status===401?'Session expired. Sign in again.':'Session refresh is temporarily unavailable.'),{status:response.status});}
-    const body=await response.json();if(getRefreshToken()!==refreshToken)return false;setTokens(body.accessToken,body.refreshToken,undefined,body.rememberUntil);return true;
+    const refreshToken=getRefreshToken(),cookie=usesCookieSession(),access=getAccessToken();
+    if(!refreshToken&&!cookie){clearTokens();return false;}
+    const response=await fetch(`${API}/api/auth/refresh`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-IClusters-Browser':'1'},body:JSON.stringify(refreshToken?{refreshToken}:{})});
+    if(!response.ok){if(response.status===401&&getRefreshToken()===refreshToken&&getAccessToken()===access)clearTokens();throw Object.assign(new Error(response.status===401?'Session expired. Sign in again.':'Session refresh is temporarily unavailable.'),{status:response.status});}
+    const body=await response.json();if(getRefreshToken()!==refreshToken||cookie&&getAccessToken()!==access)return false;setTokens(body.accessToken,body.refreshToken,undefined,body.rememberUntil,body.cookieSession===true);return true;
   })().catch(e=>{if(e.status!==401)window.dispatchEvent?.(new CustomEvent('homecloud-session-unavailable',{detail:e.message||'Connection temporarily unavailable'}));throw e;}).finally(()=>{refreshInFlight=null;});
   return refreshInFlight;
 }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string, rawResponse=false): Promise<T> {
-  const headers:any = { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(options.headers).entries()) };
+  const headers:any = { 'Content-Type': 'application/json', 'X-IClusters-Browser':'1', ...Object.fromEntries(new Headers(options.headers).entries()) };
   const host=localStorage.getItem('homecloud_docker_host');if(host&&!Object.hasOwn(headers,'x-homecloud-docker-host')&&(/^\/(?:docker|actions\/docker)(?:\/|\?|$)|^\/(?:storage|network)(?:\?|$)/.test(path)))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
   if(confirmation) headers['X-HomeCloud-Confirm']=confirmation;

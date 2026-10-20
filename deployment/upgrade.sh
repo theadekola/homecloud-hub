@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Standard Compose upgrade with a consistent local recovery point and automatic
+# rollback to the original images/database if the new deployment fails health.
+set -Eeuo pipefail
+[[ $EUID == 0 ]] || { echo 'Run the updater as root.' >&2; exit 1; }
+project=${HOMECLOUD_INSTALL_DIR:-/opt/homecloud-hub}
+cd "$project"
+[[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Tracked files have local changes; commit or revert them before updating.' >&2; exit 1; }
+git symbolic-ref --quiet HEAD >/dev/null || { echo 'This checkout is pinned. Select a reviewed release branch before updating.' >&2; exit 1; }
+exec 9>"${ICLUSTERS_MAINTENANCE_LOCK:-/run/lock/iclusters-maintenance.lock}"
+flock -n 9 || { echo 'Controller maintenance is already running.' >&2; exit 1; }
+[[ ! -e runtime/maintenance.json ]] || { echo 'Inspect the existing maintenance operation before retrying.' >&2; exit 1; }
+umask 077
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+recovery="${ICLUSTERS_UPGRADE_RECOVERY_ROOT:-/var/backups/iclusters}/upgrade-$stamp"
+mkdir -m 0700 -p "$recovery"
+previous=$(git rev-parse HEAD)
+printf '%s\n' "$previous" > "$recovery/revision"
+cp -a .env docker-compose.yml deployment/Caddyfile "$recovery/"
+api_image=$(docker compose images -q api | head -1)
+web_image=$(docker compose images -q web | head -1)
+[[ -n $api_image && -n $web_image ]] || { echo 'The existing API/web images are required for rollback.' >&2; exit 1; }
+docker tag "$api_image" "iclusters-rollback-api:$stamp"
+docker tag "$web_image" "iclusters-rollback-web:$stamp"
+printf '{"services":{"api":{"image":"iclusters-rollback-api:%s"},"web":{"image":"iclusters-rollback-web:%s"}}}\n' "$stamp" "$stamp" > "$recovery/images.json"
+printf '{"operation":"software-upgrade"}\n' > runtime/maintenance.json
+paused=0
+snapshot=0
+rollback(){
+ local result=$?
+ trap - ERR
+ echo 'Upgrade failed; restoring the previous controller deployment.' >&2
+ set +e
+ if ((paused)); then docker compose stop api; fi
+ if ((snapshot)); then
+   git reset --hard "$previous"
+   cp -a "$recovery/.env" .env
+   cp -a "$recovery/docker-compose.yml" docker-compose.yml
+   cp -a "$recovery/Caddyfile" deployment/Caddyfile
+   mv runtime "runtime.failed-$stamp"
+   mkdir -m 0700 runtime
+   cp -a "$recovery/runtime/." runtime/
+   docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$recovery/database.dump"
+   db_result=$?
+   docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 180
+   service_result=$?
+   if ((db_result==0 && service_result==0)); then rm -f runtime/maintenance.json; echo 'Previous controller restored. The failed upgrade remains available for inspection.' >&2; else echo 'Automatic rollback could not be verified. Maintenance remains enabled; use the recovery point.' >&2; fi
+ elif ((paused)); then docker compose up -d --no-deps api; rm -f runtime/maintenance.json
+ else rm -f runtime/maintenance.json
+ fi
+ echo "Local recovery point: $recovery" >&2
+ exit "$result"
+}
+trap rollback ERR
+# First upgrade from an older release may not yet contain the maintenance check.
+docker compose exec -T api node -e "if(require('fs').existsSync('scripts/check-maintenance.mjs'))import('./scripts/check-maintenance.mjs')"
+paused=1
+docker compose stop api
+docker compose exec -T postgres sh -c 'pg_dump --format=custom --no-owner -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$recovery/database.dump"
+cp -a runtime "$recovery/"
+snapshot=1
+git pull --ff-only
+grep -q '^WEB_PORT=' .env || echo 'WEB_PORT=80' >> .env
+grep -q '^HTTPS_PORT=' .env || echo 'HTTPS_PORT=443' >> .env
+if ! grep -q '^SETUP_TOKEN=' .env; then printf '\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 16)" >> .env; fi
+python3 deployment/configure-https.py
+docker compose config --quiet
+source deployment/build-env.sh
+docker compose build --pull
+docker compose up -d --wait --wait-timeout 180
+install -m 0755 deployment/homecloud /usr/local/bin/homecloud
+install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+bash deployment/setup-updater.sh
+systemctl daemon-reload
+rm -f runtime/maintenance.json
+trap - ERR
+echo "Upgrade completed and health checks passed. Local recovery point: $recovery"

@@ -8,3 +8,5 @@ test('backup storage alerts recover only from a matching online storage reading'
  storage=[{id:'node02/media-storage',name:'media-storage',node:'node02',content:'backup',status:'online'}];await monitor.sample(true);assert.equal(state.alerts[0].status,'resolved');assert.ok(state.alerts[0].resolvedAt);
  state.alerts=[{id:'background-update',status:'active'}];const cached=await monitor.sample();assert.equal(cached.alerts[0].id,'background-update');
 });
+
+test('explicit removal of backup content retires an obsolete backup alert without claiming the mount recovered',async()=>{const state={alerts:[],metrics:[],rules:[]};let content='backup';const monitor=createMonitor({proxmox:{configured:()=>true,read:async()=>({nodes:[],storage:[{id:'node02/media',node:'node02',name:'media',status:'offline',content}]})}},{get:()=>state,mutate:fn=>fn(state)},async()=>[]);await monitor.sample(true);assert.equal(state.alerts[0].status,'active');content='images,iso';await monitor.sample(true);assert.equal(state.alerts[0].status,'resolved');assert.equal(state.alerts[0].resolution,'no-longer-backup-destination');assert.match(state.alerts[0].details,/does not mean.*mount was repaired/)});

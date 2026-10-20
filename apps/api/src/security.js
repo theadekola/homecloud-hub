@@ -24,10 +24,13 @@ export async function auth(req, res, next) {
   if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
   try {
     const claims = jwt.verify(header.slice(7), ACCESS_SECRET, { algorithms: ['HS256'] });
+    if(claims.typ&&claims.typ!=='access')throw Error('Invalid token type');
     if(claims.sessionExp&&Date.now()>=claims.sessionExp*1000)throw Error('Session expired');
-    let result;try{result=await accountQuery('SELECT id,email,username,name,role,status FROM users WHERE id=$1',[claims.sub]);}catch{return res.status(503).json({error:'Account verification is temporarily unavailable. Try again shortly.'});}
+    let result;try{result=await accountQuery('SELECT id,email,username,name,role,status,token_version FROM users WHERE id=$1',[claims.sub]);}catch{return res.status(503).json({error:'Account verification is temporarily unavailable. Try again shortly.'});}
     if(!result.rowCount||result.rows[0].status!=='active')return res.status(401).json({error:'Account is inactive or missing'});
-    req.user={sub:result.rows[0].id,email:result.rows[0].email||result.rows[0].username,username:result.rows[0].username,name:result.rows[0].name,role:result.rows[0].role};
+    if((claims.ver||0)!==(result.rows[0].token_version||0))throw Error('Session revoked');
+    if(claims.sid){const session=await accountQuery('SELECT id FROM auth_sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>NOW()',[claims.sid,claims.sub]);if(!session.rowCount)throw Error('Session revoked');}
+    req.user={sid:claims.sid,sessionExp:claims.sessionExp,remember:claims.remember===true,sub:result.rows[0].id,email:result.rows[0].email||result.rows[0].username,username:result.rows[0].username,name:result.rows[0].name,role:result.rows[0].role};
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired access token' });
@@ -41,11 +44,12 @@ export function requireRole(minRole) {
   };
 }
 
-export async function issueTokens(user,{remember=false,sessionExp}={}) {
+export async function issueTokens(user,{remember=false,sessionExp,sid,device='Browser'}={}) {
   const now=Math.floor(Date.now()/1000);
   if(remember&&!sessionExp)sessionExp=now+10*24*60*60;
   if(sessionExp&&sessionExp<=now)throw Error('Session expired');
-  const claims=sessionExp?{sessionExp,remember}:{};
+  if(!sid){sid=crypto.randomUUID();const expiry=jwt.decode(jwt.sign({},REFRESH_SECRET,{expiresIn:sessionExp?sessionExp-now:process.env.JWT_REFRESH_EXPIRES_IN||'7d'})).exp;await accountQuery('INSERT INTO auth_sessions(id,user_id,expires_at,device) VALUES($1,$2,to_timestamp($3),$4)',[sid,user.id,expiry,String(device).slice(0,200)]);}
+  const claims={sid,ver:user.token_version||0,...(sessionExp?{sessionExp,remember}:{})};
   const payload = { sub:user.id,email:user.email,username:user.username,role:user.role,name:user.name,...claims };
   const configured=jwt.decode(jwt.sign({},ACCESS_SECRET,{expiresIn:process.env.JWT_EXPIRES_IN||'15m'}));
   const accessToken=jwt.sign(payload,ACCESS_SECRET,{expiresIn:sessionExp?Math.min(configured.exp-now,sessionExp-now):process.env.JWT_EXPIRES_IN||'15m',algorithm:'HS256'});
@@ -60,11 +64,13 @@ export async function rotateRefreshToken(token) {
   if(decoded.sessionExp&&Date.now()>=decoded.sessionExp*1000)throw Error('Session expired');
   if (decoded.typ !== 'refresh') throw new Error('Invalid refresh token');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const row = await accountQuery(`SELECT rt.*,u.email,u.username,u.name,u.role,u.status FROM refresh_tokens rt JOIN users u ON u.id=rt.user_id WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>NOW()`, [tokenHash]);
+  const row = await accountQuery(`SELECT rt.*,u.email,u.username,u.name,u.role,u.status,u.token_version FROM refresh_tokens rt JOIN users u ON u.id=rt.user_id WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>NOW()`, [tokenHash]);
   if (!row.rowCount || row.rows[0].status !== 'active') throw new Error('Refresh token rejected');
+  if((decoded.ver||0)!==(row.rows[0].token_version||0))throw Error('Session revoked');
+  if(decoded.sid){const session=await accountQuery('SELECT id FROM auth_sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>NOW()',[decoded.sid,decoded.sub]);if(!session.rowCount)throw Error('Session revoked');}
   const revoked = await accountQuery('UPDATE refresh_tokens SET revoked_at=NOW() WHERE token_hash=$1 AND revoked_at IS NULL RETURNING id', [tokenHash]);
   if (!revoked.rowCount) throw new Error('Refresh token already used');
-  return issueTokens({ ...row.rows[0], id:row.rows[0].user_id },{remember:decoded.remember===true,sessionExp:decoded.sessionExp});
+  return issueTokens({ ...row.rows[0], id:row.rows[0].user_id },{remember:decoded.remember===true,sessionExp:decoded.sessionExp,sid:decoded.sid});
 }
 
 export async function verifyPassword(email,password) {

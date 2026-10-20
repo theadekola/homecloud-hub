@@ -8,7 +8,7 @@ This document describes the i-Clusters application's data flows. It is not a pri
 
 | Information | Purpose and location |
 | --- | --- |
-| Account name, email, role, status and password hash | Authentication and access control in the controller's PostgreSQL database; passwords are hashed with bcrypt |
+| Account name, username, optional email, role, status and password hash | Authentication and access control in the controller's PostgreSQL database; passwords are hashed with bcrypt |
 | Refresh-token hashes, approval and audit records | Session rotation, authorization and recorded application actions in PostgreSQL |
 | Provider inventory, hostnames, addresses, measurements, alerts and activity | Infrastructure management and local persisted runtime state |
 | Supported integration secrets and saved connection details | Server-side connection configuration; supported credential stores encrypt secret values using deployment key material |
@@ -30,7 +30,7 @@ The bundled application has no built-in advertising or analytics tracking servic
 
 ## Browser storage and sessions
 
-Remember me uses persistent browser storage; unchecked sign-in uses tab session storage. The inactivity preference applies in either case. Signing out clears stored access and refresh tokens in this browser. It does not remove server records, revoke every issued token or sign out other devices. See [browser sessions](docs/browser-sessions.md).
+Remember this device uses persistent browser storage for a fixed ten days from successful sign-in; activity and token rotation do not extend the deadline. Unchecked sign-in uses tab session storage and the configured browser inactivity timeout. Signing out clears stored access and refresh tokens in this browser. It does not remove server records, revoke every issued token or sign out other devices. See [browser sessions](docs/browser-sessions.md).
 
 ## Retention, access and deletion
 

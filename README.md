@@ -124,7 +124,7 @@ Open **Docker → Updates** to check the registry tags used by containers, revie
 
 Provider monitoring normally samples every 30 seconds; read caches and UI polling can have different intervals. Gaps, permission failures and partial readings are retained as limitations. Missing metric samples do not resolve metric alerts.
 
-The header bell counts **unresolved alerts only**, including acknowledged conditions that have not recovered. Recent activity stays in the popup without increasing the badge. Marking activity read does not resolve alerts.
+The header bell counts **active, unacknowledged alerts only**. Acknowledged conditions stay listed until monitoring confirms recovery, but do not increase the badge. Recent activity stays in the popup without increasing the badge. Marking activity read does not resolve alerts.
 
 Configure your channel in **Settings → Connections → Notifications**, choose its severity/recovery preference, save, enable it and send an explicitly confirmed test. Supported channels include Discord, Telegram, SMTP, Slack, Teams, Pushover, Gotify, custom webhooks and IFTTT. Each automatic alert is sent separately; Discord displays a colour-coded card. See the [channel setup guide](docs/notification-channels.md). Saved credentials do not prove delivery. Failed deliveries retry with backoff; delivery is not guaranteed exactly once.
 
@@ -158,7 +158,7 @@ Protect the controller separately: back up PostgreSQL consistently, its `runtime
 
 ## Development
 
-Use Node.js 20 or a compatible installed runtime and a PostgreSQL instance. The API needs database configuration and signing keys; review `.env.example` and [production configuration](PRODUCTION.md). Run API tests against their fixtures rather than live infrastructure.
+Use Node.js 24 LTS and a PostgreSQL instance. The API needs database configuration and signing keys; review `.env.example` and [production configuration](PRODUCTION.md). Run API tests against their fixtures rather than live infrastructure.
 
 ```sh
 npm install
@@ -193,6 +193,8 @@ journalctl -u homecloud-node-agent.service -n 100 --no-pager
 Do not post credentials, environment files, private SSH material or full unredacted infrastructure reports in public issues.
 
 ## Documentation and project policies
+
+Commercial deployment status and remaining release gates: [20 October readiness review](docs/audits/2026-10-20-commercial-readiness.md).
 
 | Document | Contents |
 | --- | --- |

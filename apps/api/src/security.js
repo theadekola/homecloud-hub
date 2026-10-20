@@ -10,13 +10,14 @@ if (!REFRESH_SECRET || REFRESH_SECRET.length < 32) throw new Error('JWT_REFRESH_
 
 const accountQuery=async(...args)=>{try{return await pool.query(...args);}catch{throw Object.assign(new Error('Account service is temporarily unavailable. Try again shortly.'),{status:503});}};
 
-export const roles = {
+// A role must be an explicit entry, never an inherited Object property.
+export const roles = Object.freeze(Object.assign(Object.create(null), {
   viewer: 10,
   auditor: 20,
   operator: 30,
   admin: 40,
   owner: 50,
-};
+}));
 
 export async function auth(req, res, next) {
   const header = req.headers.authorization || '';

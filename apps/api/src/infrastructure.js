@@ -65,6 +65,18 @@ export async function backupArchives(query=pve,{timeoutMs=20000}={}){
       if(![1,true,'1'].includes(store.active)||[0,false,'0'].includes(store.enabled)){const message=`${n.node}/${store.storage}: backup storage is inactive, disabled or unavailable; archives were not checked.`,config=configs.find(c=>c.storage===store.storage),mount=config?.type==='dir'&&[1,true,'1'].includes(config.is_mountpoint);errors.push(message);coverage.issues.push({code:'storage-unavailable',node:n.node,storage:store.storage,message,help:mount?`Confirm ${config.path||'the configured directory'} is mounted on ${n.node}, then retry inventory. Do not disable the mount-point check or write backups into an unmounted directory.`:'Check that this storage is enabled, online and accessible on this node in Proxmox, then retry inventory.'});return;}
       try{const files=await read(`/nodes/${encode(n.node)}/storage/${encode(store.storage)}/content?content=backup`);
         if(!Array.isArray(files)||files.some(f=>!f||typeof f.volid!=='string'||!f.volid))throw Error('Unexpected backup archive inventory');
+        // Proxmox silently filters backup volumes by privileges. An HTTP 200
+        // with [] is not evidence of an empty destination for an audit-only token.
+        if(!files.length){
+          const scopes=[{path:`/storage/${store.storage}`,privilege:'Datastore.AllocateSpace'},{path:'/vms',privilege:'VM.Backup'}];
+          for(const scope of scopes){
+            let permissions;
+            try{permissions=await read(`/access/permissions?path=${encode(scope.path)}`);}
+            catch{throw Error(`Cannot verify archive visibility at ${scope.path}; check the connection account and token permissions. An empty API response does not prove there are no backups.`);}
+            const privileges=permissions?.[scope.path];
+            if(!privileges||![1,true,'1'].includes(privileges[scope.privilege]))throw Error(`Backup archive visibility is incomplete: ${scope.privilege} is not confirmed at ${scope.path}. Proxmox can hide archives from this account. Check both the user and token permissions; guest-scoped access may intentionally show only some backups.`);
+          }
+        }
         coverage.checkedStorage++;
         for(const f of files)points.push({id:Buffer.from(JSON.stringify({node:n.node,storage:store.storage,volid:f.volid})).toString('base64url'),provider:'proxmox',node:n.node,storage:store.storage,shared:(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===1||(store.shared??configs.find(c=>c.storage===store.storage)?.shared)===true,volid:f.volid,name:f.volid,type:f.subtype||(/vzdump-lxc/.test(f.volid)?'lxc':'qemu'),vmid:f.vmid??null,created:f.ctime?new Date(f.ctime*1000).toISOString():null,size:f.size??null,protected:Boolean(f.protected)});
       }catch(e){const message=`${n.node}/${store.storage}: ${e.message}`;errors.push(message);coverage.issues.push({code:'archive-read-failed',node:n.node,storage:store.storage,message});}

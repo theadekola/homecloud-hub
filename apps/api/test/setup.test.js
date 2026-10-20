@@ -25,3 +25,8 @@ await test('first owner is hashed, registration locks the table and closes witho
  await assert.rejects(registerOwner(db,{...input,email:'another@example.test'},token),error=>error.status===409);
  assert.equal(queries.at(-1),'ROLLBACK');assert.equal(queries.filter(q=>q.startsWith('INSERT INTO users')).length,1);
 });
+
+test('first-use registration creates a username-only owner without requiring an email',async()=>{
+ let values;const client={release(){},query:async(sql,args)=>{if(sql.startsWith('SELECT EXISTS'))return {rows:[{registered:false}]};if(sql.startsWith('INSERT INTO users')){values=args;return {rows:[{id:'new',username:args[3],name:args[1],email:args[0],role:'owner'}]}}return {rows:[]}}};
+ const owner=await registerOwner({connect:async()=>client},{name:'Owner',username:'New_Owner',password:'A strong test password',setupToken:token},token);assert.equal(values[0],null);assert.equal(values[3],'new_owner');assert.equal(owner.username,'new_owner');assert.equal(owner.email,null);
+});

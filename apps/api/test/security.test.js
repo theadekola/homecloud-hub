@@ -27,3 +27,11 @@ await test('deactivation and role changes apply to existing access tokens immedi
  await auth(req,res,()=>{nextCalled=true;});assert.equal(nextCalled,true);assert.equal(req.user.role,'viewer');
  user.status='inactive';nextCalled=false;await auth(req,res,()=>{nextCalled=true;});assert.equal(responseStatus,401);assert.equal(nextCalled,false);
 });
+
+test('remembered credentials expire at ten days and token rotation cannot extend the original deadline',async()=>{
+ user.status='active';const first=await issueTokens(user,{remember:true}),refresh=jwt.verify(first.refreshToken,process.env.JWT_REFRESH_SECRET),access=jwt.verify(first.accessToken,process.env.JWT_SECRET);
+ assert.equal(refresh.sessionExp-refresh.iat,10*86400);assert.equal(refresh.exp,refresh.sessionExp);assert.equal(first.rememberUntil,refresh.exp*1000);assert.equal(access.sessionExp,refresh.sessionExp);
+ const second=await rotateRefreshToken(first.refreshToken);assert.equal(jwt.decode(second.refreshToken).sessionExp,refresh.sessionExp);assert.equal(second.rememberUntil,first.rememberUntil);
+ const originalNow=Date.now;Date.now=()=>refresh.sessionExp*1000;
+ try{await assert.rejects(()=>rotateRefreshToken(second.refreshToken));const forgedLongAccess=jwt.sign({...user,sub:user.id,sessionExp:refresh.sessionExp},process.env.JWT_SECRET,{expiresIn:'30d'});let status,next=false;await auth({headers:{authorization:'Bearer '+forgedLongAccess}},{status(v){status=v;return this},json(){}},()=>next=true);assert.equal(status,401);assert.equal(next,false)}finally{Date.now=originalNow}
+});

@@ -48,6 +48,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import {accountIdentity} from './username.js';
 import { setupStatus,registerOwner } from './setup.js';
 import { clusterStore,clusterConfig,publicCluster,validateCluster } from './cluster-config.js';
 import { pool } from './db.js';
@@ -80,16 +81,16 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.post('/api/node-agent/setup-script',(req,res)=>{authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json({script:readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')});});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
  app.post('/api/auth/register',loginLimiter,async(req,res)=>{
-   const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
+   const user=await registerOwner(db,req.body);res.status(201).json({ok:true,user:{id:user.id,email:user.email,username:user.username,name:user.name,role:user.role},message:'Owner account created. Sign in to continue.'});
  });
  app.get('/api/health',async(req,res,next)=>{try{await db.query('SELECT 1');res.json({ok:true,version:buildInfo.version,time:new Date().toISOString()});}catch(e){res.status(503).json({ok:false,error:'Database is unavailable'});}});
  app.post('/api/auth/login',loginLimiter,async(req,res)=>{
-   const email=required(req.body.email,'Email'),password=req.body.password;
+   const email=required(req.body.username??req.body.email,'Username'),password=req.body.password;
    if(typeof password!=='string'||!password.length)throw httpError('Password is required');
    const user=await verifyPassword(email,password);if(user)req.activityUser={sub:user.id,role:user.role};if(!user)return res.status(401).json({error:'Invalid credentials'});
 
    await db.query('UPDATE users SET last_login=NOW() WHERE id=$1',[user.id]);
-   res.json({user:{id:user.id,email:user.email,name:user.name,role:user.role},...await issueTokens(user)});
+   res.json({user:{id:user.id,email:user.email,username:user.username,name:user.name,role:user.role},...await issueTokens(user,{remember:req.body.remember===true})});
  });
  app.post('/api/auth/refresh',loginLimiter,async(req,res)=>{try{res.json(await rotateRefreshToken(req.body?.refreshToken));}catch(e){res.status(e.status===503?503:401).json({error:e.status===503?e.message:'Refresh token rejected'});}});
 
@@ -432,12 +433,12 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return {answer:`Sampled ${s.sampledAt}. ${s.services.map(x=>`${x.name}: ${x.status}${x.error?` (${x.error})`:''}`).join('; ')}. ${context.alerts.length} active or acknowledged alerts. Configure the AI Assistant in Settings → Integrations for conversational analysis.`,mode:'local'};
 
  });
- read('/users',async()=>({users:(await db.query(`SELECT id,name,email,role,status,two_factor_enabled AS "twoFactor",last_login AS "lastLogin",created_at AS "createdAt" FROM users ORDER BY created_at`)).rows}),'admin');
+ read('/users',async()=>({users:(await db.query(`SELECT id,name,email,username,role,status,two_factor_enabled AS "twoFactor",last_login AS "lastLogin",created_at AS "createdAt" FROM users ORDER BY created_at`)).rows}),'admin');
  action('post','/users','admin','user.create',async req=>{
    const {email,name,password,role='viewer'}=req.body;if(!roles[role]||(role==='owner'&&req.user.role!=='owner')||roles[role]>roles[req.user.role])throw httpError('Role cannot be granted',403);
-   const normalizedEmail=required(email,'Email').toLowerCase(),normalizedName=required(name,'Name');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)||normalizedEmail.length>254)throw httpError('Enter a valid email address');if(normalizedName.length>200)throw httpError('Name must be at most 200 characters');if(typeof password!=='string'||password.length<12||Buffer.byteLength(password)>72)throw httpError('Password must have at least 12 characters and at most 72 bytes');
+   const {email:normalizedEmail,username}=accountIdentity(req.body),normalizedName=required(name,'Name');if(normalizedName.length>200)throw httpError('Name must be at most 200 characters');if(typeof password!=='string'||password.length<12||Buffer.byteLength(password)>72)throw httpError('Password must have at least 12 characters and at most 72 bytes');
 
-   const hash=await bcrypt.hash(password,12);try{return (await db.query(`INSERT INTO users(email,name,password_hash,role,status) VALUES($1,$2,$3,$4,'active') RETURNING id,email,name,role,status`,[normalizedEmail,normalizedName,hash,role])).rows[0];}catch(e){if(e.code==='23505')throw httpError('Email already exists',409);throw e;}
+   const hash=await bcrypt.hash(password,12);try{return (await db.query(`INSERT INTO users(email,name,password_hash,role,status,username) VALUES($1,$2,$3,$4,'active',$5) RETURNING id,email,username,name,role,status`,[normalizedEmail,normalizedName,hash,role,username])).rows[0];}catch(e){if(e.code==='23505')throw httpError('Username or email already exists',409);throw e;}
  });
  action('post','/users/:id/toggle','admin','user.toggle',async req=>{
    if(req.params.id===req.user.sub)throw httpError('You cannot deactivate yourself');
@@ -456,7 +457,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/notifications',()=>notificationService.status(),'owner');
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);if(preferences.notifyDockerUpdates===undefined&&get().notificationPreferences?.notifyDockerUpdates!==undefined)preferences.notifyDockerUpdates=get().notificationPreferences.notifyDockerUpdates;mutate(s=>s.notificationPreferences=preferences);return preferences;});
  action('post','/notifications/test','owner','notification.test',req=>notificationService.test(required(req.body.channel,'Channel')));
- read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:false,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:false,apiKeys:false,networkManagement:false}));
+ read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:false,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',rememberedSessionLifetime:'10d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:false,apiKeys:false,networkManagement:false}));
  read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:false,notifications:'in-app and nine configurable notification delivery channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
 
  action('put','/settings','admin','settings.update',async req=>{

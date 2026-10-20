@@ -11,14 +11,14 @@ async function client(){
  const values=new Map();globalThis.localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
  const temporary=new Map();globalThis.sessionStorage={getItem:key=>temporary.get(key)??null,setItem:(key,value)=>temporary.set(key,String(value)),removeItem:key=>temporary.delete(key)};
  globalThis.CustomEvent??=class extends Event{constructor(type,options){super(type);this.detail=options?.detail}};
- globalThis.window={prompt:()=>null,dispatchEvent:e=>{values.set('lastEvent',e.type)}};
+ globalThis.window={prompt:()=>null,dispatchEvent:e=>{if(e.type!=='homecloud-network-loading')values.set('lastEvent',e.type)}};
  return import(`data:text/javascript;base64,${Buffer.from(compiled+`\n// ${++generation}`).toString('base64')}`);
 }
 const response=(status,body={})=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage,sessionStorage:globalThis.sessionStorage};
 try{
  await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
-  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-api-write')return;assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
+  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(['homecloud-api-write','homecloud-network-loading'].includes(e.type))return;assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
  });
  await test('PUT and DELETE target approvals use SSH modal metadata and pin selected Docker host without native passkeys',async()=>{
   for(const method of ['PUT','DELETE']){const c=await client();c.setTokens('token','refresh');c.setDockerHost('original-host');let detail,requests=[];window.prompt=()=>{throw Error('Native confirmation must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-ssh-approval'){detail=e.detail;c.setDockerHost('changed-host');detail.resolve('verified grant')}};
@@ -85,7 +85,7 @@ try{
   await assert.rejects(c.api('/auth/me'),{status:503});assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('homecloud_refresh_token'),'refresh');
  });
  await test('successful writes invalidate read caches while GET, SSH and failed writes do not',async()=>{
-  const c=await client(),events=[];window.dispatchEvent=e=>events.push(e.type);globalThis.fetch=async()=>response(200,{});
+  const c=await client(),events=[];window.dispatchEvent=e=>{if(e.type!=='homecloud-network-loading')events.push(e.type)};globalThis.fetch=async()=>response(200,{});
   await c.api('/storage');await c.api('/ssh/session/one',{method:'POST',body:'{}'});assert.deepEqual(events,[]);
   await c.api('/actions/docker/container/one/restart',{method:'POST',body:'{}'});assert.deepEqual(events,['homecloud-api-write']);
   globalThis.fetch=async()=>response(403,{error:'Denied'});await assert.rejects(c.api('/users',{method:'POST',body:'{}'}));assert.equal(events.length,1);
@@ -94,5 +94,10 @@ try{
   const c=await client();c.setTokens('old','refresh',false);let finish,started;const ready=new Promise(resolve=>started=resolve);
   globalThis.fetch=async url=>{if(url.endsWith('/auth/refresh')){started();return new Promise(resolve=>finish=resolve)}return response(401)};
   const pending=c.api('/auth/me');await ready;c.clearTokens();finish(response(200,{accessToken:'late',refreshToken:'late-refresh'}));await assert.rejects(pending,{status:401});assert.equal(c.getAccessToken(),'');assert.equal(sessionStorage.getItem('homecloud_refresh_token'),null);assert.equal(localStorage.getItem('homecloud_refresh_token'),null);
+ });
+ await test('loading events balance concurrent requests and failures without reporting activity',async()=>{
+  const c=await client(),counts=[];window.dispatchEvent=e=>{if(e.type==='homecloud-network-loading')counts.push(e.detail)};let finish;
+  globalThis.fetch=async url=>url.endsWith('/one')?new Promise(resolve=>finish=resolve):Promise.reject(Error('Offline'));
+  const first=c.api('/one');await assert.rejects(c.api('/two'),/Offline/);finish(response(200));await first;assert.deepEqual(counts,[1,2,1,0]);
  });
 }finally{Object.assign(globalThis,original);}

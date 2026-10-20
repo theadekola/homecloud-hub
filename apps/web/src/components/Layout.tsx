@@ -1,3 +1,4 @@
+import LoadingIndicator from './LoadingIndicator';
 import PageIcon, {pageIconForPath} from './PageIcon';
 import BrandIcon from './BrandIcon';
 import HeaderNotifications from './HeaderNotifications';
@@ -66,7 +67,7 @@ export default function Layout() {
   },[mobile,menuOpen]);
   const showLabels=mobile||!collapsed;
   const signOut=()=>{clearTokens();window.location.assign('/');};
-  return <div className="app-shell">
+  return <div className="app-shell"><LoadingIndicator/>
     {mobile&&menuOpen&&<button className="nav-backdrop" aria-label="Close navigation" onClick={closeMenu}/>}
     <aside id="primary-navigation" ref={menuRef} className={`sidebar${!mobile&&collapsed?' collapsed':''}${mobile&&menuOpen?' mobile-open':''}`} inert={mobile&&!menuOpen} role={mobile&&menuOpen?'dialog':undefined} aria-modal={mobile&&menuOpen?true:undefined} aria-label="Main navigation">
       <div className="brand"><div className="brand-icon"><img className="homecloud-product-logo" src="/assets/iclusters-512.png" alt=""/></div>{showLabels && <b title={configuration?.settings?.siteName}>{configuration?.settings?.siteName||'i-Clusters'}</b>}{mobile&&<button className="icon-btn nav-close" aria-label="Close navigation" onClick={closeMenu}><X size={20}/></button>}</div>

@@ -1,5 +1,5 @@
 [Unit]
-Description=Watch for owner-requested HomeCloud updates
+Description=Watch for owner-requested i-Clusters updates
 
 [Path]
 PathExists=/opt/homecloud-hub/runtime/update-request.json

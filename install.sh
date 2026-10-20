@@ -28,7 +28,7 @@ source /etc/os-release
 [[ $ID == ubuntu ]] || fail 'This installer supports Ubuntu.'
 command -v systemctl >/dev/null || fail 'Ubuntu with systemd is required.'
 [[ ! -e /opt/homecloud-hub ]] || fail '/opt/homecloud-hub already exists. Use sudo homecloud update for an existing installation.'
-[[ ! -e /usr/local/bin/homecloud && ! -e /etc/systemd/system/homecloud-hub.service ]] || fail 'HomeCloud command or service already exists.'
+[[ ! -e /usr/local/bin/homecloud && ! -e /etc/systemd/system/homecloud-hub.service ]] || fail 'i-Clusters command or service already exists.'
 apt-get update
 apt-get install -y ca-certificates curl git openssl nano iproute2 python3
 if ! command -v docker >/dev/null; then
@@ -61,7 +61,7 @@ trap 'rm -rf -- "$stage"' EXIT
 git clone -- "$repo" "$stage/source"
 if [[ -n $ref ]]; then git -C "$stage/source" checkout --detach "$ref"; fi
 cd "$stage/source"
-[[ -f docker-compose.yml && -f deployment/homecloud && -f deployment/homecloud-hub.service && -f .env.example ]] || fail 'Repository does not contain the HomeCloud Hub installation files.'
+[[ -f docker-compose.yml && -f deployment/homecloud && -f deployment/homecloud-hub.service && -f .env.example ]] || fail 'Repository does not contain the i-Clusters installation files.'
 sh deployment/generate-secrets.sh
 if [[ -z $url ]]; then
   source deployment/network.sh
@@ -87,7 +87,7 @@ source deployment/build-env.sh
 docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now homecloud-hub.service
-echo "HomeCloud Hub installed at $url"
+echo "i-Clusters installed at $url"
 echo 'Open this URL and register your owner account using the setup code shown above.'
 echo 'Choose your name, email and password in the browser. Registration closes after the first account.'
 echo 'Configure supported integrations in Settings: Connections, Notifications and Integrations.'

@@ -5,8 +5,8 @@ set -Eeuo pipefail
 command -v python3 >/dev/null
 command -v systemctl >/dev/null
 command -v curl >/dev/null
-read -rp 'HomeCloud HTTPS URL: ' hub
-python3 -c 'import sys,urllib.parse; u=urllib.parse.urlsplit(sys.argv[1]); assert u.scheme=="https" and u.hostname and not u.username and not u.password and u.path in ("","/") and not u.query and not u.fragment, "Enter a HomeCloud HTTPS origin without credentials or a path"' "$hub"
+read -rp 'i-Clusters HTTPS URL: ' hub
+python3 -c 'import sys,urllib.parse; u=urllib.parse.urlsplit(sys.argv[1]); assert u.scheme=="https" and u.hostname and not u.username and not u.password and u.path in ("","/") and not u.query and not u.fragment, "Enter an i-Clusters HTTPS origin without credentials or a path"' "$hub"
 if ! test -S /var/run/docker.sock; then
   . /etc/os-release
   case "$ID" in debian|ubuntu) ;; *) echo 'Install and start Docker manually on this OS, then retry.'; exit 1 ;; esac
@@ -21,7 +21,7 @@ if ! test -S /var/run/docker.sock; then
 fi
 curl --fail --silent --show-error --max-time 15 --unix-socket /var/run/docker.sock http://localhost/info |
   python3 -c 'import json,sys; assert json.load(sys.stdin).get("ServerVersion"), "Docker Engine verification failed"'
-read -rsp 'One-time pairing code from HomeCloud: ' pairing
+read -rsp 'One-time pairing code from i-Clusters: ' pairing
 printf '\n'
 umask 077
 curl --fail --silent --show-error --proto '=https' "${hub%/}/api/node-agent/download" -o /usr/local/sbin/homecloud-node-agent.py
@@ -29,7 +29,7 @@ printf '%s\n' "$pairing" | python3 /usr/local/sbin/homecloud-node-agent.py --url
 unset pairing
 cat > /etc/systemd/system/homecloud-node-agent.service <<'UNIT'
 [Unit]
-Description=HomeCloud outbound Docker host connector
+Description=i-Clusters outbound Docker host connector
 After=network-online.target docker.service
 Wants=network-online.target
 [Service]
@@ -42,4 +42,4 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable --now homecloud-node-agent.service
-echo 'Paired. Return to HomeCloud and click Verify & Connect. No Docker TCP port was opened.'
+echo 'Paired. Return to i-Clusters and click Verify & Connect. No Docker TCP port was opened.'

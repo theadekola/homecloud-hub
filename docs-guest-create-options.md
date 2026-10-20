@@ -4,9 +4,9 @@ The Create VM and Create LXC pop-ups now include the General and Network options
 
 ## General
 
-- VM/CT ID: leave blank for automatic allocation, or enter an available ID from 100 to 999999999. HomeCloud checks cluster resources for collisions; Proxmox remains the final allocator and creation never uses force. Concurrent attempts to use the same ID cannot replace an existing guest.
+- VM/CT ID: leave blank for automatic allocation, or enter an available ID from 100 to 999999999. i-Clusters checks cluster resources for collisions; Proxmox remains the final allocator and creation never uses force. Concurrent attempts to use the same ID cannot replace an existing guest.
 - Resource pool: select a permitted existing pool. The server checks availability again before creation. Node-specific discovery provides bridge suggestions and an available-ID suggestion; failed discoveries remain visible.
-- Add to HA: admin/owner only. Creation returns a pending follow-up receipt, not a claim that HA is already configured. Once the creation task succeeds, click Recheck & Add to HA and complete the separate confirmation. HA is registered with desired state stopped. The guest must still be stopped; HomeCloud does not start or stop it automatically.
+- Add to HA: admin/owner only. Creation returns a pending follow-up receipt, not a claim that HA is already configured. Once the creation task succeeds, click Recheck & Add to HA and complete the separate confirmation. HA is registered with desired state stopped. The guest must still be stopped; i-Clusters does not start or stop it automatically.
 - LXC unprivileged: enabled by default. Operators cannot create privileged containers. Admin/owner selection of privileged mode requires typed confirmation.
 - LXC nesting: opt in when the workload requires it.
 - LXC root password: enter it twice. Both fields clear after submission, including failed submissions. Passwords do not appear in creation results.

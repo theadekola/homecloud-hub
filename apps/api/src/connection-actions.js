@@ -32,7 +32,7 @@ export function createConnectionActions({persistence={get},nodes=agentNodes,begi
    if(!paired())throw fail('Pairing changed while the action ran. Recheck the connection.',409);
    if(result.action!==input.action||result.target!==target)throw fail('Service response did not match the selected action and host',502);
    if(input.action.endsWith('-start')&&(!result.active||input.action==='docker-start'&&!result.docker?.ready))throw fail('Service readiness was not verified. Recheck status before retrying.',422);
-   if(input.action==='connector-start'){const fresh=()=>nodes().some(n=>n.id===id&&n.online&&Date.parse(n.lastSeen)>=startedAt);const deadline=now()+heartbeatTimeout;while(!fresh()&&now()<deadline)await sleep(1000);if(!fresh())throw fail('Connector service is active, but its fresh connection to HomeCloud was not verified. Recheck Setup before retrying.',422);result.connected=true;result.message='Connector service is active and fresh connection verified.';}
+   if(input.action==='connector-start'){const fresh=()=>nodes().some(n=>n.id===id&&n.online&&Date.parse(n.lastSeen)>=startedAt);const deadline=now()+heartbeatTimeout;while(!fresh()&&now()<deadline)await sleep(1000);if(!fresh())throw fail('Connector service is active, but its fresh connection to i-Clusters was not verified. Recheck Setup before retrying.',422);result.connected=true;result.message='Connector service is active and fresh connection verified.';}
    return result;
   }catch(error){throw error?.status?error:fail('Connection action failed. Verify the SSH address, fingerprint, credentials and service access.',422)}finally{password='';try{client?.end()}finally{end(id)}}
  }};

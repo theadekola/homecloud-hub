@@ -1,7 +1,7 @@
 import {isIP} from 'node:net';
 import {pve} from './connectors.js';
 export async function connectorSSHAddress(node,{query=pve}={}){
- const hostname=node.hostname||node.name,base={host:hostname,port:22,source:'hostname',message:'Enter an IP address reachable from the HomeCloud server if this hostname does not resolve.'};
+ const hostname=node.hostname||node.name,base={host:hostname,port:22,source:'hostname',message:'Enter an IP address reachable from the i-Clusters server if this hostname does not resolve.'};
  if(node.kind==='docker')return base;
  try{
   const rows=await query('/cluster/status');if(!Array.isArray(rows))return base;

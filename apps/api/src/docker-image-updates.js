@@ -28,7 +28,7 @@ export function registryCheckFailure(error,phase='registry'){
  else if(/no such host|ENOTFOUND|EAI_AGAIN|name resolution|lookup .*no such/i.test(message)){code='registry-dns';detail='The Docker host could not resolve the registry address. Check its DNS configuration.';retryable=true}
  else if(/timed? ?out|timeout|expired|deadline/i.test(message)){code='registry-timeout';detail='The registry check timed out. The Docker connection can still be healthy. Retry, then check registry access from that host if it persists.';retryable=true}
  else if(http===404||/manifest unknown|name unknown|not found/i.test(message)){code=phase==='image'?'local-image-missing':'registry-image-missing';detail=phase==='image'?'The installed image is no longer available locally. Refresh the container inventory and retry.':'The registry could not find this repository or tag. Check the image reference and repository access.'}
- else if(http>=500||/ECONNRESET|ECONNREFUSED|socket hang up|connection reset|connection refused/i.test(message)){code='registry-unavailable';detail='The registry lookup failed on the Docker host. Its connection to HomeCloud can still be healthy. Check registry availability and outbound network access.';retryable=true}
+ else if(http>=500||/ECONNRESET|ECONNREFUSED|socket hang up|connection reset|connection refused/i.test(message)){code='registry-unavailable';detail='The registry lookup failed on the Docker host. Its connection to i-Clusters can still be healthy. Check registry availability and outbound network access.';retryable=true}
  return {status:'unknown',code,detail,retryable};
 }
 export async function readUpdateHost(query=docker){

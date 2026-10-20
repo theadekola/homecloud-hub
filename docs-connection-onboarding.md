@@ -4,7 +4,7 @@ Owners open **Settings → Connections → Add Connection**. Shortcuts on Proxmo
 
 ## Proxmox Node
 
-Test and save the Proxmox API connection using the existing token, CA and permission controls. HomeCloud supports one active API connection. Saving replaces that connection and verifies resource access first; a successful test does not grant management permissions.
+Test and save the Proxmox API connection using the existing token, CA and permission controls. i-Clusters supports one active API connection. Saving replaces that connection and verifies resource access first; a successful test does not grant management permissions.
 
 Pair each Proxmox node for Docker guest discovery. The root installer requires qm, pct, Python 3, curl and systemd. Its outbound HTTPS connector discovers running guests without exposing their Docker API ports. The pairing code expires after ten minutes and can be consumed once. Existing connectors remain compatible. Display names are separate from the node hostname used by guest setup.
 
@@ -14,11 +14,11 @@ Choose a discovered Docker host and Connect. Install & Connect remains available
 
 Name the connection, generate its code, and run the displayed installer on the intended Linux Docker server. It requires Python 3, curl and systemd. Existing Docker must respond on /var/run/docker.sock. If Docker is absent on Debian/Ubuntu, the installer asks for INSTALL before installing docker.io and starting the service. Existing nonresponsive Docker or Podman requires manual review. Other operating systems require Docker to be installed manually.
 
-Enter the HomeCloud HTTPS origin and code at the installer prompts. The code is passed to Python over standard input, rather than through process arguments. Private CA deployments require the host trust store to trust the issuing certificate. TLS verification stays enabled. No Docker TCP listener is created, no whole OS upgrade is performed, and no guest power operation occurs.
+Enter the i-Clusters HTTPS origin and code at the installer prompts. The code is passed to Python over standard input, rather than through process arguments. Private CA deployments require the host trust store to trust the issuing certificate. TLS verification stays enabled. No Docker TCP listener is created, no whole OS upgrade is performed, and no guest power operation occurs.
 
 The connector uses the same root service and configuration paths as the Proxmox connector. It refuses to overwrite an existing connector. Its stored type limits discovery and execution to the local Docker Engine; the server rejects guest reports from standalone connectors.
 
-Click **Verify & Connect** after installation. HomeCloud resolves the connector associated with that exact pairing code, checks its online report, then requests /info from that exact Engine. Failed verification does not change the selected host. Successful verification opens the Docker dashboard. If the code has expired after successful installation, use the saved connection card's Test and Manage controls.
+Click **Verify & Connect** after installation. i-Clusters resolves the connector associated with that exact pairing code, checks its online report, then requests /info from that exact Engine. Failed verification does not change the selected host. Successful verification opens the Docker dashboard. If the code has expired after successful installation, use the saved connection card's Test and Manage controls.
 
 ## Advanced: Direct Docker API
 

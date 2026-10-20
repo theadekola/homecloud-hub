@@ -95,7 +95,7 @@ export async function proxmoxVmAction(node,id,action,payload={},call=pve){
   await assertGuestPlacement(node,id,'qemu',call);
   const statusActions=new Set(['start','stop','shutdown','reboot','reset','suspend','resume']);
   if(statusActions.has(action)) return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub',vmstate:payload.vmstate?1:0})});
+  if(action==='snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by i-Clusters',vmstate:payload.vmstate?1:0})});
   if(action==='delete-snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   if(action==='clone') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/clone`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({newid:payload.newid,name:payload.name,target:payload.target,full:payload.full===false?0:1,storage:payload.storage})});
   if(action==='delete') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}`,{method:'DELETE'});
@@ -106,7 +106,7 @@ export async function proxmoxLxcAction(node,id,action,payload={},call=pve){
   const statusActions=new Set(['start','stop','shutdown','reboot','suspend','resume']);
   const base=`/nodes/${encodeURIComponent(node)}/lxc/${encodeURIComponent(id)}`;
   if(statusActions.has(action)) return call(`${base}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return call(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by HomeCloud Hub'})});
+  if(action==='snapshot') return call(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by i-Clusters'})});
   if(action==='delete-snapshot') return call(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox LXC action: ${action}`);
 }
@@ -165,7 +165,7 @@ export async function proxmoxBackup(payload){
   const node=payload.node; if(!node)throw new Error('node required');
   await validateBackupSelection(payload,pve);
   return pve(`/nodes/${encodeURIComponent(node)}/vzdump`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({
-    vmid:payload.vmid, storage:payload.storage, mode:payload.mode||'snapshot', compress:payload.compress||'zstd', 'notes-template':payload.notes||'HomeCloud Hub'
+    vmid:payload.vmid, storage:payload.storage, mode:payload.mode||'snapshot', compress:payload.compress||'zstd', 'notes-template':payload.notes||'i-Clusters'
   })});
 }
 

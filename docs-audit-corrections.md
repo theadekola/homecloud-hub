@@ -1,4 +1,4 @@
-# HomeCloud audit corrections
+# i-Clusters audit corrections
 
 This change addresses the implementation findings from the 14 October 2026 audit. It changes repository code only; validation uses local fixtures and rendered React components, without operating a live cluster.
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=HomeCloud Hub update checker and installer
+Description=i-Clusters update checker and installer
 After=network-online.target docker.service
 Wants=network-online.target
 

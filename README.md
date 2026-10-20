@@ -1,8 +1,12 @@
-# HomeCloud
+# i-Clusters
+
+<img src="apps/web/public/assets/iclusters-192.png" alt="i-Clusters logo" width="96"/>
+
+[Website](https://www.i-clusters.com) | [Support](https://support.i-clusters.com)
 
 **Your infrastructure, in one interface.**
 
-HomeCloud is a self-hosted infrastructure management application for Proxmox VE, Docker and TrueNAS. It brings inventory, monitoring, supported infrastructure actions, backups, SSH terminals and SFTP into one responsive interface.
+i-Clusters is a self-hosted infrastructure management application for Proxmox VE, Docker and TrueNAS. It brings inventory, monitoring, supported infrastructure actions, backups, SSH terminals and SFTP into one responsive interface.
 
 Developed by **Adekola Kazeem Ayannuga** through [The Adekola Labs](https://theadekola.online). Application version: **3.0.0**. Licence: [MIT](LICENSE).
 
@@ -52,18 +56,18 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    API["HomeCloud API"] --> PVE["Proxmox VE API"]
+    API["i-Clusters API"] --> PVE["Proxmox VE API"]
     API --> Agents["Paired node or Docker host connectors"]
     API --> Engine["Optional direct Docker Engine"]
     API --> NAS["TrueNAS API"]
     Agents --> Docker["Local or guest Docker socket"]
 ```
 
-Paired connectors poll HomeCloud over outbound HTTPS; the arrows show logical access, not inbound listener requirements. Optional external notification services and OpenAI receive requests only for their configured features. See [architecture and repository structure](docs/architecture.md) for trust boundaries, data flows and source layout.
+Paired connectors poll i-Clusters over outbound HTTPS; the arrows show logical access, not inbound listener requirements. Optional external notification services and OpenAI receive requests only for their configured features. See [architecture and repository structure](docs/architecture.md) for trust boundaries, data flows and source layout.
 
 ## Install on Ubuntu
 
-Use a dedicated Ubuntu server or VM with systemd, Git/network access and capacity for Docker, the API and PostgreSQL. This does not install HomeCloud into the Proxmox host itself. Existing Docker installations need the Compose plugin.
+Use a dedicated Ubuntu server or VM with systemd, Git/network access and capacity for Docker, the API and PostgreSQL. This does not install i-Clusters into the Proxmox host itself. Existing Docker installations need the Compose plugin.
 
 ```sh
 sudo apt-get update
@@ -85,7 +89,7 @@ LAN HTTPS uses Caddy's local certificate authority. Install its public root cert
 4. Use the eye icon to show or hide the entered password. **Remember me** controls persistent browser sign-in; it does not save the password.
 5. Choose an inactivity timeout under **Settings → Security → Active Sessions**. The default is 30 minutes, including remembered sign-ins. See [browser sessions](docs/browser-sessions.md).
 
-If you missed the first-use code, run this on the HomeCloud VM and copy only the value after `=`:
+If you missed the first-use code, run this on the i-Clusters VM and copy only the value after `=`:
 
 ```sh
 sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
@@ -106,11 +110,11 @@ Open **Settings → Connections → Add Connection**.
 
 For Proxmox pairing, install one connector per node. Linux CT access uses `pct exec`; Linux VM access uses `qm guest exec`. VMs need the QEMU Guest Agent enabled in Proxmox and installed/running inside the VM. Guests need `/bin/sh`, `curl`, `base64` and the local Docker socket. Windows guests are not provisioned by this Linux Docker setup flow.
 
-**Open** verifies an existing Engine. Under **Settings → Connections → Needs Setup → Optional Docker guest setup**, **Set Up Docker** supports eligible Debian/Ubuntu guests, reuses existing Docker installations, and asks for explicit approval and target credentials. A CT configuration change may require a restart; HomeCloud does not restart guests automatically for setup. Use verified SSH bootstrap where the UI offers it for missing guest access.
+**Open** verifies an existing Engine. Under **Settings → Connections → Needs Setup → Optional Docker guest setup**, **Set Up Docker** supports eligible Debian/Ubuntu guests, reuses existing Docker installations, and asks for explicit approval and target credentials. A CT configuration change may require a restart; i-Clusters does not restart guests automatically for setup. Use verified SSH bootstrap where the UI offers it for missing guest access.
 
 Use dedicated provider identities with only the privileges needed. Proxmox guest command execution needs a separate scoped privilege, not just the read role. See [connection recovery](docs/connections-and-health.md) and [warning recovery](docs/monitoring-warning-recovery.md).
 
-Connector **version 5** batches container statistics. After updating HomeCloud, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest HomeCloud agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
+Connector **version 5** batches container statistics. After updating i-Clusters, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest i-Clusters agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
 
 ## Docker image update notifications
 
@@ -148,7 +152,7 @@ The updater checks the configured Git upstream and rebuilds the deployment. Loca
 
 ## Backup and recovery
 
-HomeCloud manages provider-reported backup/snapshot operations; it does not turn every Docker volume or database into an independently protected backup. A ZFS snapshot on the same pool is not an off-host backup.
+i-Clusters manages provider-reported backup/snapshot operations; it does not turn every Docker volume or database into an independently protected backup. A ZFS snapshot on the same pool is not an off-host backup.
 
 Protect the controller separately: back up PostgreSQL consistently, its `runtime` directory, deployment configuration and signing/encryption keys, certificates and Caddy data as applicable. Encrypted saved credentials require the original key material. Keep backups outside the controller and test restores. Do not run `docker compose down --volumes` on a live installation unless you intend to delete its volumes. See [production recovery](PRODUCTION.md).
 
@@ -173,7 +177,7 @@ If Windows workspace links are unavailable, install separately within `apps/api`
 | --- | --- |
 | VM discovery HTTP 403 | Check user and privilege-separated token ACLs. Scope `VM.GuestAgent.Unrestricted` to intended VM paths for Proxmox 9 guest commands; retain the read role. |
 | Guest agent unavailable | Enable the VM option and install/start the guest OS service. A full shutdown/start may be necessary after adding its channel. |
-| Container statistics unavailable | Update HomeCloud first, then paired connectors to version 5. Inspect actual container state and the precise reported error. |
+| Container statistics unavailable | Update i-Clusters first, then paired connectors to version 5. Inspect actual container state and the precise reported error. |
 | Docker inventory unavailable/offline | Verify selected host, connector service, network, guest power and Docker service. No substitute host is selected silently. |
 | Browser certificate warning | Trust the deployment CA or use a valid publicly trusted hostname/certificate. |
 | Integration test fails | Check the popup's endpoint, credentials, CA, permissions and service-specific error. Save and test have different effects. |

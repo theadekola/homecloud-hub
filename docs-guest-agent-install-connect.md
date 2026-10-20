@@ -2,7 +2,7 @@
 
 The previous VM installer used `qm guest exec`, so it could install Docker only after QEMU Guest Agent already worked. That could not bootstrap a VM with missing guest access. It also completed installation without selecting the prepared host. Direct Engine configuration was independent of this node-agent path.
 
-Owners can now expand Automatic Docker Hosts and use Install & Connect on a reported VM with guest access required. Enter the VM's reachable SSH address, port, username and fresh password through HomeCloud HTTPS. Verify the displayed host fingerprint through a trusted console. Root login or an account with working password-based sudo is required; the SSH password is also used for sudo. SSH key login is not implemented by this flow.
+Owners can now expand Automatic Docker Hosts and use Install & Connect on a reported VM with guest access required. Enter the VM's reachable SSH address, port, username and fresh password through i-Clusters HTTPS. Verify the displayed host fingerprint through a trusted console. Root login or an account with working password-based sudo is required; the SSH password is also used for sudo. SSH key login is not implemented by this flow.
 
 The API checks the VM belongs to the selected Proxmox node and is running, reads its configuration, then verifies the SSH machine's OS, privilege and identity before writes. Debian and Ubuntu are supported. If Proxmox has a SMBIOS UUID, it must match; otherwise a configured NIC MAC must match. No override is offered for failed identity checks. ISA guest-agent channels require manual review.
 

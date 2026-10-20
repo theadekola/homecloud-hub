@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HomeCloud outbound connector for Proxmox nodes or standalone Docker hosts."""
+"""i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
 VERSION=6
 REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
@@ -262,7 +262,7 @@ def main():
   if not args.pair:raise SystemExit('Pairing code is required')
  if args.pair:
   if os.path.exists(args.config):raise SystemExit('Connector already configured. Revoke and remove the old connector before pairing again.')
-  if not args.url or not args.url.startswith('https://'):raise SystemExit('HomeCloud HTTPS URL is required')
+  if not args.url or not args.url.startswith('https://'):raise SystemExit('i-Clusters HTTPS URL is required')
   config={'url':args.url.rstrip('/')};config.update(post(config,'pair',{'code':args.pair,'name':socket.gethostname(),'kind':args.kind}))
   fd=os.open(args.config,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
   with os.fdopen(fd,'w') as f:json.dump(config,f)

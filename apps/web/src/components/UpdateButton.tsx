@@ -10,7 +10,7 @@ export default function UpdateButton({showLabel=false}:{showLabel?:boolean}){
   const result=await api('/updates');if(!active)return;setStatus(result);setStatusError('');
   if(started.current&&result.current!==previous.current&&['ready','completed'].includes(result.state)){window.location.reload();return;}
   if(check.current){
-   if(result.state!=='checking'&&!result.checking&&(check.current.checkId&&result.checkId?result.checkId===check.current.checkId:result.checkedAt!==check.current.checkedAt)){check.current=null;setRequested(false);notice(result.state==='failed'?result.message:result.available?'A new update is available. Click the update button to install it.':result.message&&result.message!=='Up to date.'?result.message:'No new updates. HomeCloud is up to date.',result.state!=='failed');}
+   if(result.state!=='checking'&&!result.checking&&(check.current.checkId&&result.checkId?result.checkId===check.current.checkId:result.checkedAt!==check.current.checkedAt)){check.current=null;setRequested(false);notice(result.state==='failed'?result.message:result.available?'A new update is available. Click the update button to install it.':result.message&&result.message!=='Up to date.'?result.message:'No new updates. i-Clusters is up to date.',result.state!=='failed');}
    else if(Date.now()-check.current.time>150000){check.current=null;setRequested(false);notice('The update check did not finish. Check the updater service and try again.');}
   }
   if(result.state==='failed'){started.current=false;setBusy(false);if(!check.current)notice(result.message);}

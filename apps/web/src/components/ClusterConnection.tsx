@@ -40,7 +40,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  <summary>How to get your Proxmox CA certificate</summary>
  <ol>
  <li>In Proxmox, select your node, then open <strong>Shell</strong>.</li>
- <li>Run this command on the <strong>Proxmox node</strong>, not the HomeCloud Ubuntu VM:
+ <li>Run this command on the <strong>Proxmox node</strong>, not the i-Clusters Ubuntu VM:
  <div className="ca-command"><code>cat /etc/pve/pve-root-ca.pem</code><button type="button" className="btn secondary" onClick={copyCaCommand}>Copy command</button></div>
  {copyMessage&&<small role="status">{copyMessage}</small>}</li>
  <li>Copy the entire output, including <code>-----BEGIN CERTIFICATE-----</code> and <code>-----END CERTIFICATE-----</code>.</li>
@@ -49,7 +49,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  </ol>
  <p>This applies to the default Proxmox cluster CA. A certificate from a trusted public authority usually needs no CA pasted here. The host must match the certificate's hostname or IP address.</p>
  </details>
- <details className="cluster-wide cluster-ca-help"><summary>What loads automatically with this token?</summary><p>HomeCloud discovers permitted nodes, VMs, CTs, Proxmox storage, node networks, tasks and services. PVEAuditor at / with Propagate provides cluster read access. Privilege-separated tokens need their own ACL in addition to the user ACL.</p><p>Docker images, volumes, networks and Compose applications inside a VM or CT are guest resources. A cluster read token does not expose them. VM application inventory also requires the QEMU guest agent and permission to execute the fixed inventory command. Complete Docker management requires its Engine connection.</p></details><p className="muted cluster-wide">Connection details are encrypted on the server. A successful test confirms API access; permissions for management actions must also be granted in Proxmox.</p>
+ <details className="cluster-wide cluster-ca-help"><summary>What loads automatically with this token?</summary><p>i-Clusters discovers permitted nodes, VMs, CTs, Proxmox storage, node networks, tasks and services. PVEAuditor at / with Propagate provides cluster read access. Privilege-separated tokens need their own ACL in addition to the user ACL.</p><p>Docker images, volumes, networks and Compose applications inside a VM or CT are guest resources. A cluster read token does not expose them. VM application inventory also requires the QEMU guest agent and permission to execute the fixed inventory command. Complete Docker management requires its Engine connection.</p></details><p className="muted cluster-wide">Connection details are encrypted on the server. A successful test confirms API access; permissions for management actions must also be granted in Proxmox.</p>
  {error&&<p role="alert" className="login-error cluster-wide">{error}</p>}{message&&<p role="status" className="cluster-wide">{message}</p>}
  {!!nodes.length&&<ul className="cluster-wide">{nodes.map(n=><li key={n.name}>{n.name} — {n.status||'Unknown'}</li>)}</ul>}
  <div className="modal-actions cluster-wide"><button className="btn secondary" type="button" disabled={busy} onClick={()=>setOpen(false)}>Cancel</button><button className="btn secondary" type="submit" value="test" disabled={busy}>Test Connection</button><button className="btn primary" type="submit" value="save" disabled={busy}>{busy?'Connecting…':'Save & Load Cluster'}</button></div>

@@ -4,7 +4,7 @@ import {backupArchives} from '../src/infrastructure.js';
 
 test('backup inventory distinguishes a successfully checked empty store from an unavailable store',async()=>{
  for(const active of [1,0,undefined]){
-  const paths=[],result=await backupArchives(async path=>{paths.push(path);if(path==='/nodes')return [{node:'node01',status:'online'}];if(path==='/storage')return [];if(path.endsWith('/storage?content=backup'))return [{storage:'backup',active}];return []});
+  const paths=[],result=await backupArchives(async path=>{paths.push(path);if(path.startsWith('/access/permissions?')){const scope=decodeURIComponent(path.split('path=')[1]);return {[scope]:{'Datastore.AllocateSpace':1,'VM.Backup':1}};}if(path==='/nodes')return [{node:'node01',status:'online'}];if(path==='/storage')return [];if(path.endsWith('/storage?content=backup'))return [{storage:'backup',active}];return []});
   assert.deepEqual(result.points,[]);
   assert.equal(result.coverage.complete,active===1);
   assert.equal(result.coverage.checkedStorage,active===1?1:0);
@@ -71,4 +71,38 @@ test('a stalled archive read returns healthy archives within the overall deadlin
  assert.equal(result.points.length,2);assert.equal(result.coverage.checkedStorage,2);assert.equal(result.coverage.complete,false);
  assert.deepEqual(result.coverage.issues.map(i=>[i.node,i.storage,i.code]),[['node02','media','archive-read-failed']]);assert.match(result.errors[0],/timed out/);
  release([{volid:'media:backup/late'}]);await new Promise(resolve=>setImmediate(resolve));assert.equal(result.points.length,2);
+});
+
+
+test('an audit-only token cannot establish a zero archive count from a filtered empty response',async()=>{
+ const result=await backupArchives(async path=>{
+  if(path==='/nodes')return [{node:'node01',status:'online'}];
+  if(path==='/storage')return [];
+  if(path.endsWith('/storage?content=backup'))return [{storage:'backup',active:1}];
+  if(path.startsWith('/access/permissions?'))return {'/storage/backup':{'Datastore.Audit':1}};
+  return [];
+ });
+ assert.equal(result.coverage.complete,false);assert.equal(result.coverage.checkedStorage,0);
+ assert.match(result.errors[0],/Datastore.AllocateSpace.*Proxmox can hide archives/);
+});
+test('storage privileges without guest backup privileges do not prove an empty destination',async()=>{
+ const result=await backupArchives(async path=>{
+  if(path==='/nodes')return [{node:'node01',status:'online'}];
+  if(path==='/storage')return [];
+  if(path.endsWith('/storage?content=backup'))return [{storage:'backup',active:1}];
+  if(path.includes('/access/permissions'))return {'/storage/backup':{'Datastore.AllocateSpace':1},'/vms':{'VM.Audit':1}};
+  return [];
+ });
+ assert.equal(result.coverage.complete,false);assert.match(result.errors[0],/VM.Backup.*guest-scoped/);
+});
+test('permission-check errors preserve visible archives and report unknown visibility',async()=>{
+ const result=await backupArchives(async path=>{
+  if(path==='/nodes')return [{node:'node01',status:'online'}];
+  if(path==='/storage')return [];
+  if(path.endsWith('/storage?content=backup'))return ['good','empty'].map(storage=>({storage,active:1}));
+  if(path.startsWith('/access/permissions'))throw Error('Denied');
+  return path.includes('/good/')?[{volid:'good:backup/test.vma.zst'}]:[];
+ });
+ assert.equal(result.points.length,1);assert.equal(result.coverage.complete,false);
+ assert.match(result.errors[0],/Cannot verify archive visibility/);
 });

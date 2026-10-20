@@ -2,8 +2,6 @@ export function setDockerHost(id:string){localStorage.setItem('homecloud_docker_
 import {getAccessToken,getRefreshToken,setTokens,clearTokens} from './session';
 export {getAccessToken,setTokens,clearTokens} from './session';
 const API = import.meta.env.VITE_API_URL || '';
-let pendingRequests=0;
-const reportLoading=()=>window.dispatchEvent(new CustomEvent('homecloud-network-loading',{detail:pendingRequests}));
 let refreshInFlight:Promise<boolean>|null=null;
 function refreshAccessToken(){
   if(!refreshInFlight)refreshInFlight=(async()=>{
@@ -17,7 +15,6 @@ function refreshAccessToken(){
 }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string, rawResponse=false): Promise<T> {
-  pendingRequests++;reportLoading();try{
   const headers:any = { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(options.headers).entries()) };
   const host=localStorage.getItem('homecloud_docker_host');if(host&&!Object.hasOwn(headers,'x-homecloud-docker-host')&&(/^\/(?:docker|actions\/docker)(?:\/|\?|$)|^\/(?:storage|network)(?:\?|$)/.test(path)))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
@@ -37,7 +34,6 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   }
   if(options.method&&!['GET','HEAD'].includes(options.method.toUpperCase())&&path!=='/node-agents/pairing/status'&&!/^\/(auth|ssh)(?:\/|$)/.test(path))window.dispatchEvent?.(new Event('homecloud-api-write'));
   return body;
-  }finally{pendingRequests--;reportLoading();}
 }
 
 export async function confirmedApi<T=any>(path:string, options:RequestInit={}):Promise<T>{

@@ -99,3 +99,8 @@ test('a failed backup refresh preserves known archive and job counts with stale 
  });
  try{failed=true;await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/Last known.*refresh failed/);const card=page.container.querySelector('.backup-status-widget');assert.match(card.textContent,/1 configured jobs/);assert.match(card.textContent,/Backup inventory timed out/);assert.ok(stat(page,'Backups').classList.contains('needs-attention'))}finally{await page.close()}
 });
+
+test('pending overview measurements say Loading while completed unavailable inventories remain Unknown',async()=>{
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[],jobs:[]}:{...sample(),nodes:[],guests:[],resources:[],refreshing:true,services:[{provider:'proxmox',status:'pending'},{provider:'docker',status:'pending'}]});
+ try{for(const label of ['Total Servers','Virtual Machines','Containers']){assert.equal(stat(page,label).querySelector('strong').textContent,'Loading…');assert.match(stat(page,label).textContent,/Loading inventory/);}}finally{await page.close()}
+});

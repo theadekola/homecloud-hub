@@ -80,7 +80,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
               if(rule&&rule.enabled!==false&&(!row||!Number.isFinite(value)||(row.status!=null&&!['online','running','healthy','available'].includes(String(row.status).toLowerCase()))))continue;
             }existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
         }
-        for(const condition of conditions){const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
+        for(const condition of conditions){const closed=state.alerts.find(a=>a.key===condition.key&&a.status==='resolved'&&a.resolution==='manual');if(closed&&Date.parse(snapshot.sampledAt)<=Date.parse(closed.resolvedAt))continue;const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
           if(current){current.ruleId=condition.ruleId||current.ruleId;current.node=condition.node;current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
         }
         state.alerts=state.alerts.slice(0,1000);

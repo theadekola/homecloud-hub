@@ -45,3 +45,10 @@ test('unread recent activity never contributes to the bell badge',()=>{
 test('attention summary separates monitoring alerts from updates before preview truncation',()=>{
  const state={alerts:Array.from({length:60},(_,i)=>({id:String(i),status:i%2?'active':'acknowledged',severity:'critical'}))};const feed=createHeaderNotifications({get:()=>state,mutate:fn=>fn(state)},()=>[{id:'node1',name:'node1',update:{available:true,version:5}}]);const result=feed.read(owner,{enabled:true,available:true});assert.equal(result.attention.length,50);assert.equal(result.attentionCount,62);assert.equal(result.acknowledgedCount,30);assert.equal(result.badgeCount,32);assert.equal(result.alertCount,60);assert.equal(result.updateCount,2);assert.equal(result.criticalCount,60);assert.equal(feed.read(user).attentionCount,60);
 });
+
+test('manual resolution leaves attention counts and uses manual wording instead of recovered',()=>{
+ const alert={id:'manual',key:'connection:pve',status:'acknowledged',severity:'critical',title:'Offline',source:'pve'},state={alerts:[alert]};
+ const feed=createHeaderNotifications({get:()=>state,mutate:f=>f(state)},()=>[]),snapshot={services:[]};observeHeaderActivity(state,snapshot);
+ alert.status='resolved';alert.resolution='manual';observeHeaderActivity(state,snapshot);
+ const result=feed.read(user);assert.equal(result.badgeCount,0);assert.equal(result.attentionCount,0);assert.ok(result.activity.some(r=>r.title==='Manually resolved: Offline'));assert.ok(!result.activity.some(r=>r.title==='Recovered: Offline'));
+});

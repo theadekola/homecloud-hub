@@ -24,3 +24,10 @@ test('caller cancellation propagates while requests are pending and listeners de
   await requestWithDeadline('/report',{signal:next.signal},r=>r.json(),1000);next.abort();assert.equal(signal.aborted,false);
  }finally{globalThis.fetch=original}
 });
+
+test('terminal streams remain unread and caller cancellation reaches transport after headers arrive',async()=>{
+ const original=globalThis.fetch;const caller=new AbortController();let transport,controller;
+ try{globalThis.fetch=async(url,options)=>{transport=options.signal;return new Response(new ReadableStream({start(c){controller=c;transport.addEventListener('abort',()=>c.error(transport.reason),{once:true})}}))};
+ const response=await requestWithDeadline('/stream',{signal:caller.signal},async r=>r,1000,true);assert.equal(response.bodyUsed,false);const reading=response.text();caller.abort();await assert.rejects(reading,{name:'AbortError'});assert.equal(transport.aborted,true);
+ }finally{globalThis.fetch=original}
+});

@@ -22,11 +22,11 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   if(confirmation) headers['X-HomeCloud-Confirm']=confirmation;
   const deadline=path.startsWith('/auth/')?30000:/^\/(?:node-agents\/guest\/(?:agent|bootstrap|setup)|docker\/image\/(?:pull|build))(?:[/?]|$)/.test(path)?1020000:undefined;
   const readResponse=async(res:Response)=>({res,body:rawResponse&&res.ok?undefined:await res.json().catch(()=>({}))});
-  let {res,body} = await requestWithDeadline(`${API}/api${path}`, { ...options, headers },readResponse,deadline);
+  let {res,body} = await requestWithDeadline(`${API}/api${path}`, { ...options, headers },readResponse,deadline,rawResponse);
 
   if(res.status===401 && (!path.startsWith('/auth/')||path==='/auth/me')){
     if((getAccessToken()!==token&&getAccessToken())||await refreshAccessToken()){
-      headers.Authorization=`Bearer ${getAccessToken()}`;({res,body}=await requestWithDeadline(`${API}/api${path}`,{...options,headers},readResponse,deadline));
+      headers.Authorization=`Bearer ${getAccessToken()}`;({res,body}=await requestWithDeadline(`${API}/api${path}`,{...options,headers},readResponse,deadline,rawResponse));
     }
   }
   if(rawResponse&&res.ok)return res as T;

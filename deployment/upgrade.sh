@@ -66,7 +66,13 @@ rollback(){
      printf '{"operation":"software-upgrade","recoveryRequired":true}\n' > runtime/maintenance.json
      echo 'Automatic rollback could not be verified. Maintenance remains enabled; use the recovery point.' >&2
    fi
- elif ((paused)); then docker compose up -d --no-deps api; rm -f runtime/maintenance.json
+ elif ((paused)); then
+   if docker compose up -d --no-deps api; then
+     rm -f runtime/maintenance.json
+   else
+     printf '{"operation":"software-upgrade","recoveryRequired":true}\n' > runtime/maintenance.json
+     echo 'The original API could not be restarted. Maintenance remains enabled; inspect the deployment.' >&2
+   fi
  else rm -f runtime/maintenance.json
  fi
  echo "Local recovery point: $recovery" >&2

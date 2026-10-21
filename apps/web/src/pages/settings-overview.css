@@ -50,3 +50,5 @@
 .settings-section-action{margin-left:auto;flex-shrink:0;min-width:44px;min-height:44px}.settings-overview-card form{min-width:0}#backup-restore{min-width:0}#backup-restore>.settings-overview-card{height:100%}
 
 .settings-overview-card>form>label:not(.settings-toggle):not(.settings-import){display:grid;gap:6px;margin:0 0 12px}.settings-overview-card>form>p:not(.error){font-size:12px;line-height:1.7;color:#acbdd0}.settings-overview-card>form>.settings-import{margin-bottom:12px}
+
+.settings-card-heading>div{min-width:0;flex:1}.settings-card-heading h2,.settings-card-heading p{overflow-wrap:anywhere}

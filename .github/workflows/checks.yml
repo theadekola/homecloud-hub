@@ -112,7 +112,8 @@ jobs:
 
   release:
     needs: checks
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Publication paused until final fixes and acceptance testing are complete.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

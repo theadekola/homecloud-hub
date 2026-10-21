@@ -144,3 +144,9 @@ test('stalled selected-host inventory releases checking and reports a retryable 
  const state={alerts:[]},service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},inventoryBudgetMs:10,readHost:()=>new Promise(()=>{})});
  service.checkHost('node:qemu/201');await service.settled();assert.equal(service.status('node:qemu/201').manualChecking,false);assert.match(service.status('node:qemu/201').error,/timed out/);
 });
+
+test('retry prioritizes images deferred by the previous scan budget',async()=>{
+ const state={alerts:[],dockerImageUpdates:{rows:[{hostId:'direct',containerId:'c2',code:'registry-scan-deferred'}]}},seen=[];
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},query:async p=>{seen.push(p);return p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:next}}}});
+ service.observe({...snapshot,docker:{...snapshot.docker,containers:[snapshot.docker.containers[0],{...snapshot.docker.containers[0],id:'c2',imageId:'second-image'}]}},true);await service.settled();assert.ok(seen[0].includes('second-image'));assert.ok(service.status().rows.every(r=>r.status==='available'));
+});

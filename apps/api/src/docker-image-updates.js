@@ -52,6 +52,8 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
   const eligible=host=>onlyHost?host===onlyHost:!hostReads.has(host)&&!pending.has(host)&&(!scanning.sampledAt||Date.parse(scanning.sampledAt)>=(hostRequestedAt.get(host)||0));
   const rows=monitoredDocker(scanning).filter(c=>eligible(c.hostId)&&!String(c.name||'').startsWith('homecloud-backup-'));
   const previous=new Map((prior.rows||[]).filter(r=>eligible(r.hostId)).map(r=>[r.hostId+':'+r.containerId,r])),results=[],cache=new Map();
+  // Resume deferred images first so repeated bounded checks cannot starve them.
+  rows.sort((a,b)=>Number(previous.get(b.hostId+':'+b.id)?.code==='registry-scan-deferred')-Number(previous.get(a.hostId+':'+a.id)?.code==='registry-scan-deferred'));
   const affected=new Set([...previous.values()].map(r=>r.hostId).concat(rows.map(r=>r.hostId),onlyHost?[onlyHost]:[])),epochs=new Map([...affected].map(h=>[h,hostVersions.get(h)||0]));
   const valid=h=>epochs.get(h)===(hostVersions.get(h)||0);
   const started=version,deadline=Date.now()+scanBudgetMs;
@@ -60,6 +62,7 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
    const check=async c=>{
     const row={hostId:c.hostId,host:c.host,node:c.node,containerId:c.id,name:c.name,image:c.image,imageId:c.imageId,checkedAt:new Date(now()).toISOString()};
     if(typeof c.image!=='string'||!c.imageId||!imageReference.test(c.image)||c.image.includes('@')||/^sha256:/.test(c.image)){results.push({...row,status:'unsupported',detail:'Digest-pinned or local-only image. Change its reference explicitly to update it.'});return}
+    if(Date.now()>=deadline){results.push({...row,status:'unknown',code:'registry-scan-deferred',detail:'The scan reached its time budget before this image could be checked. Retry Check for Updates; deferred images are checked first and existing alerts are retained.'});return}
     const key=c.hostId+':'+c.imageId+':'+c.image;
     if(!cache.has(key))cache.set(key,agentContext.run({host:c.hostId==='direct'?'':c.hostId},async()=>{
      let local;try{local=await bounded(timeoutMs=>query('/images/'+encodeURIComponent(c.imageId)+'/json',{timeoutMs}),10000)}catch(error){const {retryable,...failure}=registryCheckFailure(error,'image');return failure}

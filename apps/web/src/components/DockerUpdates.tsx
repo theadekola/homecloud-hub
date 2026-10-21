@@ -6,8 +6,9 @@ import {Download,RefreshCw,PackageCheck,AlertCircle} from 'lucide-react';
 import {useApi} from '../hooks';
 import {api,confirmedApi} from '../api';
 import {Card,Badge,Modal} from './UI';
+const updateRefresh=(data:any)=>data?.checking?2000:30000;
 export default function DockerUpdates({owner,onUpdated,userId}:{owner:boolean;onUpdated:()=>void;userId?:string}){
- const live=useApi<any>('/docker/updates',{rows:[],settings:{enabled:true,intervalHours:6}}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[review,setReview]=useState<any>(null),[success,setSuccess]=useState(''),[accepted,setAccepted]=useState(false),[operation,setOperation]=useState<any>(null),[progress,setProgress]=useState<any>(null),[progressError,setProgressError]=useState(''),[elapsed,setElapsed]=useState(0);
+ const live=useApi<any>('/docker/updates',{rows:[],settings:{enabled:true,intervalHours:6}},updateRefresh),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[review,setReview]=useState<any>(null),[success,setSuccess]=useState(''),[accepted,setAccepted]=useState(false),[operation,setOperation]=useState<any>(null),[progress,setProgress]=useState<any>(null),[progressError,setProgressError]=useState(''),[elapsed,setElapsed]=useState(0);
  const awake=useInstallationWakeLock(!!operation&&busy);
  const installationKey=userId?'homecloud-docker-install:'+JSON.stringify([userId,localStorage.getItem('homecloud_docker_host')||'']):'';
  const finish=(result:any)=>{setProgress({percent:100,stage:'Update installed and verified',status:'completed'});setSuccess('100% · '+result.message+(result.warning?' '+result.warning:''));setError('');setBusy(false)};

@@ -37,13 +37,13 @@ function load(entry:Resource,force=false,background=false):Promise<void>{
  })();entry.pending=work;emit(entry);return work;
 }
 
-export function useApi<T>(path: string, initial: T, refreshMs?:number) {
+export function useApi<T>(path: string, initial: T, refreshMs?:number|((data:T)=>number)) {
  const entry=resource(path),initialValue=useRef(initial),[,render]=useState(0);
  const refresh=useCallback(()=>load(entry,true),[entry]);
  const setData=useCallback((value:T|((previous:T)=>T))=>{entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;entry.data=typeof value==='function'?(value as (previous:T)=>T)(entry.hasData?entry.data:initialValue.current):value;entry.hasData=true;entry.updated=Date.now();entry.error='';emit(entry);},[entry]);
  useEffect(()=>{
   let timer:number|undefined,active=true;
-  const schedule=()=>{window.clearTimeout(timer);if(!active)return;const delay=entry.data?.refreshing?1000:refreshMs===0?0:refreshMs??interval;if(delay)timer=window.setTimeout(()=>{void load(entry,true,true).then(schedule)},delay);};
+  const schedule=()=>{window.clearTimeout(timer);if(!active)return;const configured=typeof refreshMs==='function'?refreshMs(entry.data):refreshMs;const delay=entry.data?.refreshing?1000:configured===0?0:configured??interval;if(delay)timer=window.setTimeout(()=>{void load(entry,true,true).then(schedule)},delay);};
   const notify=()=>{if(active){render(v=>v+1);schedule();}};entry.listeners.add(notify);void load(entry).then(schedule);schedule();
   window.addEventListener('homecloud-refresh',schedule);
   return()=>{active=false;entry.listeners.delete(notify);window.clearTimeout(timer);window.removeEventListener('homecloud-refresh',schedule);queueMicrotask(()=>{if(!entry.listeners.size&&entry.pending){entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;}});};

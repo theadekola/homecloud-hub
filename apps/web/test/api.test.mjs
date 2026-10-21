@@ -68,7 +68,7 @@ try{
   const c=await client(),controller=new AbortController();let seen;
   globalThis.fetch=async(url,options)=>{seen=options;return response(200)};
   await c.api('/storage',{headers:new Headers({'X-Test':'present'}),signal:controller.signal});
-  assert.equal(new Headers(seen.headers).get('X-Test'),'present');assert.equal(seen.signal,controller.signal);
+  assert.equal(new Headers(seen.headers).get('X-Test'),'present');assert.equal(seen.signal.aborted,false);controller.abort();assert.equal(seen.signal.aborted,false); // completed request has released its caller listener
  });
  await test('Storage and Network use the same selection while TrueNAS share reads remain separate',async()=>{
   const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];

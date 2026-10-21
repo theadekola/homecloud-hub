@@ -36,7 +36,7 @@ export async function readUpdateHost(query=docker){
  if(!Array.isArray(containers)||!info||Array.isArray(info)||typeof info.Name!=='string')throw Error('Invalid Docker inventory response');
  return {host:{hostname:info.Name,engineId:info.ID},containers:containers.map(c=>({id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Labels?.[trackedImageLabel]||c.Image,imageId:c.ImageID}))};
 }
-export function createDockerImageUpdates({persistence={get,mutate},query=docker,now=Date.now,notify=async()=>{},sleep=ms=>new Promise(r=>setTimeout(r,ms)),readHost=()=>readUpdateHost(query)}={}){
+export function createDockerImageUpdates({persistence={get,mutate},query=docker,now=Date.now,notify=async()=>{},sleep=ms=>new Promise(r=>setTimeout(r,ms)),readHost=()=>readUpdateHost(query),scanBudgetMs=120000,inventoryBudgetMs=30000}={}){
  let lastSnapshot=null,lastSignature='',version=0;const pending=new Map(),hostReads=new Map(),hostVersions=new Map(),hostProgress=new Map(),hostRequestedAt=new Map();
  const settings=()=>({...updateDefaults,...persistence.get().dockerImageUpdates?.settings});
  const status=(host)=>{const data=persistence.get().dockerImageUpdates||{};return {settings:settings(),checking:host===undefined?pending.size+hostReads.size>0:pending.has('all')||pending.has(host||'direct')||hostReads.has(host||'direct'),manualChecking:host===undefined?hostReads.size>0:[host||'direct'].some(h=>hostReads.has(h)||pending.has(h)),progress:hostProgress.get(host||'direct')||null,error:data.hostErrors?.[host||'direct']||'',lastChecked:host===undefined?data.lastChecked||null:data.hostChecked?.[host||'direct']||null,rows:(data.rows||[]).filter(r=>host===undefined||r.hostId===(host||'direct'))}};
@@ -54,18 +54,24 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
   const previous=new Map((prior.rows||[]).filter(r=>eligible(r.hostId)).map(r=>[r.hostId+':'+r.containerId,r])),results=[],cache=new Map();
   const affected=new Set([...previous.values()].map(r=>r.hostId).concat(rows.map(r=>r.hostId),onlyHost?[onlyHost]:[])),epochs=new Map([...affected].map(h=>[h,hostVersions.get(h)||0]));
   const valid=h=>epochs.get(h)===(hostVersions.get(h)||0);
-  const started=version;const work=(async()=>{
+  const started=version,deadline=Date.now()+scanBudgetMs;
+  const bounded=async(work,maximum)=>{const remaining=Math.min(maximum,deadline-Date.now());if(remaining<=0)throw Error('Registry scan deadline exceeded');let timer;try{return await Promise.race([Promise.resolve().then(()=>work(remaining)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Registry scan deadline exceeded')),remaining)})]);}finally{clearTimeout(timer)}};
+  const work=(async()=>{
    const check=async c=>{
     const row={hostId:c.hostId,host:c.host,node:c.node,containerId:c.id,name:c.name,image:c.image,imageId:c.imageId,checkedAt:new Date(now()).toISOString()};
     if(typeof c.image!=='string'||!c.imageId||!imageReference.test(c.image)||c.image.includes('@')||/^sha256:/.test(c.image)){results.push({...row,status:'unsupported',detail:'Digest-pinned or local-only image. Change its reference explicitly to update it.'});return}
     const key=c.hostId+':'+c.imageId+':'+c.image;
     if(!cache.has(key))cache.set(key,agentContext.run({host:c.hostId==='direct'?'':c.hostId},async()=>{
-     let local;try{local=await query('/images/'+encodeURIComponent(c.imageId)+'/json',{timeoutMs:20000})}catch(error){const {retryable,...failure}=registryCheckFailure(error,'image');return failure}
-     for(let attempt=0;attempt<2;attempt++)try{const remote=await query('/distribution/'+encodeURIComponent(c.image)+'/json',{timeoutMs:45000});return compareImage(local,remote,c.image)}catch(error){const {retryable,...failure}=registryCheckFailure(error);if(!retryable||attempt===1)return failure;await sleep(1000)}
+     let local;try{local=await bounded(timeoutMs=>query('/images/'+encodeURIComponent(c.imageId)+'/json',{timeoutMs}),10000)}catch(error){const {retryable,...failure}=registryCheckFailure(error,'image');return failure}
+     for(let attempt=0;attempt<2;attempt++)try{const remote=await bounded(timeoutMs=>query('/distribution/'+encodeURIComponent(c.image)+'/json',{timeoutMs}),15000);return compareImage(local,remote,c.image)}catch(error){const {retryable,...failure}=registryCheckFailure(error);if(!retryable||attempt===1||Date.now()+1000>=deadline)return failure;await bounded(()=>sleep(1000),1500)}
     }));
     results.push({...row,...await cache.get(key)});
    };
-   for(let i=0;i<rows.length;i+=2){await Promise.all(rows.slice(i,i+2).map(check));if(onlyHost&&started===version&&valid(onlyHost)){hostProgress.set(onlyHost,{stage:'registry',completed:results.length,total:rows.length});persistence.mutate(s=>{s.dockerImageUpdates??={};const keys=new Set(results.map(r=>r.hostId+':'+r.containerId));s.dockerImageUpdates.rows=[...(s.dockerImageUpdates.rows||[]).filter(r=>!keys.has(r.hostId+':'+r.containerId)),...results]})}}
+   const publish=()=>{if(started!==version)return;for(const host of affected)if(valid(host))hostProgress.set(host,{stage:'registry',completed:results.filter(r=>r.hostId===host).length,total:rows.filter(r=>r.hostId===host).length});persistence.mutate(s=>{s.dockerImageUpdates??={};const accepted=results.filter(r=>valid(r.hostId)),keys=new Set(accepted.map(r=>r.hostId+':'+r.containerId));s.dockerImageUpdates.rows=[...(s.dockerImageUpdates.rows||[]).filter(r=>!keys.has(r.hostId+':'+r.containerId)),...accepted]})};
+   await new Promise(resolve=>{const queue=[...rows],perHost=new Map();let active=0;
+    const pump=()=>{while(active<4){const index=queue.findIndex(c=>(perHost.get(c.hostId)||0)<2);if(index<0)break;const [c]=queue.splice(index,1);active++;perHost.set(c.hostId,(perHost.get(c.hostId)||0)+1);
+     Promise.resolve().then(()=>check(c)).catch(()=>{results.push({hostId:c.hostId,containerId:c.id,name:c.name,image:c.image,imageId:c.imageId,checkedAt:new Date(now()).toISOString(),status:'unknown',code:'registry-timeout',detail:'The update scan could not finish this image. Retry Check for Updates; existing alerts are retained.'})}).finally(()=>{publish();active--;perHost.set(c.hostId,perHost.get(c.hostId)-1);pump()});
+    }if(!queue.length&&!active)resolve();};pump();});
    // Keep prior observations when a host is absent/offline. An absent reading is not proof of recovery.
    const retired=host=>host==='direct'?scanning.services?.some(s=>s.id==='docker'&&s.status==='not-configured'):Array.isArray(scanning.dockerFleet?.connectors)&&!scanning.dockerFleet.connectors.some(n=>n.id===host.split(':')[0]);
    const keys=new Set(results.map(r=>r.hostId+':'+r.containerId));
@@ -88,7 +94,7 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
     s.alerts=s.alerts.slice(0,1000);
    });
    await notify(persistence.get().alerts);
-  })().catch(()=>{}).finally(()=>{pending.delete(scope);if(onlyHost)hostProgress.delete(onlyHost)});pending.set(scope,work);
+  })().catch(()=>{}).finally(()=>{pending.delete(scope);for(const host of affected)if(valid(host))hostProgress.delete(host)});pending.set(scope,work);
   return status();
  };
  const checkHost=host=>{
@@ -96,7 +102,7 @@ export function createDockerImageUpdates({persistence={get,mutate},query=docker,
   hostVersions.set(id,(hostVersions.get(id)||0)+1);hostRequestedAt.set(id,now());hostProgress.set(id,{stage:'inventory',completed:0,total:null});
   const work=Promise.resolve().then(()=>agentContext.run({host:id==='direct'?'':id},async()=>{
    let snapshot,inventoryError='';
-   try{const data=await readHost();snapshot=id==='direct'?{docker:data,services:[]}:{dockerFleet:{hosts:[{id,status:'reachable',inventory:data}]}}}
+   try{let timer;const data=await Promise.race([Promise.resolve().then(readHost),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Docker inventory timed out')),inventoryBudgetMs)})]).finally(()=>clearTimeout(timer));snapshot=id==='direct'?{docker:data,services:[]}:{dockerFleet:{hosts:[{id,status:'reachable',inventory:data}]}}}
    catch(error){const message=String(error?.message||''),detail=/timed? ?out|timeout|expired|deadline/i.test(message)?'The guest inventory request timed out. Check this guest’s Docker service and connector access.':[401,403].includes(error?.dockerStatus)?'The guest Docker API refused inventory access. Check its Docker permissions.':/offline|unavailable/i.test(message)?'This Docker guest is offline or unavailable through its connector.':'The Docker guest did not return a usable inventory. Check its Docker service and access through the paired connector.';inventoryError=detail;snapshot=id==='direct'?{services:[{id:'docker',status:'error'}],dockerFleet:{hosts:[{id,status:'error',failure:detail}]}}:{dockerFleet:{hosts:[{id,status:'error',failure:detail}]}}}
    persistence.mutate(s=>{s.dockerImageUpdates??={};s.dockerImageUpdates.hostErrors??={};if(inventoryError)s.dockerImageUpdates.hostErrors[id]=inventoryError;else delete s.dockerImageUpdates.hostErrors[id]});
    observe(snapshot,true,id);await pending.get(id);

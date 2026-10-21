@@ -2,6 +2,14 @@
 
 Developer: **The Adekola** · Company: **ATT-Tech**.
 
+## 3.1.0-rc.2 — 21 October 2026
+
+- Bound page/authentication response waits and ordinary action responses, including stalled response bodies. Long guest setup and image build/pull operations retain a separate deadline; timed-out writes are never automatically resubmitted.
+- Replace pair barriers with rolling Docker registry workers, publish completed image results, enforce a two-minute registry scan budget, and retain unresolved alerts for unknown results.
+- Refresh Docker check status every two seconds while active; retain quiet normal polling and no global loading spinner.
+- Load the terminal implementation only when opened, reducing the startup JavaScript chunk.
+- Live browser timing remains blocked by an installation-specific certificate mismatch; configured intervals and fixture measurements are not a live-fleet guarantee.
+
 ## 3.1.0-rc.1 — 20 October 2026
 
 Release candidate for controlled evaluation, not a general-availability certification.

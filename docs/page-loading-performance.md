@@ -84,3 +84,7 @@ After updating HomeCloud, use the existing connector `--update` flow on each pai
 Host selectors verify the Engine before committing a new selection. Discovery now distinguishes ready hosts from the selected connection, and setup verification reports its last actual failure and can be cancelled. Duplicate IPv4/IPv6 port rows are collapsed for display. CPU samples without valid deltas remain unknown; Linux memory subtracts reported inactive cache to match Docker CLI usage.
 
 Discovery retains known running guests while probing them, so incremental scans do not temporarily remove unscanned hosts. Successfully enumerated stopped guests are removed; failed VM/CT enumeration marks known affected guests unavailable instead of advertising them as ready.
+
+## Report availability
+
+Overview recognises paired Docker Engine inventories even when no direct Engine or guest-agent application report is present. A successfully reported empty Engine counts as zero; failed/stale discovery alone does not. Docker inventory loads display Loading rather than falsely advertising a disconnected host. Monitoring treats informational update notices separately from warning/critical health and labels pending collection as Refreshing. These changes improve report truthfulness; they do not eliminate provider/network latency or establish an end-to-end SLA.

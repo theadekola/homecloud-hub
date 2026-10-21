@@ -112,13 +112,13 @@ export async function restoreArchive(id,body,{query=pve,archives=backupArchives,
   return {node,task:await write(`/nodes/${encode(node)}/qemu`,'POST',{vmid,archive:point.volid,storage,force:0})};
 }
 export function truenasConfigured(env=runtimeEnvironment()){return Boolean(env.TRUENAS_URL&&env.TRUENAS_API_KEY);}
-export async function truenas(method,params=[],env=runtimeEnvironment()){
-  try{return await truenasCall(method,params,env);}catch(error){
-    if(method.startsWith('pool.snapshot.')&&(error.code===-32601||/method.*not found|method.*does not exist/i.test(error.message)))return truenasCall(method.replace('pool.snapshot.','zfs.snapshot.'),params,env);
+export async function truenas(method,params=[],env=runtimeEnvironment(),options={}){
+  try{return await truenasCall(method,params,env,options);}catch(error){
+    if(method.startsWith('pool.snapshot.')&&(error.code===-32601||/method.*not found|method.*does not exist/i.test(error.message)))return truenasCall(method.replace('pool.snapshot.','zfs.snapshot.'),params,env,options);
     throw error;
   }
 }
-async function truenasCall(method,params=[],env=runtimeEnvironment()){
+async function truenasCall(method,params=[],env=runtimeEnvironment(),options={}){
   if(!truenasConfigured(env))throw httpError('TrueNAS is not configured',503);
   const base=new URL(env.TRUENAS_URL);
   if(base.protocol!=='https:')throw httpError('TrueNAS requires an HTTPS URL');
@@ -128,7 +128,7 @@ async function truenasCall(method,params=[],env=runtimeEnvironment()){
     const ws=new WebSocket(target,{ca:env.TRUENAS_CA_PEM|| (env.TRUENAS_TLS_CA?fs.readFileSync(env.TRUENAS_TLS_CA):undefined),rejectUnauthorized:true,maxPayload:32*1024*1024});
     let finished=false;
     const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);ws.close();error?reject(error):resolve(result);};
-    const timer=setTimeout(()=>{finish(Object.assign(new Error('TrueNAS request timed out'),{code:'ETIMEDOUT'}));ws.terminate();},Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);
+    const timer=setTimeout(()=>{finish(Object.assign(new Error('TrueNAS request timed out'),{code:'ETIMEDOUT'}));ws.terminate();},options.timeoutMs||Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);
     ws.on('unexpected-response',(_request,response)=>{response.resume();finish(Object.assign(new Error('TrueNAS WebSocket upgrade rejected'),{providerStatus:response.statusCode}));});
     ws.on('error',error=>finish(error));ws.on('close',()=>{if(!finished)finish(Object.assign(new Error('TrueNAS closed the connection'),{truenasFailure:'closed'}));});
     const send=(id,method,params)=>ws.send(JSON.stringify(legacy?{msg:'method',id:String(id),method,params}:{jsonrpc:'2.0',id,method,params}));

@@ -92,3 +92,10 @@ test('inaccessible background progress unlocks the popup without permitting a du
  });
  try{await page.click(button(page,'Review & Install'));await page.click(page.container.querySelector('[aria-label="Approve Docker image installation"]'));await page.click(button(page,'Pull & Install Update'));assert.equal(writes,1);assert.match(page.container.querySelector('.modal [role=alert]').textContent,/may still be running/);assert.ok(button(page,'Pull & Install Update').disabled);assert.equal(page.container.querySelector('.connection-success'),null);await page.click(page.container.querySelector('.modal button[aria-label="Close dialog"]'));assert.equal(page.container.querySelector('[role=dialog]'),null)}finally{await page.close()}
 });
+
+ test('review shows immediate loading feedback while pending and clears it after success or failure',async()=>{
+ for(const fail of [false,true]){let finish,calls=0;const response=new Promise((resolve,reject)=>finish=()=>fail?reject(Error('Review unavailable')):resolve(plan));
+ const page=await mounted('components/DockerUpdates.tsx',{owner:true,onUpdated(){}},async p=>{if(p==='/docker/updates')return {rows:[row],settings:{enabled:true,intervalHours:6}};if(p.endsWith('/plan')){calls++;return response}return {}});
+ try{await page.click(button(page,'Review & Install'));const loading=page.container.querySelector('[aria-label="Loading update review"]');assert.ok(loading);assert.equal(loading.textContent,'Loading');assert.ok(loading.querySelector('.spin'));assert.equal(button(page,'Review & Install').disabled,true);assert.equal(page.container.querySelector('[role=dialog]'),null);await page.click(button(page,'Review & Install'));assert.equal(calls,1);await act(async()=>{finish();await new Promise(r=>setTimeout(r,0))});assert.equal(page.container.querySelector('[aria-label="Loading update review"]'),null);assert.equal(button(page,'Review & Install').disabled,false);if(fail)assert.match(page.container.querySelector('[role=alert]').textContent,/Review unavailable/);else assert.ok(page.container.querySelector('[role=dialog]'));}finally{await page.close()}
+ }
+ });

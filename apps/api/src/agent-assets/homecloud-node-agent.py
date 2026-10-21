@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
-VERSION=6
+VERSION=7
 REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
 HOSTS=[]
 RESCAN=threading.Event()
@@ -199,6 +199,120 @@ def network_scan():
   with LOCK:NETWORK=report
   time.sleep(5)
 
+# Operational telemetry contains public measurements only; never send VPN secrets.
+OPERATIONS=None
+VPN_INTERFACE='icvpn'
+def command_json(args,timeout=5):
+ p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+ return json.loads(p.stdout)
+def collect_operations():
+ report={'sampledAt':time.time(),'temperatures':[],'disks':[],'ups':[],'vpn':{'status':'not-configured','peers':[]},'errors':[]}
+ for hwmon in list(pathlib.Path('/sys/class/hwmon').glob('hwmon*'))[:16]:
+  for sensor in list(hwmon.glob('temp*_input'))[:8]:
+   try:
+    value=float(sensor.read_text())/1000;label=sensor.with_name(sensor.name.replace('_input','_label'));name=label.read_text().strip() if label.exists() else sensor.name
+    if -50<=value<=200:report['temperatures'].append({'name':((hwmon/'name').read_text().strip()+' / '+name)[:80],'celsius':value})
+   except (OSError,ValueError):pass
+ for zone in list(pathlib.Path('/sys/class/thermal').glob('thermal_zone*'))[:32]:
+  try:
+   value=float((zone/'temp').read_text())/1000
+   if -50<=value<=200:report['temperatures'].append({'name':(zone/'type').read_text().strip()[:80],'celsius':value})
+  except (OSError,ValueError):pass
+ try:
+  devices=command_json(['smartctl','--scan','--json']).get('devices',[])[:16]
+  for device in devices:
+   name=device.get('name','')
+   if not re.fullmatch(r'/dev/[A-Za-z0-9_./-]{1,100}',name):continue
+   try:
+    data=command_json(['smartctl','-H','-A','-n','standby','--json',name],3)
+    report['disks'].append({'name':name,'healthy':data.get('smart_status',{}).get('passed'),'celsius':data.get('temperature',{}).get('current')})
+   except Exception:report['disks'].append({'name':name,'healthy':None,'celsius':None})
+ except Exception:report['errors'].append('Disk health unavailable. Install smartmontools and check device support/permissions.')
+ try:
+  names=run(['upsc','-l','localhost'],timeout=3).splitlines()[:8]
+  for name in names:
+   if not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',name):continue
+   try:
+    values=dict(line.split(': ',1) for line in run(['upsc',name+'@localhost'],timeout=3).splitlines() if ': ' in line)
+    report['ups'].append({'name':name,'status':values.get('ups.status',''),'charge':values.get('battery.charge'),'runtime':values.get('battery.runtime')})
+   except Exception:report['errors'].append('UPS reading unavailable: '+name)
+ except Exception:report['errors'].append('UPS unavailable. Configure a local Network UPS Tools server and upsc client.')
+ try:
+  public=run(['wg','show',VPN_INTERFACE,'public-key'],timeout=3).strip()
+  peers=run(['wg','show',VPN_INTERFACE,'allowed-ips'],timeout=3).splitlines()
+  handshakes=dict(line.split('\t',1) for line in run(['wg','show',VPN_INTERFACE,'latest-handshakes'],timeout=3).splitlines() if '\t' in line)
+  addresses=command_json(['ip','-j','address','show','dev',VPN_INTERFACE],3)
+  address=next((str(a['local'])+'/'+str(a['prefixlen']) for row in addresses for a in row.get('addr_info',[]) if a.get('family')=='inet'),None)
+  report['vpn']={'status':'configured','address':address,'publicKey':public,'peers':[{'publicKey':line.split('\t')[0],'address':line.split('\t',1)[1],'lastHandshake':int(handshakes.get(line.split('\t')[0],0))} for line in peers[:128] if '\t' in line]}
+ except Exception:pass
+ return report
+def operations_scan():
+ global OPERATIONS
+ while True:
+  try:report=collect_operations()
+  except Exception:report={'errors':['Operational measurements unavailable.']}
+  with LOCK:OPERATIONS=report
+  time.sleep(60)
+def operations_job(job):
+ if job.get('host')!='node':raise RuntimeError('Operational actions only run on the paired host')
+ body=json.loads(base64.b64decode(job.get('body','') or 'e30='))
+ operation=body.get('action')
+ if operation=='network-check':
+  checks=[]
+  for host in ['ghcr.io','lscr.io','registry-1.docker.io']:
+   started=time.monotonic()
+   try:
+    # Fixed HTTPS registry destinations; no arbitrary URL/port probing.
+    output=run(['curl','--head','--silent','--output','/dev/null','--write-out','%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect}','--connect-timeout','3','--max-time','5','https://'+host+'/v2/'],timeout=6)
+    parts=output.strip().split();code=parts[0]
+    checks.append({'name':host,'status':'reachable' if code in ('200','401','405') else 'failed','httpStatus':code,'dnsMilliseconds':round(float(parts[1])*1000),'connectMilliseconds':round(float(parts[2])*1000),'tlsMilliseconds':round(float(parts[3])*1000),'milliseconds':round((time.monotonic()-started)*1000)})
+   except Exception:checks.append({'name':host,'status':'failed','message':'Check host DNS, outbound HTTPS, certificate trust and registry access.'})
+  result={'checks':checks,'sampledAt':time.time()}
+ elif operation=='install-tools':
+  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','smartmontools','nut-client'],timeout=180)
+  result={'message':'Monitoring tools installed. UPS readings require an existing local NUT server; no UPS shutdown policy was changed.'}
+ elif operation=='vpn-setup':
+  address=ipaddress.ip_interface(body.get('address',''))
+  port=body.get('port')
+  if address.version!=4 or address.network.prefixlen!=24 or not address.ip.is_private or address.ip in (address.network.network_address,address.network.broadcast_address) or type(port)!=int or not 1024<=port<=65535:raise RuntimeError('Use a private IPv4 /24 gateway address and port 1024–65535')
+  directory=pathlib.Path('/etc/wireguard');config=directory/(VPN_INTERFACE+'.conf')
+  if config.exists():raise RuntimeError('Managed VPN already exists; it will not be overwritten')
+  interfaces=command_json(['ip','-j','address'],3)
+  for interface in interfaces:
+   for item in interface.get('addr_info',[]):
+    if item.get('family')=='inet' and address.network.overlaps(ipaddress.ip_network(str(item['local'])+'/'+str(item['prefixlen']),strict=False)):raise RuntimeError('VPN subnet overlaps an existing host network')
+  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','wireguard-tools'],timeout=180)
+  directory.mkdir(mode=0o700,parents=True,exist_ok=True)
+  key=run(['wg','genkey'],timeout=5).strip()
+  fd=os.open(str(config),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+  with os.fdopen(fd,'w') as f:f.write('[Interface]\nAddress = '+str(address)+'\nListenPort = '+str(port)+'\nPrivateKey = '+key+'\nSaveConfig = true\n')
+  try:run(['systemctl','enable','--now','wg-quick@'+VPN_INTERFACE],timeout=30)
+  except Exception:raise RuntimeError('VPN configuration was created but startup failed. Inspect the gateway service before retrying.')
+  result={'message':'VPN gateway started. Configure router UDP forwarding when needed. Access currently reaches this gateway only; LAN routing and firewall policy are separate.'}
+ elif operation in ('vpn-add','vpn-remove'):
+  key=body.get('publicKey','')
+  if not re.fullmatch(r'[A-Za-z0-9+/]{43}=',key) or len(base64.b64decode(key))!=32:raise RuntimeError('Invalid WireGuard public key')
+  config=pathlib.Path('/etc/wireguard')/(VPN_INTERFACE+'.conf')
+  if not config.is_file():raise RuntimeError('Set up the managed VPN gateway first')
+  existing=run(['wg','show',VPN_INTERFACE,'allowed-ips'],timeout=3).splitlines()
+  if operation=='vpn-add':
+   address=ipaddress.ip_interface(body.get('address',''))
+   gateway=re.search(r'^Address\s*=\s*(\S+)',config.read_text(),re.M)
+   if not gateway:raise RuntimeError('Gateway address unavailable')
+   interface=ipaddress.ip_interface(gateway.group(1))
+   if address.version!=4 or address.network.prefixlen!=32 or address.ip not in interface.network or address.ip in (interface.ip,interface.network.network_address,interface.network.broadcast_address):raise RuntimeError('Device needs an unused /32 within the gateway subnet')
+   if len(existing)>=128 or any(line.split('\t')[0]==key or str(address) in line.split('\t')[-1].split(' ') for line in existing):raise RuntimeError('Device key or address already exists, or peer limit reached')
+   run(['wg','set',VPN_INTERFACE,'peer',key,'allowed-ips',str(address)],timeout=5)
+  else:
+   if not any(line.split('\t')[0]==key for line in existing):raise RuntimeError('Device peer no longer exists')
+   run(['wg','set',VPN_INTERFACE,'peer',key,'remove'],timeout=5)
+  try:run(['wg-quick','save',VPN_INTERFACE],timeout=5)
+  except Exception:raise RuntimeError('Live VPN peer changed but persistence failed. Inspect the gateway configuration before restarting it.')
+  result={'message':'Device approved.' if operation=='vpn-add' else 'Device access revoked.'}
+ else:raise RuntimeError('Unsupported operational action')
+ RESCAN.set()
+ return {'status':200,'body':base64.b64encode(json.dumps(result).encode()).decode()}
+
 def post(config,path,body):
  request=urllib.request.Request(config['url']+'/api/node-agent/'+path,data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+config.get('token','')})
  with urllib.request.urlopen(request,timeout=30) as response:return json.load(response)
@@ -210,7 +324,8 @@ def read_job(job):
 def execute_job(job):
  if job.get('expiresAt',time.time()*1000+1)<=time.time()*1000:return {'id':job['id'],'error':'Request expired before execution'}
  try:
-  if job.get('operation')=='setup':result=setup_guest(job['host'])
+  if job.get('operation')=='operations':result=operations_job(job)
+  elif job.get('operation')=='setup':result=setup_guest(job['host'])
   else:
    remaining=max(1,min(900 if job.get('progress') else 300,int((job.get('expiresAt',time.time()*1000+300000)-time.time()*1000)/1000)))
    if job.get('progress') and job.get('method')=='POST' and re.fullmatch(r'/images/create\?fromImage=[A-Za-z0-9%._~:-]+',job.get('path','')):
@@ -238,9 +353,9 @@ def poll_once(config,reads,writes,completed,ready):
  while len(results)<20:
   try:results.append(completed.get_nowait())
   except queue.Empty:break
- with LOCK:hosts=list(HOSTS);network=NETWORK
+ with LOCK:hosts=list(HOSTS);network=NETWORK;operations=OPERATIONS
  with PULL_PROGRESS_LOCK:progress=list(PULL_PROGRESS.values())[:20];PULL_PROGRESS.clear()
- try:response=post(config,'poll',{'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,**({'network':network} if network else {})})
+ try:response=post(config,'poll',{'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,'operations':operations,**({'network':network} if network else {})})
  except Exception:
   for result in results:completed.put(result)
   with PULL_PROGRESS_LOCK:
@@ -269,7 +384,7 @@ def main():
   os.chmod(args.config,0o600);return
  with open(args.config) as f:config=json.load(f)
  CONFIG=config
- threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start()
+ threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start();threading.Thread(target=operations_scan,daemon=True).start()
  reads,writes,completed,ready=start_workers()
  while True:
   try:poll_once(config,reads,writes,completed,ready)

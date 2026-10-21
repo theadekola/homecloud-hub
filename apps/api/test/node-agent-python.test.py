@@ -179,4 +179,22 @@ class AgentTests(unittest.TestCase):
     with patch.object(agent,'guest_run',side_effect=guest):result=agent.docker_pull('qemu/100','/images/create?fromImage=nginx',15,progress)
     self.assertEqual(result['status'],200);self.assertTrue(observed);self.assertLess(len(result['body']),1000);self.assertTrue(release.is_set())
    finally:release.set();server.shutdown();server.server_close();thread.join(timeout=2)
+class OperationalTests(unittest.TestCase):
+ def job(self,body,host='node'):
+  return {'host':host,'body':base64.b64encode(json.dumps(body).encode()).decode()}
+ def test_invalid_operational_actions_never_run_a_command(self):
+  with patch.object(agent,'run') as run:
+   for body in [{'action':'shell'},{'action':'vpn-setup','address':'10.0.0.1/16','port':51820},{'action':'vpn-add','publicKey':'bad'}]:
+    with self.assertRaises(Exception):agent.operations_job(self.job(body))
+   with self.assertRaises(RuntimeError):agent.operations_job(self.job({'action':'network-check'},'qemu/100'))
+   run.assert_not_called()
+ def test_network_checks_use_fixed_https_targets_and_report_timings(self):
+  with patch.object(agent,'run',return_value='401 0.010 0.020 0.030') as run:
+   response=agent.operations_job(self.job({'action':'network-check','url':'http://untrusted'}));data=json.loads(base64.b64decode(response['body']))
+   self.assertEqual(len(data['checks']),3);self.assertEqual(data['checks'][0]['dnsMilliseconds'],10)
+   for call in run.call_args_list:self.assertTrue(call.args[0][-1].startswith('https://'));self.assertNotIn('untrusted',str(call))
+ def test_gateway_never_overwrites_an_existing_configuration(self):
+  with patch.object(agent.pathlib.Path,'exists',return_value=True),patch.object(agent,'run') as run:
+   with self.assertRaisesRegex(RuntimeError,'will not be overwritten'):agent.operations_job(self.job({'action':'vpn-setup','address':'10.77.0.1/24','port':51820}))
+   run.assert_not_called()
 if __name__=='__main__':unittest.main()

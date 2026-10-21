@@ -39,4 +39,14 @@ try{
   assert.equal((await call('/notifications','','viewer')).status,403);
   assert.equal((await call('/notifications/test','','admin','POST')).status,403);
  });
+ await test('operational reads and recovery writes enforce roles and action-time confirmation',async()=>{
+  assert.equal((await call('/operations/health','','viewer')).status,403);
+  assert.equal((await call('/operations/performance','','admin')).status,200);
+  assert.equal((await call('/operations/unknown/vpn','','admin','POST')).status,403);
+  assert.equal((await call('/operations/unknown/tools','','owner','POST')).status,409);
+  assert.equal((await call('/operations/unknown/vpn','','owner','POST')).status,409);
+  assert.equal((await call('/recovery-tests','','viewer')).status,403);
+  assert.equal((await call('/recovery-tests','','operator','POST')).status,403);
+  assert.equal((await call('/recovery-tests','','admin','POST')).status,409);
+ });
 }finally{clearInterval(timer);agents.revokeAgent(paired.id);await new Promise(resolve=>server.close(resolve));fs.rmSync(process.env.DATA_DIR,{recursive:true,force:true});}

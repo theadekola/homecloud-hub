@@ -620,3 +620,12 @@ test('alert details enable Resolve after acknowledgement and show the recorded m
  const page=await mounted('pages/Alerts.tsx',{},async(p,init)=>{if(init?.method==='POST'){writes.push(p);if(p.endsWith('/acknowledge'))alert={...alert,status:'acknowledged',acknowledgedBy:'operator'};else alert={...alert,status:'resolved',resolution:'manual',resolvedBy:'operator',resolvedAt:new Date().toISOString()};return {result:{status:alert.status}}}return p==='/alerts'?{alerts:[alert],rules:[]}:activeAlertApi(p)});
  try{await page.click(page.container.querySelector('[aria-label="Details for alert critical"]'));assert.equal(button(page.container,'Resolve').disabled,true);await page.click(button(page.container,'Acknowledge'));assert.equal(button(page.container,'Resolve').disabled,false);await page.click(button(page.container,'Resolve'));assert.deepEqual(writes,['/alerts/critical/acknowledge','/alerts/critical/resolve']);assert.match(page.container.querySelector('.modal').textContent,/Manually resolved/);assert.match(page.container.querySelector('.modal').textContent,/operator/);assert.equal(page.container.querySelectorAll('.active-alert-table tbody tr').length,0);}finally{await page.close()}
 });
+
+test('Monitoring does not degrade healthy endpoints for informational update notices',async()=>{
+ const data=monitoringRedesignFixture();data.services=data.services.map(s=>({...s,status:'reachable',error:null}));data.alerts=[{id:'update',title:'Docker image update available',status:'active',severity:'info'}];
+ const page=await mounted('pages/Monitoring.tsx',{},monitoringRedesignApi(data));try{assert.equal(page.container.querySelector('.monitor-stat strong').textContent,'Healthy');assert.match(page.container.querySelector('.monitor-stat').textContent,/endpoints responding/)}finally{await page.close()}
+});
+test('Monitoring labels pending collections as refreshing rather than a failed connection',async()=>{
+ const data=monitoringRedesignFixture();data.services=[{id:'docker-fleet',provider:'docker',name:'Docker collection',status:'pending'}];data.alerts=[];
+ const page=await mounted('pages/Monitoring.tsx',{},monitoringRedesignApi(data));try{assert.equal(page.container.querySelector('.monitor-stat strong').textContent,'Refreshing')}finally{await page.close()}
+});

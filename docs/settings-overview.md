@@ -13,7 +13,9 @@ Settings uses one primary location for each group of controls. Related tabs link
 
 ## Editing and persistence
 
-Editable input sections have independent edit and save icons. Saving one section does not submit another section’s draft. Failed saves retain the section draft and show an error. Navigation discards unsaved section inputs. Switches apply immediately, including dashboard widgets, appearance motion and notification preferences; failed persistence keeps the previous saved value. Theme, density and background choices also apply immediately. There are no page-wide Edit, Save or Cancel controls. General-settings imports remain staged for review in System before using that section’s save icon.
+Site Information and Refresh Preferences are directly editable for administrators and owners. Their valid changed values save on field blur (or Enter), without edit/save icons; typing alone and unchanged values do not write. Saves are serialized and merge fresh server settings so independent sections cannot overwrite each other. Rejected writes retain the draft and show an error; leaving the field again retries. Dashboard switches apply immediately.
+
+System → Backup & Restore has no duplicate editable fields or edit/save icons. Import validates and previews a whitelisted general-settings file; Restore Imported Settings requires explicit confirmation. Merely choosing a file never restores it. Export remains a separate action. Active Sessions saves its inactivity selection immediately and preserves the previous selection on storage failure. Accent Style and its intensity slider apply immediately without edit/save icons. Other appearance input sections and notification severity retain their scoped editors. Switches retain immediate persistence and failure rollback.
 
 Site name, description and the 15–300 second page-refresh preference require administrator or owner access and are shared. Dashboard widget preferences are saved in this browser and are editable by signed-in viewers. General saves do not rewrite appearance or sidebar preferences.
 
@@ -25,7 +27,7 @@ System displays actual API/container runtime facts rather than physical-host upt
 
 Runtime metadata is not repeated under About. About owns version/update information, while System owns hostname, OS, kernel, architecture, Node.js runtime, uptime and datastore facts. The global header updater remains an application-wide shortcut.
 
-Provider inventory and per-provider health are owned by Connections. System runs explicit read-only API compatibility checks and can export their results. The checks do not create guests, change shares or prove write permissions. Only owners can run them. Failures remain visible and retryable.
+Provider inventory and per-provider health are owned by Connections. System runs explicit read-only API compatibility checks and can export their results. The checks do not create guests, change shares or prove write permissions. Only owners can run them. Failures remain visible and retryable. Compatibility scans have a 20-second overall budget, at most four active reads and two per paired node. Unrun checks are labelled not-checked. Use Diagnostic scope to retry one known Docker host without waiting for the whole fleet.
 
 ## Security
 
@@ -44,7 +46,7 @@ Integrations and Advanced are removed from Settings navigation. Old links redire
 
 ## Backup and product information
 
-General-settings exports contain site name, description and refresh interval. Imports validate and stage only those fields for review before saving that section. Credentials, user accounts, application data, browser preferences and infrastructure backups are excluded. Export/import lives under System → Backup & Restore. The separate settings tab is removed; its old links redirect to System.
+General-settings exports contain site name, description and refresh interval. Imports validate and stage only those fields for review before explicit restoration. Credentials, user accounts, application data, browser preferences and infrastructure backups are excluded. Export/import lives under System → Backup & Restore. The separate settings tab is removed; its old links redirect to System.
 
 About uses reported version facts and verified project links. Build number, UTC date and source revision come from build-time API metadata; development builds without metadata are labelled explicitly. About links to the MIT License, security guidance, privacy/data handling and terms of use, plus the full README and architecture diagrams. Shared instance-name/description inputs stay in General. Project documentation and issue links are consolidated into Quick Links rather than repeated in a Support card.
 

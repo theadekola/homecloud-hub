@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createDockerFleet,monitoredDocker} from '../src/docker-fleet.js';
 import {selectedAgentHost,agentContext} from '../src/node-agents.js';
 import {createMonitor,alertConditions} from '../src/monitor.js';
-import {discovered} from '../src/discovery.js';
+import {discovered,discoveredContainerCount} from '../src/discovery.js';
 const inventory=(name,cpu=90)=>({host:{hostname:name,engineId:name},containers:[{id:'same-id',name:'app',status:'running',cpu,memoryPercent:80}],volumes:[],networks:[]});
 test('fleet samples hosts in isolated contexts, retains partial success and detects offline hosts',async()=>{
  let list=[{id:'a',node:'node01',name:'first',online:true},{id:'b',node:'node02',name:'second',online:true}];
@@ -98,4 +98,14 @@ test('monitor sends one connection recovery notification when the paired node re
  nodes=[{id:'a',name:'node01',online:true,lastSeen:new Date().toISOString()}];hosts=[{id:'a:qemu/101',agent:'a',node:'node01',name:'guest',online:true}];
  await monitor.sample(true);await Promise.all(deliveries);assert.equal(sent.length,1);assert.match(sent[0].title,/Connection restored: Docker node01/);
  await monitor.sample(true);await Promise.all(deliveries);assert.equal(sent.length,1);
+});
+
+test('Overview counts real paired Engine inventory without a direct Engine or guest-agent report',()=>{
+ const snapshot={dockerFleet:{hosts:[{id:'paired',status:'reachable',inventory:inventory('paired',10)}]}};
+ assert.equal(discoveredContainerCount(snapshot),1);
+ snapshot.dockerFleet.hosts[0].status='partial';assert.equal(discoveredContainerCount(snapshot),1);
+ snapshot.dockerFleet.hosts[0].inventory.containers=[];assert.equal(discoveredContainerCount(snapshot),0);
+ snapshot.dockerFleet.hosts[0].status='error';assert.equal(discoveredContainerCount(snapshot),null);
+ assert.equal(discoveredContainerCount({docker:{host:{hostname:'direct'},containers:[]}}),0);
+ assert.equal(discoveredContainerCount({}),null);
 });

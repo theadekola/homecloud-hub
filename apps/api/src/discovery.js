@@ -11,3 +11,11 @@ export function discovered(snapshot){
  // LXC capability information is not a failed VM access check.
  return {resources,reports,discoveryLimitations:snapshot.proxmox?.guestInventory?.limitations||[],discoveryNotes:snapshot.proxmox?.lxc?.length?['LXC lifecycle and resource measurements are available through Proxmox. For application inventory, use a paired Proxmox node under Docker. QEMU Guest Agent permissions apply only to VMs.']:[]};
 }
+
+// An Engine reached through a paired host is a real inventory source, including
+// an empty Engine. Failed or stale guest-only discovery cannot establish zero.
+export function discoveredContainerCount(snapshot,inventory=discovered(snapshot)){
+ const paired=snapshot.dockerFleet?.hosts?.some(h=>['reachable','partial'].includes(h.status)&&Array.isArray(h.inventory?.containers));
+ const available=Array.isArray(snapshot.docker?.containers)||paired||inventory.reports.some(r=>r.status==='online');
+ return available?inventory.resources.filter(r=>r.kind==='Docker container'&&r.status!=='stale').length:null;
+}

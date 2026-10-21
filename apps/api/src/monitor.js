@@ -1,3 +1,5 @@
+import {operationsView,operationalConditions,operationalRecovery} from './operations-health.js';
+import {operationalNodes} from './node-agents.js';
 import {dockerImageUpdates} from './docker-image-updates.js';
 import {observeHeaderActivity} from './header-notifications.js';
 import {notifier} from './notifications.js';
@@ -13,7 +15,7 @@ export const providers={
   truenas:{configured:truenasConfigured,read:truenasSnapshot}
 };
 export function alertConditions(snapshot,rules){
-  const conditions=[];
+  const conditions=snapshot.operations?operationalConditions(snapshot.operations):[];
   for(const service of snapshot.services)if(['error','partial'].includes(service.status))conditions.push({key:`connection:${service.id||service.name}`,connectorId:service.id||service.provider,title:service.status==='partial'?'Incomplete monitoring':'Connection failed',source:service.name,provider:service.provider,severity:service.status==='partial'?'warning':'critical',details:service.error});
   for(const row of snapshot.proxmox?.storage||[])if(row.status==='offline'&&String(row.content||'').split(',').includes('backup'))conditions.push({key:`backup-storage:${row.node}:${row.id}`,title:'Backup storage unavailable',source:`${row.node} / ${row.name}`,node:row.node,resourceId:row.id,provider:'proxmox',severity:'warning',details:'Proxmox reports this backup storage offline. Its backup archives cannot be checked. Open Backups → Destinations to inspect its status.'});
   const resources=[...(snapshot.proxmox?.nodes||[]).map(n=>({...n,provider:'proxmox'})),...monitoredDocker(snapshot).map(c=>({...c,id:c.monitorId,provider:'docker',memory:c.memoryPercent})),...(snapshot.proxmox?.storage||[]).map(p=>({...p,provider:'proxmox',storage:p.usage})),...(snapshot.truenas?.pools||[]).map(p=>({...p,provider:'truenas',storage:p.usage}))];
@@ -56,6 +58,8 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
      (async()=>{let services;try{snapshot.dockerFleet=await fleet();services=snapshot.dockerFleet.hosts.map(h=>({id:`docker:${h.id}`,name:`Docker ${h.node} / ${h.name}`,provider:'docker',hostId:h.id,status:h.status,response:h.response??null,error:h.error}));}catch{services=[{id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'error',error:'Docker host inventory failed'}];}snapshot.services=[...snapshot.services.filter(s=>s.id!=='docker-fleet'),...services];})(),
      (async()=>{try{snapshot.services.push(...await checkServices());}catch(e){snapshot.services.push({name:'Additional service configuration',status:'error',error:e.message});}})()
     ]);
+    snapshot.operations=operationsView(operationalNodes());
+    snapshot.services.push(...snapshot.operations.nodes.map(n=>({id:`operations:${n.id}`,name:`Hardware ${n.name}`,provider:'hardware',status:n.version<7?'not-configured':n.status==='current'?'reachable':n.status==='waiting'?'pending':'partial'})));
     snapshot.hosts=hosts(snapshot);
     if(ticket!==generation)return snapshot;
       const measured=snapshot.proxmox?.nodes?.filter(n=>n.status==='online')||[];
@@ -65,6 +69,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         const conditions=alertConditions(snapshot,state.rules),activeKeys=new Set(conditions.map(c=>c.key));
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           if(existing.key?.startsWith('docker-image:'))continue;
+          if(existing.key?.startsWith('operations:')){if(operationalRecovery(existing,snapshot.operations)){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}continue;}
           if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}else if(typeof row?.content==='string'&&!row.content.split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;existing.resolution='no-longer-backup-destination';existing.details='This storage is no longer configured for backup content. This does not mean its filesystem mount was repaired.';}continue;}
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           // A no-heartbeat placeholder disappears when real Docker hosts are discovered.

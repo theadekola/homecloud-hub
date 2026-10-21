@@ -1,3 +1,4 @@
+import {publicOperations,validateOperationalAction} from './operations-health.js';
 import {connectorUpdateInfo} from './connector-release.js';
 import crypto from 'node:crypto';
 import {acceptNetworkReport} from './network-telemetry.js';
@@ -16,13 +17,14 @@ export function pairNode(code,name,kind='proxmox'){const digest=hash(String(code
 export function pairingStatus(code){const pairing=pairings.get(hash(String(code)));if(!pairing||pairing.expires<Date.now())fail('Pairing code expired or invalid',401);return {paired:!!pairing.id,id:pairing.id||null,kind:pairing.kind};}
 export function authenticateAgent(token){const digest=hash(String(token||''));return (get().nodeAgents||[]).find(n=>n.tokenHash===digest)||fail('Agent authentication rejected',401);}
 export function agentNodes(){return (get().nodeAgents||[]).map(({id,name,hostname=name,kind='proxmox'})=>{const report=nodes.get(id),node={id,name,hostname,kind,lastSeen:report?.lastSeen||null,hosts:report?.hosts||[],version:report?.version||1,revision:report?.revision||null,online:Date.now()-(report?.time||0)<90000};return {...node,update:connectorUpdateInfo(node)};});}
+export function operationalNodes(){return agentNodes().map(n=>({...n,operations:nodes.get(n.id)?.operations||null}));}
 export function agentNetworkReports(){return agentNodes().map(n=>({id:n.id,hostname:n.hostname,kind:n.kind,online:n.online,version:n.version,network:nodes.get(n.id)?.network||null}));}
 export function agentHosts(){return agentNodes().flatMap(n=>n.hosts.map(h=>({...h,id:`${n.id}:${h.id}`,agent:n.id,node:n.name,kind:n.kind,online:n.online&&h.online})));}
 export function revokeAgent(id){mutate(s=>{s.nodeAgents=(s.nodeAgents||[]).filter(n=>n.id!==id)});nodes.delete(id);for(const [key,j]of jobs)if(j.agent===id){j.reject(new Error('Node agent revoked'));jobs.delete(key)}}
 export function pollAgent(agent,input){
  if(!Array.isArray(input.hosts)||input.hosts.length>500)fail('Invalid host report');
  const hosts=input.hosts.map(h=>{if((agent.kind==='docker'&&h.id!=='node')||!/^(node|qemu\/\d+|lxc\/\d+)$/.test(h.id))fail('Invalid guest identity');return {id:h.id,name:String(h.name||h.id).slice(0,100),online:h.online===true,error:String(h.error||'').slice(0,400),setup:h.setup===true,status:String(h.status||'unavailable').slice(0,40)}});
- nodes.set(agent.id,{version:Number.isInteger(input.version)&&input.version>0&&input.version<=1000?input.version:1,revision:/^[a-f0-9]{64}$/.test(input.revision||'')?input.revision:null,time:Date.now(),lastSeen:new Date().toISOString(),hosts,network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
+ nodes.set(agent.id,{version:Number.isInteger(input.version)&&input.version>0&&input.version<=1000?input.version:1,revision:/^[a-f0-9]{64}$/.test(input.revision||'')?input.revision:null,time:Date.now(),lastSeen:new Date().toISOString(),hosts,operations:publicOperations(input.operations,Date.now(),nodes.get(agent.id)?.operations),network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
  for(const p of (Array.isArray(input.progress)?input.progress:[]).slice(0,20)){const j=jobs.get(p?.id);if(!j||j.agent!==agent.id||!j.onProgress)continue;for(const e of (Array.isArray(p.events)?p.events:[]).slice(0,256))j.onProgress(e);}
  for(const r of (input.results||[]).slice(0,20)){const j=jobs.get(r.id);if(!j||j.agent!==agent.id)continue;jobs.delete(r.id);if(r.error)j.reject(new Error(String(r.error).slice(0,400)));else if(typeof r.body==='string'&&r.body.length<=2500000&&Number.isInteger(r.status))j.resolve(r);else j.reject(new Error('Invalid agent response'));}
  const pending=[];for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt,...(j.onProgress?{progress:true}:{})});if(pending.length===5)break}return {jobs:pending};
@@ -57,5 +59,15 @@ export async function installAgentHost(identity){
  if(!host.setup||host.id.endsWith(':node'))fail('Guest setup requires a reachable Debian/Ubuntu guest',400);
  if([...jobs.values()].some(j=>j.operation==='setup'&&j.agent===host.agent&&j.host===host.id.slice(host.agent.length+1)))fail('Setup is already running for this guest',409);
  const result=await new Promise((resolve,reject)=>{const id=crypto.randomUUID(),timeout=setTimeout(()=>{jobs.delete(id);reject(new Error('Guest setup timed out; inspect the guest before retrying'))},960000);jobs.set(id,{agent:host.agent,host:host.id.slice(host.agent.length+1),operation:'setup',path:'',method:'POST',body:'',expiresAt:Date.now()+960000,sent:false,resolve:r=>{clearTimeout(timeout);resolve(r)},reject:e=>{clearTimeout(timeout);reject(e)}})});
+ return JSON.parse(Buffer.from(result.body,'base64').toString('utf8'));
+}
+
+export async function operationalAction(id,input){
+ const node=agentNodes().find(n=>n.id===id);if(!node?.online)fail('Paired host is offline or unavailable',503);
+ if(node.version<7)fail('Update this connector to version 7 for operational tools',409);
+ if(updating.has(id)||[...jobs.values()].some(j=>j.agent===id&&j.operation==='operations'))fail('Another operational action or connector update is running on this host',409);
+ const body=validateOperationalAction(input),duration=['vpn-setup','install-tools'].includes(body.action)?360000:25000;
+ const result=await queueAgentRead({agent:id,id:id+':node'},{operation:'operations',path:'',method:'POST',body:Buffer.from(JSON.stringify(body)).toString('base64')},duration);
+ if(result.status!==200)fail('Operational action failed',502);
  return JSON.parse(Buffer.from(result.body,'base64').toString('utf8'));
 }

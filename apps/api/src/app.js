@@ -1,3 +1,7 @@
+import {createReportPerformance} from './report-performance.js';
+import {createRecoveryTests} from './recovery-tests.js';
+import {operationsView} from './operations-health.js';
+import {operationalNodes,operationalAction} from './node-agents.js';
 import {changeAlertStatus} from './alert-status.js';
 import {sessionResponse,refreshCredential,browserSession} from './browser-sessions.js';
 import {accountSecurityRouter} from './account-security.js';
@@ -67,7 +71,8 @@ import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createB
 
 export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
 
- const app=express(),readCache=createReadCache();
+ const app=express(),readCache=createReadCache(),reportPerformance=createReportPerformance();
+ app.use((req,res,next)=>{const started=performance.now();res.on('finish',()=>{if(req.method==='GET'&&req.route?.path)reportPerformance.record(req.route.path,performance.now()-started,res.statusCode)});next()});
  app.use((req,res,next)=>{res.on('finish',()=>{try{activity.capture(req,res.statusCode,res.locals.activityStatus)}catch{console.error('Application activity could not be recorded.')}});next();});
  app.use((req,res,next)=>{res.on('finish',()=>{if(!['GET','HEAD'].includes(req.method)&&res.statusCode<400&&req.path!=='/api/node-agents/pairing/status'&&!/^\/api\/(auth|ssh|node-agent|header-notifications)(?:\/|$)/.test(req.path))readCache.clear();});next();});
 
@@ -224,7 +229,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
 
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:discoveredContainerCount(s,inventory),alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
- read('/monitoring',async req=>{const s=await sampleView(req);return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined};});
+ read('/monitoring',async req=>{const s=await sampleView(req);return {...s,...discovered(s),services:s.services.filter(x=>x.status!=='not-configured'),proxmox:undefined,docker:undefined,truenas:undefined,operations:undefined};});
 
  read('/proxmox',async req=>{if(forceRead(req))void monitor.sample(true).catch(()=>{});const config=clusterConfig();return {...await snapshot('proxmox',forceRead(req)),cluster:config.url?{name:config.name,url:config.url}:null};});
 
@@ -459,6 +464,18 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return (await db.query(`UPDATE users SET status=CASE status WHEN 'active' THEN 'inactive' ELSE 'active' END WHERE id=$1 RETURNING id,name,status`,[req.params.id])).rows[0];
  },true);
  read('/audit',async()=>({logs:(await db.query(`SELECT id::text,created_at AS time,COALESCE(user_email,'system') AS "user",action,resource,details,status,COALESCE(ip,'-') ip FROM audit_logs ORDER BY created_at DESC LIMIT 500`)).rows}),'auditor');
+ const recoveryTests=createRecoveryTests();
+ read('/recovery-tests',()=>recoveryTests.list(),'admin');
+ read('/recovery-tests/:id',req=>recoveryTests.inspect(req.params.id),'admin');
+ action('post','/recovery-tests','admin','backup.recovery-test.create',req=>recoveryTests.start(req.body,req.user.sub),true);
+ action('post','/recovery-tests/:id/isolate','admin','backup.recovery-test.isolate',req=>recoveryTests.isolate(req.params.id),true);
+ action('post','/recovery-tests/:id/boot','admin','backup.recovery-test.boot',req=>recoveryTests.boot(req.params.id),true);
+ action('post','/recovery-tests/:id/verify','admin','backup.recovery-test.verify',req=>recoveryTests.attest(req.params.id,req.body,req.user.sub),true);
+ read('/operations/performance',()=>reportPerformance.snapshot(),'admin');
+ read('/operations/health',()=>operationsView(operationalNodes()),'admin');
+ action('post','/operations/:id/network-check','owner','network.diagnose',req=>operationalAction(req.params.id,{action:'network-check'}));
+ action('post','/operations/:id/tools','owner','host.monitoring-tools.install',req=>operationalAction(req.params.id,{action:'install-tools'}),true);
+ action('post','/operations/:id/vpn','owner','vpn.configure',req=>{if(!['vpn-setup','vpn-add','vpn-remove'].includes(req.body.action))throw httpError('Unsupported VPN action');return operationalAction(req.params.id,req.body)},true);
  read('/diagnostics',req=>providerDiagnostics({hostId:typeof req.query.dockerHost==='string'?req.query.dockerHost:undefined}),'owner');
  action('post','/configuration/ai/models','owner','configuration.models',async req=>({models:await listAIModels(validateConfiguration('ai',req.body.configuration??{},configuration.resolve('ai')))}));
  read('/configuration/:service',req=>configuration.publicConfig(req.params.service),'owner');

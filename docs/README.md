@@ -16,3 +16,5 @@ Developer: **The Adekola** · Company: **ATT-Tech** · Current candidate: **3.1.
 | Commercial acceptance | [Procedure](commercial-acceptance.md), [private record template](acceptance-record.example.json), [acceptance checklist](acceptance-checklist.md) |
 | Evaluation status | [Current assessment](audits/2026-10-20-release-candidate.md) |
 | Policies and contribution | [Security](../SECURITY.md), [privacy](../PRIVACY.md), [terms](../TERMS.md), [contributing](../CONTRIBUTING.md), [notices](../THIRD_PARTY_NOTICES.md) |
+
+Operational tools: [Hardware, network diagnostics, recovery tests and WireGuard remote access](operations-and-remote-access.md).

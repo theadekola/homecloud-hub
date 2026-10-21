@@ -15,7 +15,7 @@ const percent=(value:any)=>value==null?'Unavailable':`${Math.round(Number(value)
 const sum=(rows:any[],key:string)=>rows.length&&rows.every(row=>typeof row[key]==='number')?rows.reduce((total,row)=>total+row[key],0):null;
 const tone=(status:string)=>status==='running'?'green':status==='stopped'?'red':'gray';
 
-export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:{navigation?:import('react').ReactNode;data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
+export default function LxcContainers({navigation,data,role,clusterUrl,refresh,loading=false}:{navigation?:import('react').ReactNode;data:any;loading?:boolean;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
  const [rowsPerPage,setRowsPerPage]=useState(12);
  const [params,setParams]=useSearchParams();
  const containers=data?.lxc||[],nodes=data?.nodes||[],storage=data?.storage||[],operator=['operator','admin','owner'].includes(role||'');
@@ -42,7 +42,7 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh}:
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   {created&&<Card><p>Creation queued for CT {created.vmid} on {created.node}. Check task history for completion. The container is created stopped.</p><CreationHa created={created} onUpdate={setCreated}/></Card>}
   <div className="vm-stats metric-grid">
-   <CtStat icon={Box} label="Total Containers" value={inventoryComplete(data)?containers.length:'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
+   <CtStat icon={Box} label="Total Containers" value={inventoryComplete(data)?containers.length:loading||data?.refreshing?'Loading…':'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
    <CtStat icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${containers.length} containers reporting`}/>
    <CtStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <CtStat icon={HardDrive} label="Root Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>

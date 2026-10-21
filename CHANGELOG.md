@@ -2,6 +2,12 @@
 
 Developer: **The Adekola** · Company: **ATT-Tech**.
 
+## 3.1.0-rc.3 — 21 October 2026
+
+- Show Loading… for pending summary measurements across overview, provider and report pages, while preserving measured values and honest unknown/error states after completion.
+- Separate Acknowledge and Resolve alert actions. Operators can manually resolve acknowledged alerts; history records the actor, time and manual origin.
+- Keep manual closure distinct from measured recovery, cancel unsent alert retries, and allow later observed failures to create a new alert.
+
 ## 3.1.0-rc.2 — 21 October 2026
 
 - Bound page/authentication response waits and ordinary action responses, including stalled response bodies. Long guest setup and image build/pull operations retain a separate deadline; timed-out writes are never automatically resubmitted.

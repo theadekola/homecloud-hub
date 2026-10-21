@@ -77,7 +77,7 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
    const policySince=persistence.get().connectionRecoveryNotificationsSince||new Date(startedAt).toISOString();
    const automaticRecovery=(alert,event)=>connectionRecovery(alert,event)&&Date.parse(alert.resolvedAt)>=Date.parse(policySince);
    const imageUpdate=alert=>alert?.key?.startsWith('docker-image:');
-   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>imageUpdate(alert)?event==='active'&&['active','acknowledged'].includes(alert.status)&&preferences.notifyDockerUpdates!==false:event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
+   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>alert.resolution==='manual'?false:imageUpdate(alert)?event==='active'&&['active','acknowledged'].includes(alert.status)&&preferences.notifyDockerUpdates!==false:event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
    const accepts=(channel,alert,event)=>imageUpdate(alert)||automaticRecovery(alert,event)||channelAccepts(channel,alert,event,environment());
    const queuedAlert=row=>({...alerts.find(a=>a.id===row.alertId),...row.alert});
    persistence.mutate(s=>{s.connectionRecoveryNotificationsSince??=policySince;s.notificationQueue??=[];
@@ -90,7 +90,7 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
      }
     }
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.
-    const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId));
+    const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId)&&(!alerts.some(a=>a.id===r.alertId&&a.resolution==='manual')||r.sentAt));
    });
    const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&eligible(queuedAlert(r),r.event)&&accepts(r.channel,queuedAlert(r),r.event)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
    for(const item of pending){let error=null;try{const n=notificationMessage({...queuedAlert(item),occurredAt:item.event==='resolved'?item.alert?.resolvedAt:item.alert?.triggered},item.event);if(!n.time){const date=item.text?.split('\n').at(-1);if(Number.isFinite(Date.parse(date)))n.time=new Date(date).toISOString();}await send(item.channel,messageText(n),{env:environment(),notification:n});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}

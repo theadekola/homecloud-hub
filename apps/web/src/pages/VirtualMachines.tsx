@@ -16,7 +16,7 @@ const percent=(value:any)=>value==null?'Unavailable':`${Math.round(Number(value)
 const sum=(rows:any[],key:string)=>rows.length&&rows.every(row=>typeof row[key]==='number')?rows.reduce((total,row)=>total+row[key],0):null;
 const tone=(status:string)=>status==='running'?'green':status==='stopped'?'red':'gray';
 
-export default function VirtualMachines({navigation,data,role,clusterUrl,refresh}:{navigation?:import('react').ReactNode;data:any;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
+export default function VirtualMachines({navigation,data,role,clusterUrl,refresh,loading=false}:{navigation?:import('react').ReactNode;data:any;loading?:boolean;role?:string;clusterUrl?:string;refresh:()=>Promise<void>}){
  const [rowsPerPage,setRowsPerPage]=useState(12);
  const [params,setParams]=useSearchParams();
  const vms=data?.vms||[],nodes=data?.nodes||[],storage=data?.storage||[],operator=['operator','admin','owner'].includes(role||'');
@@ -43,7 +43,7 @@ export default function VirtualMachines({navigation,data,role,clusterUrl,refresh
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   {created&&<Card><p role="status">Creation queued for VM {created.vmid} on {created.node}. Check task history for completion, then refresh and start the VM to {created.installationReady?'boot the selected ISO and install the operating system':'boot its disk. No operating system or installation media was supplied'}. The VM is created stopped. The guest agent must be installed inside the guest separately.</p><button className="btn secondary" disabled={!installationConsoleUrl(clusterUrl,{...created,id:created.vmid})} onClick={()=>openConsole({...created,id:created.vmid})}><ExternalLink size={14}/>Open installation console</button><CreationHa created={created} onUpdate={setCreated}/><p className="muted">The Proxmox console requires a separate sign-in and console permissions. After installation, eject the ISO or set disk-first boot in Proxmox.</p></Card>}
   <div className="vm-stats metric-grid">
-   <VmStat icon={Box} label="Total VMs" value={inventoryComplete(data)?vms.length:'Unknown'} detail={`${vms.filter((vm:any)=>vm.status==='running').length} running · ${vms.filter((vm:any)=>vm.status==='stopped').length} stopped`}/>
+   <VmStat icon={Box} label="Total VMs" value={inventoryComplete(data)?vms.length:loading||data?.refreshing?'Loading…':'Unknown'} detail={`${vms.filter((vm:any)=>vm.status==='running').length} running · ${vms.filter((vm:any)=>vm.status==='stopped').length} stopped`}/>
    <VmStat icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${vms.length} VMs reporting`}/>
    <VmStat icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <VmStat icon={HardDrive} label="Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>

@@ -35,22 +35,44 @@ rollback(){
  trap - ERR
  echo 'Upgrade failed; restoring the previous controller deployment.' >&2
  set +e
- if ((paused)); then docker compose stop api; fi
+ if ((paused)) && ! docker compose stop api; then
+   echo 'Rollback stopped: the API could not be paused safely. Maintenance remains enabled; inspect the recovery point.' >&2
+   exit "$result"
+ fi
  if ((snapshot)); then
-   git reset --hard "$previous"
-   cp -a "$recovery/.env" .env
-   cp -a "$recovery/docker-compose.yml" docker-compose.yml
-   cp -a "$recovery/Caddyfile" deployment/Caddyfile
-   mv runtime "runtime.failed-$stamp"
-   mkdir -m 0700 runtime
-   cp -a "$recovery/runtime/." runtime/
-   docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 120 postgres
-   docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$recovery/database.dump"
-   db_result=$?
-   docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 180
-   service_result=$?
-   if ((db_result==0 && service_result==0)); then rm -f runtime/maintenance.json; echo 'Previous controller restored. The failed upgrade remains available for inspection.' >&2; else echo 'Automatic rollback could not be verified. Maintenance remains enabled; use the recovery point.' >&2; fi
- elif ((paused)); then docker compose up -d --no-deps api; rm -f runtime/maintenance.json
+   restore_result=0
+   git reset --hard "$previous" || restore_result=1
+   cp -a "$recovery/.env" .env || restore_result=1
+   cp -a "$recovery/docker-compose.yml" docker-compose.yml || restore_result=1
+   cp -a "$recovery/Caddyfile" deployment/Caddyfile || restore_result=1
+   mv runtime "runtime.failed-$stamp" || restore_result=1
+   mkdir -m 0700 runtime || restore_result=1
+   cp -a "$recovery/runtime/." runtime/ || restore_result=1
+   db_result=1
+   service_result=1
+   if ((restore_result==0)); then
+     docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 120 postgres || restore_result=1
+   fi
+   if ((restore_result==0)); then
+     docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$recovery/database.dump"
+     db_result=$?
+   fi
+   if ((restore_result==0 && db_result==0)); then
+     docker compose -f docker-compose.yml -f "$recovery/images.json" up -d --no-build --wait --wait-timeout 180
+     service_result=$?
+   fi
+   if ((restore_result==0 && db_result==0 && service_result==0)); then rm -f runtime/maintenance.json; echo 'Previous controller restored. The failed upgrade remains available for inspection.' >&2; else
+     mkdir -p runtime
+     printf '{"operation":"software-upgrade","recoveryRequired":true}\n' > runtime/maintenance.json
+     echo 'Automatic rollback could not be verified. Maintenance remains enabled; use the recovery point.' >&2
+   fi
+ elif ((paused)); then
+   if docker compose up -d --no-deps --wait --wait-timeout 120 api; then
+     rm -f runtime/maintenance.json
+   else
+     printf '{"operation":"software-upgrade","recoveryRequired":true}\n' > runtime/maintenance.json
+     echo 'The original API could not be restarted. Maintenance remains enabled; inspect the deployment.' >&2
+   fi
  else rm -f runtime/maintenance.json
  fi
  echo "Local recovery point: $recovery" >&2

@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "scope": "dedicated-controller-pilot",
+  "installation": "",
+  "version": "3.1.0-rc.3",
+  "revision": "",
+  "reviewer": "",
+  "approved": false,
+  "reviewedAt": "",
+  "providerVersions": [],
+  "capacity": {
+    "hosts": 0,
+    "concurrentUsers": 0
+  },
+  "operations": {
+    "supportContact": "",
+    "securityContact": "",
+    "maintenanceWindow": "",
+    "backupRetention": "",
+    "keyCustodian": "",
+    "rpoMinutes": 0,
+    "rtoMinutes": 0
+  },
+  "checks": {
+    "identity": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "access": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "providers": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "backups": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "guestRestore": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "controllerRecovery": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "interruptedUpdates": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "softwareRollback": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "notifications": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "devices": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "load": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "security": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    },
+    "operations": {
+      "status": "not-verified",
+      "reviewer": "",
+      "testedAt": "",
+      "revision": "",
+      "evidence": []
+    }
+  }
+}

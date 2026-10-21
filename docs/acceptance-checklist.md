@@ -21,3 +21,5 @@ Copy this checklist into a private customer record. Do not commit customer addre
 | Operations | Named contacts, maintenance windows, incident process, agreed RPO/RTO, retention/key custody and customer terms | Not yet verified |
 
 CI exercises a separate empty-provider controller, authentication, encrypted restore and bounded concurrent read probes. It does not fill in this customer record. General-availability approval must identify who accepted the evidence and when.
+
+Use the [private record template](acceptance-record.example.json) and [commercial acceptance procedure](commercial-acceptance.md). Run `node deployment/acceptance-gate.mjs /private/path/acceptance.json` after review. The supplied template deliberately fails until every required field and evidence record is supplied. Do not treat the checker as evidence collection or certification.

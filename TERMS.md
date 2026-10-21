@@ -30,4 +30,4 @@ Use the [repository issue tracker](https://github.com/theadekola/homecloud-hub/i
 
 ## Release candidates
 
-Version 3.1.0-rc.1 is an evaluation release candidate. Paid support, hosting, response targets and recovery guarantees require a separate agreement from the actual service operator. The project does not assert a company registration status, statutory compliance certification or universal provider compatibility. Review [release policy](docs/release-policy.md) and complete [acceptance checks](docs/acceptance-checklist.md) before customer production use.
+The 3.1.0 release-candidate series is for evaluation. Publication is currently paused pending fixes and final acceptance; see the release policy for the current candidate. Paid support, hosting, response targets and recovery guarantees require a separate agreement from the actual service operator. The project does not assert a company registration status, statutory compliance certification or universal provider compatibility. Review [release policy](docs/release-policy.md) and complete [acceptance checks](docs/acceptance-checklist.md) before customer production use.

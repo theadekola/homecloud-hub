@@ -1,6 +1,6 @@
 # Current release-candidate assessment
 
-20 October 2026 · i-Clusters 3.1.0-rc.1 · Developer: The Adekola · Company: ATT-Tech.
+Baseline: 20 October 2026 · Updated 21 October 2026 · i-Clusters 3.1.0-rc.3 · Developer: The Adekola · Company: ATT-Tech.
 
 This supersedes the earlier same-day source-baseline findings where changes now exist. The release remains a controlled evaluation candidate, pending live installation acceptance and independent security review.
 
@@ -17,3 +17,7 @@ This supersedes the earlier same-day source-baseline findings where changes now 
 | No capacity baseline | Bounded CI concurrent-page read probe and acceptance template | Empty-provider CI is not fleet/load/soak certification |
 
 No production provider resources are changed by this source review. Automated results belong to the specific CI run and commit. A published prerelease is not permission to claim general commercial readiness or shared SaaS tenant isolation.
+
+## Readiness follow-up
+
+Release publication remains paused. The latest Settings corrections passed automated checks; they do not close live customer acceptance gates. The readiness follow-up adds a completeness checker for private acceptance records, a bounded authenticated read probe, and disposable Docker crash-recovery CI evidence. See [commercial acceptance](../commercial-acceptance.md). A successful record check is not an independent security review or proof that referenced evidence is authentic. Historical dated audit findings remain preserved.

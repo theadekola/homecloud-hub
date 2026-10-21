@@ -18,6 +18,11 @@ jobs:
           bash -n apps/api/src/agent-assets/install-docker-agent.sh
           python3 apps/api/test/node-agent-python.test.py
           node deployment/check-release.mjs
+          node --check deployment/check-docker-crash-recovery.mjs
+          if node deployment/acceptance-gate.mjs docs/acceptance-record.example.json > /dev/null; then
+            echo "An unreviewed acceptance template must not pass."
+            exit 1
+          fi
           bash -n install.sh
           bash -n deployment/homecloud-updater
           bash -n deployment/setup-updater.sh
@@ -56,6 +61,9 @@ jobs:
           docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/homecloud-ci-root.crt
           curl --fail --show-error --cacert /tmp/homecloud-ci-root.crt https://localhost:6002/api/health
           NODE_EXTRA_CA_CERTS=/tmp/homecloud-ci-root.crt node deployment/check-registration.mjs
+      - name: Disposable Docker worker crash recovery
+        run: |
+          ICLUSTERS_CI_DRILL=1 ICLUSTERS_DRILL_IMAGE="$(docker image inspect --format '{{.Id}}' "$(docker compose images -q api | head -1)")" node deployment/check-docker-crash-recovery.mjs
       - name: Encrypted controller recovery drill
         run: |
           sudo apt-get update -qq

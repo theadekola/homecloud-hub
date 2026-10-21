@@ -13,5 +13,6 @@ Developer: **The Adekola** · Company: **ATT-Tech** · Current candidate: **3.1.
 | Docker updates | [Image updates](docker-image-updates.md) |
 | Backups and controller restore | [Security/recovery](../deployment/SECURITY-AND-RECOVERY.md), [acceptance](acceptance-checklist.md) |
 | Operations and incidents | [Operations](operations.md), [warning recovery](monitoring-warning-recovery.md) |
+| Commercial acceptance | [Procedure](commercial-acceptance.md), [private record template](acceptance-record.example.json), [acceptance checklist](acceptance-checklist.md) |
 | Evaluation status | [Current assessment](audits/2026-10-20-release-candidate.md) |
 | Policies and contribution | [Security](../SECURITY.md), [privacy](../PRIVACY.md), [terms](../TERMS.md), [contributing](../CONTRIBUTING.md), [notices](../THIRD_PARTY_NOTICES.md) |

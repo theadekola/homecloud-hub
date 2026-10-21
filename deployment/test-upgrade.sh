@@ -16,11 +16,16 @@ case "$*" in
  *'images -q'*) echo image;;
  *'check-maintenance.mjs'*) if [[ $CASE == before-pause ]]; then exit 18; fi;;
  *pg_dump*) echo database;;
- *pg_restore*) test "$(cat)" = database;;
+ *pg_restore*) if [[ $CASE == rollback-db ]]; then exit 20; fi;test "$(cat)" = database;;
 esac
 MOCK
+cat > "$stage/bin/cp" <<'MOCK'
+#!/usr/bin/env bash
+if [[ $CASE == rollback-config && "$*" == *recovery/upgrade-*/.env* ]]; then exit 21; fi
+exec /bin/cp "$@"
+MOCK
 chmod +x "$stage/bin/"*
-for scenario in before-pause after-snapshot; do
+for scenario in before-pause after-snapshot rollback-db rollback-config; do
  project="$stage/$scenario";mkdir -p "$project/runtime" "$project/deployment"
  printf 'original-state\n' > "$project/runtime/state.json"
  touch "$project/.env" "$project/docker-compose.yml" "$project/deployment/Caddyfile"
@@ -30,14 +35,26 @@ for scenario in before-pause after-snapshot; do
  result=$?
  set -e
  test "$result" -ne 0
- test ! -e "$project/runtime/maintenance.json"
+ if [[ $scenario == rollback-* ]]; then
+   test -e "$project/runtime/maintenance.json"
+   grep -q 'recoveryRequired' "$project/runtime/maintenance.json"
+   grep -q 'Automatic rollback could not be verified' "$project/output"
+   if grep -q 'Previous controller restored' "$project/output"; then echo 'Failed rollback claimed success';exit 1;fi
+ else
+   test ! -e "$project/runtime/maintenance.json"
+ fi
  test "$(cat "$project/runtime/state.json")" = original-state
  if [[ $scenario == before-pause ]]; then
    if grep -q 'stop api' "$LOG"; then echo 'Preflight failure stopped a healthy API';exit 1;fi
  else
-   grep -q 'pg_restore' "$LOG"
+   if [[ $scenario == rollback-config ]]; then
+     if grep -q 'pg_restore' "$LOG"; then echo 'Configuration failure attempted a database restore';exit 1;fi
+   else
+     grep -q 'pg_restore' "$LOG"
+   fi
    grep -q 'git-reset' "$LOG"
-   grep -q -- '--no-build --wait' "$LOG"
+   if [[ $scenario != rollback-config ]]; then grep -q -- '--no-build --wait' "$LOG"; fi
+   if [[ $scenario == rollback-* ]] && grep -q -- '--wait-timeout 180' "$LOG"; then echo 'Failed rollback restarted API';exit 1;fi
  fi
 done
 echo 'Upgrade preflight and rollback fixture checks passed.'

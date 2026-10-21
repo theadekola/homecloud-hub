@@ -16,7 +16,7 @@ case "$*" in
  *'images -q'*) echo image;;
  *'check-maintenance.mjs'*) if [[ $CASE == before-pause ]]; then exit 18; fi;;
  *pg_dump*) if [[ $CASE == restart-api ]]; then exit 22; fi;echo database;;
- *'up -d --no-deps api'*) if [[ $CASE == restart-api ]]; then exit 23; fi;;
+ *'up -d --no-deps --wait --wait-timeout 120 api'*) if [[ $CASE == restart-api ]]; then exit 23; fi;;
  *'--wait-timeout 180'*) if [[ $CASE == rollback-service ]]; then exit 24; fi;;
  *pg_restore*) if [[ $CASE == rollback-db ]]; then exit 20; fi;test "$(cat)" = database;;
 esac

@@ -1,3 +1,4 @@
+import {requestWithDeadline,waitForRequest} from './request-deadline';
 export function setDockerHost(id:string){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent?.(new Event('homecloud-connection'));}
 import {getAccessToken,getRefreshToken,setTokens,clearTokens,usesCookieSession} from './session';
 export {getAccessToken,setTokens,clearTokens} from './session';
@@ -7,9 +8,9 @@ function refreshAccessToken(){
   if(!refreshInFlight)refreshInFlight=(async()=>{
     const refreshToken=getRefreshToken(),cookie=usesCookieSession(),access=getAccessToken();
     if(!refreshToken&&!cookie){clearTokens();return false;}
-    const response=await fetch(`${API}/api/auth/refresh`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-IClusters-Browser':'1'},body:JSON.stringify(refreshToken?{refreshToken}:{})});
+    const {response,body}=await requestWithDeadline(`${API}/api/auth/refresh`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-IClusters-Browser':'1'},body:JSON.stringify(refreshToken?{refreshToken}:{})},async response=>({response,body:await response.json().catch(()=>({}))}),30000);
     if(!response.ok){if(response.status===401&&getRefreshToken()===refreshToken&&getAccessToken()===access)clearTokens();throw Object.assign(new Error(response.status===401?'Session expired. Sign in again.':'Session refresh is temporarily unavailable.'),{status:response.status});}
-    const body=await response.json();if(getRefreshToken()!==refreshToken||cookie&&getAccessToken()!==access)return false;setTokens(body.accessToken,body.refreshToken,undefined,body.rememberUntil,body.cookieSession===true);return true;
+    if(getRefreshToken()!==refreshToken||cookie&&getAccessToken()!==access)return false;setTokens(body.accessToken,body.refreshToken,undefined,body.rememberUntil,body.cookieSession===true);return true;
   })().catch(e=>{if(e.status!==401)window.dispatchEvent?.(new CustomEvent('homecloud-session-unavailable',{detail:e.message||'Connection temporarily unavailable'}));throw e;}).finally(()=>{refreshInFlight=null;});
   return refreshInFlight;
 }
@@ -19,15 +20,17 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   const host=localStorage.getItem('homecloud_docker_host');if(host&&!Object.hasOwn(headers,'x-homecloud-docker-host')&&(/^\/(?:docker|actions\/docker)(?:\/|\?|$)|^\/(?:storage|network)(?:\?|$)/.test(path)))headers['X-HomeCloud-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
   if(confirmation) headers['X-HomeCloud-Confirm']=confirmation;
-  let res = await fetch(`${API}/api${path}`, { ...options, headers });
+  const deadline=path.startsWith('/auth/')?30000:/^\/(?:node-agents\/guest\/(?:agent|bootstrap|setup)|docker\/image\/(?:pull|build))(?:[/?]|$)/.test(path)?1020000:undefined;
+  const readResponse=async(res:Response)=>({res,body:rawResponse&&res.ok?undefined:await res.json().catch(()=>({}))});
+  let {res,body} = await requestWithDeadline(`${API}/api${path}`, { ...options, headers },readResponse,deadline,rawResponse);
 
   if(res.status===401 && (!path.startsWith('/auth/')||path==='/auth/me')){
-    if((getAccessToken()!==token&&getAccessToken())||await refreshAccessToken()){
-      headers.Authorization=`Bearer ${getAccessToken()}`;res=await fetch(`${API}/api${path}`,{...options,headers});
+    if((getAccessToken()!==token&&getAccessToken())||await waitForRequest(refreshAccessToken(),options.signal)){
+      headers.Authorization=`Bearer ${getAccessToken()}`;({res,body}=await requestWithDeadline(`${API}/api${path}`,{...options,headers},readResponse,deadline,rawResponse));
     }
   }
   if(rawResponse&&res.ok)return res as T;
-  const body = await res.json().catch(() => ({}));
+
   if (!res.ok) {
     const err:any=new Error(body.error || `Request failed: ${res.status}`);
     err.status=res.status; err.body=body; throw err;

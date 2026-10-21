@@ -59,10 +59,10 @@ test('registry failures explain their cause without leaking raw messages',async(
   const result=registryCheckFailure(error);assert.equal(result.code,code);assert.equal(result.status,'unknown');assert.ok(!JSON.stringify(result).includes('private-token'));
  }
 });
-test('transient registry errors retry once with longer paired transport deadlines; auth and rate limits do not retry',async()=>{
+test('transient registry errors retry once within bounded transport deadlines; auth and rate limits do not retry',async()=>{
  for(const status of [500,401,429]){
   const state={alerts:[]},calls=[];let failures=0;const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},sleep:async()=>{},query:async(p,init)=>{calls.push({p,init});if(p.startsWith('/images/'))return {RepoDigests:['nginx@'+old]};if(++failures===1)throw Object.assign(Error('private-token'),{dockerStatus:status});return {Descriptor:{digest:next}}}});
-  service.observe(snapshot,true);await service.settled();assert.equal(failures,status===500?2:1);assert.equal(service.status().rows[0].status,status===500?'available':'unknown');assert.equal(calls[0].init.timeoutMs,20000);assert.equal(calls[1].init.timeoutMs,45000);assert.ok(!JSON.stringify(service.status()).includes('private-token'));
+  service.observe(snapshot,true);await service.settled();assert.equal(failures,status===500?2:1);assert.equal(service.status().rows[0].status,status===500?'available':'unknown');assert.equal(calls[0].init.timeoutMs,10000);assert.equal(calls[1].init.timeoutMs,15000);assert.ok(!JSON.stringify(service.status()).includes('private-token'));
  }
 });
 test('manual checks read only the selected guest and bypass a blocked fleet scan without being overwritten',async()=>{
@@ -126,4 +126,27 @@ test('background installation failure remains available with its explanation and
  process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');const id='background-failed-attempt-12345',row={containerId:'b'.repeat(64),status:'available',imageId:img,image:'nginx:latest',remoteDigest:next};let installs=0;
  const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'owner',role:'owner'};next()},imageUpdates:{status:()=>({rows:[row]}),installed(){throw Error('Must not complete')}},imageUpdateInstaller:async()=>{installs++;throw Error('Image download timed out. The original container was not stopped.')},audit:async()=>{},monitor:{invalidate(){}}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}/api/docker/updates/${row.containerId}`,body=JSON.stringify({operationId:id,background:true}),headers={'Content-Type':'application/json'};
  try{const challenge=await fetch(base+'/install',{method:'POST',headers,body}),phrase=(await challenge.json()).confirmationPhrase;const approved={...headers,'x-homecloud-confirm':phrase};assert.equal((await fetch(base+'/install',{method:'POST',headers:approved,body})).status,200);const progress=(await (await fetch(base+'/progress?operation='+id)).json()).progress;assert.equal(progress.status,'failed');assert.ok(progress.percent<100);assert.match(progress.error,/original container was not stopped/);await fetch(base+'/install',{method:'POST',headers:approved,body});assert.equal(installs,1)}finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});
+
+test('a stalled registry cannot block the scan forever or falsely resolve an update alert',async()=>{
+ const state={alerts:[{key:'docker-image:direct:c1:'+next,status:'active'}]};let calls=0;
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},scanBudgetMs:20,query:async p=>{calls++;if(p.startsWith('/images/'))return {RepoDigests:['nginx@'+old]};return new Promise(()=>{})}});
+ service.observe(snapshot,true);await service.settled();assert.equal(service.status().checking,false);assert.equal(service.status().rows[0].status,'unknown');assert.equal(state.alerts[0].status,'active');assert.equal(calls,2);
+});
+test('rolling image workers publish fast results and start later work before a slow pair finishes',async()=>{
+ let release;const gate=new Promise(r=>release=r),state={alerts:[]},seen=[];
+ const data={host:{hostname:'engine'},containers:[1,2,3,4].map(i=>({id:'c'+i,name:'web'+i,image:'app'+i+':latest',imageId:img}))};
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},readHost:async()=>data,query:async p=>{if(p.startsWith('/images/'))return {RepoDigests:[1,2,3,4].map(i=>'app'+i+'@'+old)};seen.push(p);if(p.includes('app1'))await gate;return {Descriptor:{digest:next}}}});
+ try{service.checkHost('node:qemu/201');for(let i=0;i<50&&!seen.some(p=>p.includes('app4'));i++)await new Promise(r=>setTimeout(r,1));assert.ok(seen.some(p=>p.includes('app4')));assert.equal(service.status('node:qemu/201').rows.length,3);assert.equal(service.status('node:qemu/201').manualChecking,true);}finally{release();await service.settled()}
+});
+
+test('stalled selected-host inventory releases checking and reports a retryable inventory failure',async()=>{
+ const state={alerts:[]},service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},inventoryBudgetMs:10,readHost:()=>new Promise(()=>{})});
+ service.checkHost('node:qemu/201');await service.settled();assert.equal(service.status('node:qemu/201').manualChecking,false);assert.match(service.status('node:qemu/201').error,/timed out/);
+});
+
+test('retry prioritizes images deferred by the previous scan budget',async()=>{
+ const state={alerts:[],dockerImageUpdates:{rows:[{hostId:'direct',containerId:'c2',code:'registry-scan-deferred'}]}},seen=[];
+ const service=createDockerImageUpdates({persistence:{get:()=>state,mutate:fn=>fn(state)},query:async p=>{seen.push(p);return p.startsWith('/images/')?{RepoDigests:['nginx@'+old]}:{Descriptor:{digest:next}}}});
+ service.observe({...snapshot,docker:{...snapshot.docker,containers:[snapshot.docker.containers[0],{...snapshot.docker.containers[0],id:'c2',imageId:'second-image'}]}},true);await service.settled();assert.ok(seen[0].includes('second-image'));assert.ok(service.status().rows.every(r=>r.status==='available'));
 });

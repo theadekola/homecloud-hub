@@ -68,7 +68,7 @@ try{
   const c=await client(),controller=new AbortController();let seen;
   globalThis.fetch=async(url,options)=>{seen=options;return response(200)};
   await c.api('/storage',{headers:new Headers({'X-Test':'present'}),signal:controller.signal});
-  assert.equal(new Headers(seen.headers).get('X-Test'),'present');assert.equal(seen.signal,controller.signal);
+  assert.equal(new Headers(seen.headers).get('X-Test'),'present');assert.equal(seen.signal.aborted,false);controller.abort();assert.equal(seen.signal.aborted,false); // completed request has released its caller listener
  });
  await test('Storage and Network use the same selection while TrueNAS share reads remain separate',async()=>{
   const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];
@@ -99,5 +99,10 @@ try{
   const c=await client(),counts=[];window.dispatchEvent=e=>{if(e.type==='homecloud-network-loading')counts.push(e.detail)};let finish;
   globalThis.fetch=async url=>url.endsWith('/one')?new Promise(resolve=>finish=resolve):Promise.reject(Error('Offline'));
   const first=c.api('/one');await assert.rejects(c.api('/two'),/Offline/);finish(response(200));await first;assert.deepEqual(counts,[]);
+ });
+ await test('cancelling a report during shared token refresh ends that report without cancelling another reader',async()=>{
+  const c=await client();c.setTokens('old','refresh');let finish,ready;const started=new Promise(r=>ready=r),controller=new AbortController();
+  globalThis.fetch=async(url,options)=>{if(url.endsWith('/auth/refresh')){ready();return new Promise(r=>finish=r)}return response(new Headers(options.headers).get('Authorization')==='Bearer new'?200:401,{ok:true})};
+  const first=c.api('/storage',{signal:controller.signal}),second=c.api('/docker');await started;controller.abort();await assert.rejects(first,{name:'AbortError'});finish(response(200,{accessToken:'new',refreshToken:'rotated'}));assert.equal((await second).ok,true);
  });
 }finally{Object.assign(globalThis,original);}

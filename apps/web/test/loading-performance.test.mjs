@@ -46,3 +46,9 @@ test('a write during a pending first read immediately reloads mounted reports wi
  const first=deferred();let calls=0,signal;const page=await harness((p,o)=>{calls++;if(calls===1){signal=o.signal;return first.promise}return Promise.resolve({value:'Updated inventory'})});
  try{await page.render([['a','/storage',0],['b','/storage',0]]);await page.event('homecloud-api-write');assert.equal(signal.aborted,true);assert.equal(calls,2);assert.equal(page.container.querySelectorAll('span')[0].textContent,'Updated inventory');await act(async()=>{first.resolve({value:'Obsolete inventory'});await tick()});assert.ok(!page.container.textContent.includes('Obsolete inventory'))}finally{first.resolve({});await page.close()}
 });
+
+test('active background checks select a faster polling interval and return to the quiet interval',async()=>{
+ let calls=0;const interval=data=>data?.checking?15:30000;
+ const page=await harness(async()=>({value:'Ready',checking:++calls<3}));
+ try{await page.render([['a','/docker/updates',interval]]);await act(async()=>{await new Promise(r=>setTimeout(r,100))});assert.equal(calls,3);await act(async()=>{await new Promise(r=>setTimeout(r,50))});assert.equal(calls,3);}finally{await page.close()}
+});

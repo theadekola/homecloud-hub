@@ -289,7 +289,7 @@ test('acknowledging an alert clears its bell count immediately while keeping the
 
 test('Docker pending inventory never claims the host is disconnected and recovers after the read',async()=>{
  let release;const pending=new Promise(resolve=>release=resolve),data={host:{hostname:'test-engine',version:'28',cores:2,memoryTotal:1024**3},containers:[],images:[],volumes:[],networks:[],stacks:[]};
- const page=await mounted('pages/Docker.tsx',{},async p=>p==='/docker'?pending:p==='/auth/me'?{user:{role:'owner'}}:{hosts:[],directEnabled:true});try{assert.match(page.container.querySelector('h1').textContent,/Loading/);assert.ok(!page.container.querySelector('h1').textContent.includes('Not connected'));assert.ok(!page.container.querySelector('h1').textContent.includes('Unavailable'));await act(async()=>{release(data);await new Promise(r=>setTimeout(r,0))});assert.match(page.container.querySelector('h1').textContent,/test-engine Connected/);}finally{await page.close()}
+ const page=await mounted('pages/Docker.tsx',{},async p=>p==='/docker'?pending:p==='/auth/me'?{user:{role:'owner'}}:{hosts:[],directEnabled:true});try{assert.ok(page.container.querySelector('h1 [role=status] .report-loading-circle'));assert.ok(!page.container.querySelector('h1').textContent.includes('Not connected'));assert.ok(!page.container.querySelector('h1').textContent.includes('Unavailable'));await act(async()=>{release(data);await new Promise(r=>setTimeout(r,0))});assert.match(page.container.querySelector('h1').textContent,/test-engine Connected/);}finally{await page.close()}
 });
 
 test('Overlapping field completions serialize shared writes without losing either change',async()=>{

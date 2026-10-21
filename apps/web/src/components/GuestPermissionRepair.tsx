@@ -1,3 +1,4 @@
+import ReportLoading from './ReportLoading';
 import {useEffect,useRef,useState} from 'react';
 import {api} from '../api';
 import {Modal} from './UI';
@@ -20,7 +21,7 @@ export default function GuestPermissionRepair({onClose,onRepaired,initialVmId}:{
  <label>One-time code (if required)<input aria-label="Proxmox one-time code" value={otp} onChange={e=>setOtp(e.target.value)} onInput={e=>setOtp(e.currentTarget.value)} disabled={busy||!secure||!data.trustedTls||!!success} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}"/></label>
  <p className="cluster-wide muted">These credentials are used for this repair only and are not saved. The administrator must be allowed to manage Proxmox roles and permissions. This grants VM.GuestAgent.Unrestricted, which permits commands inside the selected guests.</p>
  <label className="cluster-wide"><span><input aria-label="Approve selected guest permissions" type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} required disabled={busy||!selected.length||!!success}/> Allow the connected user and API token to run guest-agent commands in these {selected.length} selected VMs.</span></label></>}</>}
- {error&&<p className="cluster-wide error" role="alert">{error}</p>}{!data&&!error&&<p role="status">Loading the configured Proxmox connection…</p>}{!data&&error&&<button className="btn secondary" type="button" onClick={()=>setReload(n=>n+1)}>Retry connection</button>}
+ {error&&<p className="cluster-wide error" role="alert">{error}</p>}{!data&&!error&&<p role="status"><ReportLoading/></p>}{!data&&error&&<button className="btn secondary" type="button" onClick={()=>setReload(n=>n+1)}>Retry connection</button>}
  {data&&<button className="btn primary" disabled={busy||!secure||!data.trustedTls||!selected.length||!consent||!password||!username||!!success}>{busy?'Applying and verifying…':'Apply & Verify Access'}</button>}<button className="btn secondary" type="button" disabled={busy} onClick={close}>Close</button>
  </form></Modal>;
 }

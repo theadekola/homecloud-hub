@@ -1,4 +1,4 @@
-import {reportValue} from '../report-value';
+import {reportValue} from '../components/ReportLoading';
 import PageIcon from '../components/PageIcon';
 import AlertRules from './AlertRules';
 import AlertHistory from './AlertHistory';

@@ -1,4 +1,4 @@
-import {reportValue} from '../report-value';
+import {reportValue} from './ReportLoading';
 import PageIcon, {pageIconForTitle} from './PageIcon';
 import React, { useEffect, useState, useRef, useId } from 'react';
 import { CheckCircle2, X } from 'lucide-react';

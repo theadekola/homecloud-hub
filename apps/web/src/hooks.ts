@@ -3,7 +3,7 @@ import { api } from './api';
 let interval=30000;
 export function configureRefresh(seconds:number){interval=Math.max(15,Math.min(300,seconds||30))*1000;window.dispatchEvent(new Event('homecloud-refresh'));}
 
-type Resource={path:string;scope:string;data:any;hasData:boolean;error:string;loading:boolean;updated:number;created:number;generation:number;listeners:Set<()=>void>;pending?:Promise<void>;controller?:AbortController};
+type Resource={path:string;scope:string;data:any;hasData:boolean;error:string;loading:boolean;updated:number;created:number;generation:number;listeners:Set<()=>void>;pending?:Promise<void>;manualPending?:Promise<void>;forced?:boolean;controller?:AbortController};
 const resources=new Map<string,Resource>();
 let eventWindow:Window|undefined;
 const identity=()=>{const token=window.sessionStorage.getItem('homecloud_access_token')||window.localStorage.getItem('homecloud_access_token')||'';try{const claim=JSON.parse(window.atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(typeof claim.sub==='string')return JSON.stringify([claim.sub,claim.role]);}catch{}return token};
@@ -27,9 +27,15 @@ function resource(path:string){
  return entry;
 }
 function load(entry:Resource,force=false,background=false):Promise<void>{
- if(entry.pending)return entry.pending;
+ if(entry.pending){
+  if(force&&!background&&!entry.forced){
+   if(!entry.manualPending){const ticket=entry.generation;entry.manualPending=entry.pending.then(()=>{entry.manualPending=undefined;if(ticket!==entry.generation||entry.scope!==scope()||!entry.listeners.size)return;return load(entry,true,false)});}
+   return entry.manualPending;
+  }
+  return entry.pending;
+ }
  if(!force&&entry.hasData&&Date.now()-entry.updated<10000)return Promise.resolve();
- const controller=new AbortController(),ticket=++entry.generation;let timedOut=false;const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},30000);entry.controller=controller;entry.loading=true;
+ const controller=new AbortController(),ticket=++entry.generation;let timedOut=false;const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},30000);entry.controller=controller;entry.forced=force&&!background;entry.loading=true;
  const work=(async()=>{
   try{const result=await api(entry.path,{signal:controller.signal,...(force&&!background?{headers:{'X-HomeCloud-Refresh':'1'}}:{})});if(ticket===entry.generation&&entry.scope===scope()){entry.data=result;entry.hasData=true;entry.updated=Date.now();entry.error='';}}
   catch(e:any){if(ticket===entry.generation&&(!controller.signal.aborted||timedOut)){entry.error=timedOut?'Report request timed out. Check the connection and use Refresh to retry.':e.message;entry.updated=0;if(e.status===401||e.status===403){entry.hasData=false;entry.data=undefined;}}}

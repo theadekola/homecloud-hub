@@ -1,3 +1,4 @@
+import ReportLoading from '../components/ReportLoading';
 import PageIcon from '../components/PageIcon';
 import {useEffect,useRef,useState} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
@@ -39,7 +40,7 @@ function SettingsOverview({category,change}:{category:string;change:(tab:string)
  const nav=<nav className="settings-overview-tabs" aria-label="Settings sections">{categories.map(([name,Icon])=><button type="button" key={name} className={category===name?'active':''} aria-current={category===name?'page':undefined} disabled={busy} onClick={()=>section(name)}><Icon size={16}/>{name}</button>)}</nav>;
  return <><div className="settings-overview-heading"><PageIcon name="settings" size={31}/><div><h1>{['Appearance','About'].includes(category)?category:'Settings'}</h1><p>Configure and customize your i-Clusters.</p></div><div className="settings-overview-actions"><label className="settings-search"><Search size={17}/><input aria-label="Search settings" placeholder="Search settings…" value={search} onChange={e=>setSearch(e.target.value)}/></label></div></div>{nav}
  {(error||live.error||session.error)&&<p className="error" role="alert">{error||live.error||session.error}</p>}{message&&<p role="status" className="settings-save-message"><CheckCircle size={17}/>{message}</p>}
- {live.loading&&!data&&<Card><p>Loading settings…</p></Card>}{live.error&&!data&&<button type="button" className="btn secondary" onClick={()=>live.refresh()}>Retry settings</button>}
+ {live.loading&&!data&&<Card><p><ReportLoading/></p></Card>}{live.error&&!data&&<button type="button" className="btn secondary" onClick={()=>live.refresh()}>Retry settings</button>}
  {data&&<><div className={`settings-overview-grid ${category==='System'?'system-settings-grid':category==='Security'?'security-settings-grid':category==='Appearance'?'appearance-settings-grid':category==='About'?'about-settings-grid':''}`}>
  {category==='Security'&&<SecuritySettings user={session.data?.user} search={search}/>}
  {category==='System'&&<SystemSettings data={data} busy={busy} search={search} onRefresh={()=>live.refresh()} onClear={()=>{clearApiCache();setMessage('In-memory API cache cleared. Credentials and preferences were preserved.')}} onReload={()=>{if(window.confirm('Reload the interface? Open terminal sessions may disconnect.'))window.location.reload()}}/>}

@@ -202,7 +202,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
 
    if(provider==='docker'&&selectedAgentHost())return {...await dockerSnapshot(),sampledAt:new Date().toISOString(),mode:'node-agent'};
    if(monitor.provider){const result=await monitor.provider(provider,{force});if(!result.data)throw httpError(result.service?.error||`${provider} is not configured`,result.service?.status==='error'?502:503);return {...result.data,sampledAt:result.sampledAt,mode:'live'};}
-   const s=await monitor.sample();const service=s.services.find(x=>x.provider===provider);
+   const s=await monitor.sample(force);const service=s.services.find(x=>x.provider===provider);
    if(!s[provider])throw httpError(service?.error||`${provider} is not configured`,service?.status==='error'?502:503);
    return {...s[provider],sampledAt:s.sampledAt,mode:'live'};
  };
@@ -273,8 +273,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    return {node:req.params.node,operation:req.params.operation,message:'Power command submitted to Proxmox. Watch node status for the outcome.'};
  },true);
  action('post','/proxmox/node/:node/service/:service/:operation','admin','proxmox.service',async req=>{if(!['start','stop','restart'].includes(req.params.operation))throw httpError('Unsupported service action');return {task:await pve(`/nodes/${encode(req.params.node)}/services/${encode(req.params.service)}/${req.params.operation}`,{method:'POST'})};},true);
- read('/docker',async()=>{if(selectedAgentHost()||providers.docker.configured())return snapshot('docker');const inventory=discovered(await monitor.sample());if(!inventory.resources.length&&!inventory.discoveryLimitations.length)return snapshot('docker');return {readOnly:true,discoveryLimitations:inventory.discoveryLimitations,guestReports:inventory.reports.length,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
- read('/truenas',()=>snapshot('truenas'));
+ read('/docker',async req=>{if(selectedAgentHost()||providers.docker.configured())return snapshot('docker',forceRead(req));const inventory=discovered(await sampleView(req));if(!inventory.resources.length&&!inventory.discoveryLimitations.length)return snapshot('docker',forceRead(req));return {readOnly:true,discoveryLimitations:inventory.discoveryLimitations,guestReports:inventory.reports.length,sampledAt:new Date().toISOString(),containers:inventory.resources.filter(r=>r.kind==='Docker container').map(r=>({...r,cpu:null,memory:null,ports:null})),images:[],volumes:[],networks:[],stacks:[],errors:inventory.reports.flatMap(r=>r.errors),note:'Guest API inventory is read-only. Connect a Docker Engine API to manage these containers.'};});
+ read('/truenas',req=>snapshot('truenas',forceRead(req)));
 
 
  read('/storage',async req=>{const [s,storageResult]=await Promise.all([sampleView(req),providers.proxmox.configured()?readStorage(req).then(result=>({result}),error=>({error})):null]),errors=[];let proxmox=[],proxmoxComplete=false,coverage={complete:true,expectedNodes:[],readNodes:[],missingNodes:[]};
@@ -405,7 +405,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    const {node,storage,rule}=req.body;return {node,task:await pve(`/nodes/${encode(required(node,'Node'))}/storage/${encode(required(storage,'Backup storage'))}/prunebackups?${new URLSearchParams({'prune-backups':retention(rule),...(req.body.vmid?{vmid:String(integer(req.body.vmid,'VM ID',100))}:{})})}`,{method:'DELETE'})};
  },true);
  read('/restore',async req=>{
-   const result=await providerReads([['snapshots','truenas',async()=>(await snapshot('truenas')).snapshots]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
+   const result=await providerReads([['snapshots','truenas',async()=>(await snapshot('truenas',forceRead(req))).snapshots]]);result.points=[];result.archiveInventory={configured:providers.proxmox.configured(),complete:false};
    if(providers.proxmox.configured())try{const archives=await readArchives(req);result.points=archives.points;result.archiveInventory={configured:true,...archives.coverage};result.errors.push(...archives.errors);}catch(e){result.errors.push(`proxmox: ${e.message}`);}
    return result;
  });
@@ -487,7 +487,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('put','/notifications/preferences','owner','notification.preferences',req=>{const preferences=validateNotificationPreferences(req.body);if(preferences.notifyDockerUpdates===undefined&&get().notificationPreferences?.notifyDockerUpdates!==undefined)preferences.notifyDockerUpdates=get().notificationPreferences.notifyDockerUpdates;mutate(s=>s.notificationPreferences=preferences);return preferences;});
  action('post','/notifications/test','owner','notification.test',req=>notificationService.test(required(req.body.channel,'Channel')));
  read('/security',()=>({authenticationRequired:true,roles:Object.keys(roles),twoFactor:true,accessTokenLifetime:process.env.JWT_EXPIRES_IN||'15m',refreshTokenLifetime:process.env.JWT_REFRESH_EXPIRES_IN||'7d',rememberedSessionLifetime:'10d',loginRequests:apiPolicy.loginRequests,loginWindowMs:apiPolicy.loginWindowMs,password:{minimumCharacters:12,maximumBytes:72,complexityRequired:false},sessionManagement:true,apiKeys:false,networkManagement:false}));
- read('/settings',async()=>{const snapshot=await sampleView();return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:true,notifications:'in-app and nine configurable notification delivery channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
+ read('/settings',async req=>{const snapshot=await sampleView(req);return {refreshing:!!snapshot.refreshing,system:{hostname:os.hostname(),platform:os.platform(),release:os.release(),runtime:process.version,architecture:os.arch(),operatingSystem:os.type(),serverTime:new Date().toISOString(),uptime:Math.floor(process.uptime()),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,...buildInfo},settings:get().settings,policy:apiPolicy,integrations:snapshot.services,capabilities:{twoFactor:true,notifications:'in-app and nine configurable notification delivery channels',monitoring:'API polling',truenas:'JSON-RPC API 25.04+; method compatibility depends on version'}};});
 
  action('put','/settings','admin','settings.update',async req=>{
    const settings={siteName:required(req.body.siteName,'Site name'),description:String(req.body.description||'').slice(0,500),refresh:integer(req.body.refresh,'Refresh interval',15,300)};

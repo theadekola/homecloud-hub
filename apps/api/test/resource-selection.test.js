@@ -15,8 +15,9 @@ agents.pollAgent(identity,{hosts,results:[]});
 const timer=setInterval(()=>{const pending=agents.pollAgent(identity,{hosts,results:[]}).jobs;
  if(pending.length)agents.pollAgent(identity,{hosts,results:pending.map(j=>({id:j.id,status:200,body:Buffer.from(JSON.stringify(answers[j.path]||{})).toString('base64')}))});},5);
 const sample={sampledAt:new Date().toISOString(),services:[],alerts:[],docker:{host:{hostname:'direct'},volumes:[{name:'direct-volume'}],networks:[{name:'direct-network'}]}};
+const providerForces=[],sampleForces=[];
 const app=createApp({authenticate:(req,res,next)=>{req.user={role:req.headers['x-role']||'owner'};next()},audit:async()=>{},
- monitor:{sample:async()=>sample,invalidate:async()=>{}},db:{query:async()=>({rows:[]})}});
+ monitor:{sample:async force=>{sampleForces.push(force);return sample},provider:async(provider,options)=>{providerForces.push({provider,force:options.force});return {data:provider==='docker'?{host:{hostname:'direct'},containers:[],images:[],volumes:[],networks:[]}: {info:{},pools:[],snapshots:[]},service:{status:'reachable'},sampledAt:new Date().toISOString()}},invalidate:async()=>{}},db:{query:async()=>({rows:[]})}});
 const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
 async function call(endpoint,host='',role='owner',method='GET'){
  const res=await fetch(`http://127.0.0.1:${server.address().port}/api${endpoint}`,{method,headers:{'X-HomeCloud-Docker-Host':host,'X-Role':role,'Content-Type':'application/json'},...(method==='GET'?{}:{body:'{"channel":"discord"}'})});return {status:res.status,body:await res.json()};
@@ -48,5 +49,12 @@ try{
   assert.equal((await call('/recovery-tests','','viewer')).status,403);
   assert.equal((await call('/recovery-tests','','operator','POST')).status,403);
   assert.equal((await call('/recovery-tests','','admin','POST')).status,409);
+ });
+ await test('explicit refresh reaches Docker, TrueNAS and settings provider reads',async()=>{
+  assert.equal((await call('/docker?refresh=1')).status,200);
+  assert.equal((await call('/truenas?refresh=1')).status,200);
+  assert.ok(providerForces.some(r=>r.provider==='docker'&&r.force===true));
+  assert.ok(providerForces.some(r=>r.provider==='truenas'&&r.force===true));
+  assert.equal((await call('/settings?refresh=1')).status,200);assert.ok(sampleForces.includes(true));
  });
 }finally{clearInterval(timer);agents.revokeAgent(paired.id);await new Promise(resolve=>server.close(resolve));fs.rmSync(process.env.DATA_DIR,{recursive:true,force:true});}

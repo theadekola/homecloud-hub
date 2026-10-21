@@ -52,3 +52,11 @@ test('active background checks select a faster polling interval and return to th
  const page=await harness(async()=>({value:'Ready',checking:++calls<3}));
  try{await page.render([['a','/docker/updates',interval]]);await act(async()=>{await new Promise(r=>setTimeout(r,100))});assert.equal(calls,3);await act(async()=>{await new Promise(r=>setTimeout(r,50))});assert.equal(calls,3);}finally{await page.close()}
 });
+
+test('manual refresh during a background read queues one fresh request and keeps current measurements visible',async()=>{
+ const gate=deferred(),requests=[];const page=await harness(async(p,o)=>{requests.push(o);if(requests.length===1)return {value:'Current'};if(requests.length===2)return gate.promise;return {value:'Fresh'}});
+ try{await page.render([['a','/dashboard'],['b','/dashboard']]);await page.event('homecloud-api-write');assert.match(page.container.textContent,/Current/);let work;await act(async()=>{work=page.hooks.refreshResources(['/dashboard']);await tick()});assert.equal(requests.length,2);assert.match(page.container.textContent,/Current/);await act(async()=>{gate.resolve({value:'Background'});await work;await tick()});assert.equal(requests.length,3);assert.equal(requests[2].headers['X-HomeCloud-Refresh'],'1');assert.match(page.container.textContent,/Fresh/)}finally{gate.resolve({});await page.close()}
+});
+test('queued manual refresh is discarded when its last page unmounts',async()=>{
+ const gate=deferred();let calls=0;const page=await harness(async()=>{calls++;return gate.promise});try{await page.render([['a','/dashboard']]);let work;await act(async()=>{work=page.hooks.refreshResources(['/dashboard']);await tick()});await page.render([]);await act(async()=>{gate.resolve({value:'Old'});await work;await tick()});assert.equal(calls,1)}finally{gate.resolve({});await page.close()}
+});

@@ -21,3 +21,8 @@
 .docker-install-progress p{display:flex;align-items:center;gap:8px;font-size:13px}
 .docker-install-progress.failed{border-color:#af5b62}.docker-install-progress.failed progress{accent-color:#d76b78}
 @media(prefers-reduced-motion:reduce){.docker-install-progress .spin{animation:none}.docker-install-progress progress::-webkit-progress-value{transition:none}}
+
+.docker-update-card .volume-toolbar>.docker-review-loading{display:flex;flex:0 0 100%;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;font-size:14px}
+.docker-review-loading .spin{animation:docker-review-rotate 1s linear infinite}
+@keyframes docker-review-rotate{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.docker-review-loading .spin{animation:none}}

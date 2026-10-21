@@ -1,4 +1,10 @@
 // Bound connection and response-body waits. Never retry a submitted mutation.
+export async function waitForRequest<T>(work:Promise<T>,signal?:AbortSignal|null):Promise<T>{
+ if(!signal)return work;
+ let cancel:()=>void=()=>{};
+ const aborted=new Promise<never>((_,reject)=>{cancel=()=>reject(signal.reason||new DOMException('Aborted','AbortError'));if(signal.aborted)cancel();else signal.addEventListener('abort',cancel,{once:true});});
+ try{return await Promise.race([work,aborted]);}finally{signal.removeEventListener('abort',cancel);}
+}
 export async function requestWithDeadline<T>(url:string, options:RequestInit, consume:(response:Response)=>Promise<T>, timeoutMs=options.method&&!['GET','HEAD'].includes(options.method.toUpperCase())?120000:30000, streaming=false):Promise<T>{
  const controller=new AbortController();let timedOut=false,keepCancellation=false;
  const cancel=()=>controller.abort(options.signal?.reason);

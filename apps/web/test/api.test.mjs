@@ -100,4 +100,9 @@ try{
   globalThis.fetch=async url=>url.endsWith('/one')?new Promise(resolve=>finish=resolve):Promise.reject(Error('Offline'));
   const first=c.api('/one');await assert.rejects(c.api('/two'),/Offline/);finish(response(200));await first;assert.deepEqual(counts,[]);
  });
+ await test('cancelling a report during shared token refresh ends that report without cancelling another reader',async()=>{
+  const c=await client();c.setTokens('old','refresh');let finish,ready;const started=new Promise(r=>ready=r),controller=new AbortController();
+  globalThis.fetch=async(url,options)=>{if(url.endsWith('/auth/refresh')){ready();return new Promise(r=>finish=r)}return response(new Headers(options.headers).get('Authorization')==='Bearer new'?200:401,{ok:true})};
+  const first=c.api('/storage',{signal:controller.signal}),second=c.api('/docker');await started;controller.abort();await assert.rejects(first,{name:'AbortError'});finish(response(200,{accessToken:'new',refreshToken:'rotated'}));assert.equal((await second).ok,true);
+ });
 }finally{Object.assign(globalThis,original);}

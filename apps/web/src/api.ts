@@ -1,4 +1,4 @@
-import {requestWithDeadline} from './request-deadline';
+import {requestWithDeadline,waitForRequest} from './request-deadline';
 export function setDockerHost(id:string){localStorage.setItem('homecloud_docker_host',id);window.dispatchEvent?.(new Event('homecloud-connection'));}
 import {getAccessToken,getRefreshToken,setTokens,clearTokens,usesCookieSession} from './session';
 export {getAccessToken,setTokens,clearTokens} from './session';
@@ -25,7 +25,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   let {res,body} = await requestWithDeadline(`${API}/api${path}`, { ...options, headers },readResponse,deadline,rawResponse);
 
   if(res.status===401 && (!path.startsWith('/auth/')||path==='/auth/me')){
-    if((getAccessToken()!==token&&getAccessToken())||await refreshAccessToken()){
+    if((getAccessToken()!==token&&getAccessToken())||await waitForRequest(refreshAccessToken(),options.signal)){
       headers.Authorization=`Bearer ${getAccessToken()}`;({res,body}=await requestWithDeadline(`${API}/api${path}`,{...options,headers},readResponse,deadline,rawResponse));
     }
   }

@@ -43,7 +43,7 @@ try{
  await test('operational reads and recovery writes enforce roles and action-time confirmation',async()=>{
   assert.equal((await call('/operations/health','','viewer')).status,403);
   assert.equal((await call('/operations/performance','','admin')).status,200);
-  assert.equal((await call('/operations/unknown/vpn','','admin','POST')).status,403);
+  for(const role of ['viewer','operator','admin','auditor'])assert.equal((await call('/operations/unknown/vpn','',role,'POST')).status,403);
   assert.equal((await call('/operations/unknown/tools','','owner','POST')).status,409);
   assert.equal((await call('/operations/unknown/vpn','','owner','POST')).status,409);
   assert.equal((await call('/recovery-tests','','viewer')).status,403);

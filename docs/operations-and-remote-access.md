@@ -42,3 +42,44 @@ Approval and **Revoke Access** require owner confirmation and update both the ru
 - [smartmontools smartctl manual source](https://github.com/smartmontools/smartmontools/blob/main/src/smartctl.8.in)
 
 Live hardware/UPS compatibility, VPN handshake/revocation and application recovery require acceptance on real test devices before production or commercial claims.
+
+## Optional LAN service access (connector 8)
+
+Gateway-only access remains the default. Update the selected connector to version **8**. Install Monitoring Tools also installs `nftables`; existing gateways must do this before applying a LAN policy. New gateway setup includes nftables. No LAN rules are enabled by an update alone.
+
+An owner can add **Permitted LAN services** under Remote Access. Each rule names an approved device, one RFC1918 server **/32**, TCP or UDP, one port, and the gateway's routed LAN/VLAN interface. Whole subnets, public addresses, gateway-local addresses, the tunnel subnet, unknown peers and default-route-only destinations are rejected. Known remote-device LANs are checked for overlap with the tunnel and destinations. Unknown remote networks cannot be inferred and need a device-side check. Conflicting address spaces require renumbering or a separately designed translation arrangement.
+
+Grant each Proxmox node, VM or Docker host/service individually. For example, grant TCP 8006 to one Proxmox node, TCP 443 to one VM service and a separate grant to a second VLAN's host. Published Docker host ports are usually preferable to ephemeral container addresses. Do not grant an entire management network. Discovery in i-Clusters does not itself grant VPN access. Application authentication remains required, and this does not publish the dashboard or change router forwarding.
+
+The LAN interface must have an existing explicit main-table route; the effective route for forwarded VPN traffic must select that interface. i-Clusters does not create VLANs or change LAN routers. With **routed** mode, the destination/router needs a return route for the tunnel subnet via this gateway. With **NAT**, only the approved service tuple is masqueraded; the destination sees the gateway's LAN address. Other host/Proxmox/Docker firewalls can still deny traffic. Existing policy-routing, asymmetric routing and reverse-path filters need operator review.
+
+Explicit owner confirmation replaces the complete policy. A dedicated `inet iclusters_lan` nftables table allows only device/server/service pairs and their established replies, then drops all other forwarded traffic involving `icvpn`, including peer-to-peer and IPv6 forwarding. Other tables and interfaces are not flushed. Accept rules do not bypass later host firewall chains. IPv4 forwarding is enabled only after the isolation guard is applied. A root-only policy file and a `PreUp` helper restore the guard before the managed tunnel starts after reboot. Existing WireGuard keys, peers, addresses and unrelated VPN interfaces are preserved. An existing custom PreUp hook requires manual review. The helper snapshot is refreshed on policy application; apply the retained policy after a connector update that changes routing behaviour.
+
+Client private keys remain on their devices. After adding grants, copy the **Client AllowedIPs** shown for that device into its existing WireGuard profile. Retain the gateway /32 and add the permitted server /32 addresses. WireGuard routes select destinations, while the gateway firewall enforces ports. New profiles initially have gateway-only access because a new key has no LAN grants yet. Do not create a replacement device just to change its routes.
+
+### Controlled verification
+
+Keep a local administrative session available. Record the current policy, tunnel configuration and forwarding value privately before changing them; the tunnel configuration contains a private key. Start with one device and one noncritical service. Verify:
+
+1. `sudo wg show icvpn` reports the expected public peer and a recent handshake from a real device on a different network.
+2. `sudo nft list table inet iclusters_lan` shows the exact source /32, destination /32, interface, protocol and port. Check `sysctl net.ipv4.ip_forward` and `ip -4 route get SERVER_IP` on the gateway.
+3. The device can authenticate to the permitted service. Another port, another server/VLAN, another peer and another device without the grant must fail. Test both routed and NAT return paths where used.
+4. Revoke the device, then verify both new and existing service connections stop, its live peer is absent, and it is absent from the persistent config. Reboot/restart testing belongs on a dedicated gateway during an agreed maintenance window.
+
+A fresh telemetry report, successful configuration response or WireGuard handshake alone is not proof of LAN service reachability. ICMP is not granted by this service-only policy, so ping failure is expected.
+
+### Disable, failure and rollback
+
+**Disable LAN Access** replaces grants with an empty policy while retaining the forward isolation guard and gateway access. It deliberately leaves the global forwarding sysctl unchanged because other VMs, containers or routers might use it. Reapply a previously recorded policy to roll back a service change, with owner confirmation and overlap checks. Do not flush the nftables ruleset or remove the guard while the tunnel is up.
+
+Firewall replacement is a checked nftables transaction. Failed validation leaves the previous live table; failures while persisting changes attempt to restore the prior policy and the previous forwarding value. An interrupted host/controller connection or failed rollback still requires local inspection before retrying. Peer revocation removes LAN grants first and writes peer removal to disk before removing the live peer. A live removal failure is reported and requires local verification; it is not reported as a completed revocation. Gateway-host access has the same pre-existing host firewall permissions as before.
+
+For emergency local isolation, `sudo ip link set icvpn down` stops VPN traffic. Inspect and restore the recorded policy/config locally before bringing the tunnel back up; use a maintenance window because all VPN devices are affected. Do not reset shared forwarding to zero unless you have established that no other network services depend on it.
+
+Automated tests cover validation, authorization boundaries, firewall generation, revoked-peer filtering and failed-change rollback with simulated commands. They do **not** establish Linux kernel firewall acceptance, provider compatibility, physical-device handshakes, real LAN isolation or routed/NAT connectivity. No live gateway/network access was available during this implementation. CGNAT traversal, relays, native clients and automatic endpoint discovery remain unimplemented. A publicly reachable UDP gateway or a separately reviewed relay/tunnel arrangement is still required.
+
+## Temperature visibility and TrueNAS authentication
+
+The Monitoring overview includes per-host maximum temperatures, individual readings and report freshness for administrators/owners. Missing or stale readings are not marked healthy. A reported 126 °C Dell hwmon sensor is retained as reported; verify its label, sensor support and manufacturer limits on the actual host before treating it as either genuine overheating or an unsupported/sentinel reading.
+
+TrueNAS monitoring now uses the same safe, actionable diagnostic messages as connection tests. An authentication rejection requires checking the saved API key, expiry/revocation, enabled user account and appropriate API permissions, then testing the connection and refreshing monitoring. Use the API protocol matching the installed TrueNAS version. Manually resolving an alert does not fix authentication. No credentials were changed and no live TrueNAS authentication was tested here.

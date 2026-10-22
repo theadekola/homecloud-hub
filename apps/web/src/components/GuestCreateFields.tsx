@@ -27,5 +27,5 @@ export default function GuestCreateFields({kind,node,role}:{kind:'vm'|'ct';node:
 export function CreationHa({created,onUpdate}:{created:any;onUpdate:(value:any)=>void}){
  const [busy,setBusy]=useState(false),[error,setError]=useState('');if(!created?.ha)return null;
  const complete=async()=>{setBusy(true);setError('');try{const response=await confirmedApi(`/proxmox/creation/${encodeURIComponent(created.ha.receipt)}/ha`,{method:'POST',body:'{}'});onUpdate({...created,ha:{...created.ha,...response.result}});}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- return <div><p role="status">{created.ha.message}</p>{created.ha.state==='pending'&&<button className="btn secondary" disabled={busy} onClick={complete}>{busy?'Checking creation…':'Recheck & Add to HA'}</button>}{error&&<p role="alert" className="login-error">{error}</p>}</div>;
+ return <div><p role="status">{created.ha.message}</p>{created.ha.state==='pending'&&<button className="btn secondary" aria-busy={busy} disabled={busy} onClick={complete}>{busy?'Checking creation…':'Recheck & Add to HA'}</button>}{error&&<p role="alert" className="login-error">{error}</p>}</div>;
 }

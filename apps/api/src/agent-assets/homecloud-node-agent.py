@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
-VERSION=7
+VERSION=8
 REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
 HOSTS=[]
 RESCAN=threading.Event()
@@ -245,6 +245,9 @@ def collect_operations():
   address=next((str(a['local'])+'/'+str(a['prefixlen']) for row in addresses for a in row.get('addr_info',[]) if a.get('family')=='inet'),None)
   report['vpn']={'status':'configured','address':address,'publicKey':public,'peers':[{'publicKey':line.split('\t')[0],'address':line.split('\t',1)[1],'lastHandshake':int(handshakes.get(line.split('\t')[0],0))} for line in peers[:128] if '\t' in line]}
  except Exception:pass
+ if VPN_POLICY.exists():
+  try:report['vpn']['lan']=json.loads(VPN_POLICY.read_text())
+  except Exception:report['errors'].append('LAN policy unavailable; inspect gateway')
  return report
 def operations_scan():
  global OPERATIONS
@@ -253,6 +256,90 @@ def operations_scan():
   except Exception:report={'errors':['Operational measurements unavailable.']}
   with LOCK:OPERATIONS=report
   time.sleep(60)
+# Dedicated policy never flushes or accepts traffic on unrelated host interfaces.
+VPN_POLICY=pathlib.Path('/etc/wireguard/iclusters-lan.json')
+VPN_CONFIG=pathlib.Path('/etc/wireguard/icvpn.conf')
+VPN_HELPER=pathlib.Path('/etc/wireguard/iclusters-routing.py')
+def vpn_policy(body, gateway, peers, routes):
+ rules=body.get('rules',[])
+ if body.get('authorized') is not True or not isinstance(rules,list) or len(rules)>64:raise RuntimeError('Explicit owner authorization and at most 64 service grants required')
+ if not rules:return {'authorized':True,'rules':[],'clientNetworks':[]}
+ networks=body.get('clientNetworks',[])
+ if not isinstance(networks,list) or len(networks)>32:raise RuntimeError('List known remote-device network subnets')
+ networks=[ipaddress.ip_network(n,strict=True) for n in networks]
+ if any(n.version!=4 or n.overlaps(gateway.network) for n in networks):raise RuntimeError('Remote-device network overlaps the VPN subnet')
+ if any(r.get('dev')!=VPN_INTERFACE and r.get('dst') not in (None,'default') and ipaddress.ip_network(r['dst'],strict=False).overlaps(gateway.network) for r in routes):raise RuntimeError('VPN subnet overlaps an existing LAN route')
+ validated=[]
+ for rule in rules:
+  key=rule.get('publicKey');target=ipaddress.ip_network(rule.get('destination',''),strict=True)
+  if target.version!=4 or target.prefixlen!=32 or not any(target.subnet_of(ipaddress.ip_network(n)) for n in ['10.0.0.0/8','172.16.0.0/12','192.168.0.0/16']) or target.overlaps(gateway.network):raise RuntimeError('Choose a private server /32 outside the VPN subnet')
+  if any(target.overlaps(n) for n in networks):raise RuntimeError('Server overlaps a remote-device network; renumber or use a separate design')
+  if key not in peers:raise RuntimeError('Grant requires a currently approved device')
+  protocol=rule.get('protocol');port=rule.get('port');interface=rule.get('interface')
+  if protocol not in ('tcp','udp') or type(port)!=int or not 1<=port<=65535 or not isinstance(interface,str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,15}',interface) or interface in ('lo',VPN_INTERFACE):raise RuntimeError('Choose TCP/UDP, one service port and a LAN interface')
+  matching=[r for r in routes if r.get('dst') not in (None,'default') and r.get('type','unicast')=='unicast' and target.subnet_of(ipaddress.ip_network(r['dst'],strict=False))]
+  if not matching or max(matching,key=lambda r:ipaddress.ip_network(r['dst'],strict=False).prefixlen).get('dev')!=interface:raise RuntimeError('Server requires an existing explicit LAN/VLAN route on the selected interface')
+  if type(rule.get('nat')) is not bool:raise RuntimeError('Choose routed or NAT mode explicitly')
+  validated.append(dict(publicKey=key,destination=str(target),protocol=protocol,port=port,interface=interface,nat=rule['nat']))
+ return {'authorized':True,'rules':validated,'clientNetworks':[str(n) for n in networks]}
+
+def vpn_firewall(policy, peers):
+ lines=['table inet iclusters_lan {','chain forward { type filter hook forward priority -10; policy accept;']
+ nat=[]
+ for rule in policy.get('rules',[]):
+  source=peers.get(rule['publicKey'])
+  if not source:continue # Revoked peers cannot regain access through stale policy.
+  destination=rule['destination'];protocol=rule['protocol'];port=rule['port'];interface=rule['interface']
+  if not re.fullmatch(r'[0-9.]+/32',source):raise RuntimeError('Invalid device route')
+  lines.append(f'iifname "icvpn" oifname "{interface}" ip saddr {source} ip daddr {destination} {protocol} dport {port} ct state new,established accept')
+  lines.append(f'oifname "icvpn" iifname "{interface}" ip daddr {source} ip saddr {destination} {protocol} sport {port} ct state established accept')
+  if rule['nat']:nat.append(f'oifname "{interface}" ip saddr {source} ip daddr {destination} {protocol} dport {port} masquerade')
+ lines+=['iifname "icvpn" drop','oifname "icvpn" drop','}','chain nat { type nat hook postrouting priority srcnat; policy accept;',*nat,'}','}']
+ return '\n'.join(lines)+'\n'
+
+def vpn_peers():
+ return dict(line.split('\t',1) for line in run(['wg','show',VPN_INTERFACE,'allowed-ips'],timeout=3).splitlines() if '\t' in line)
+
+def apply_vpn_firewall(policy,peers):
+ # delete + replace is one nft transaction. A syntax/kernel error leaves the old table.
+ exists=subprocess.run(['nft','list','table','inet','iclusters_lan'],capture_output=True).returncode==0
+ script=('delete table inet iclusters_lan\n' if exists else '')+vpn_firewall(policy,peers)
+ run(['nft','--check','-f','-'],timeout=5,input_data=script)
+ run(['nft','-f','-'],timeout=5,input_data=script)
+
+def vpn_lan_change(body):
+ config=VPN_CONFIG
+ original=config.read_text();match=re.search(r'^Address\s*=\s*(\S+)',original,re.M)
+ if not match:raise RuntimeError('Gateway address unavailable')
+ peers=vpn_peers();routes=command_json(['ip','-j','-4','route','show','table','main'],3)
+ policy=vpn_policy(body,ipaddress.ip_interface(match.group(1)),peers,routes)
+ # Deny local addresses even when their connected subnet has a usable route.
+ locals={a['local'] for i in command_json(['ip','-j','address'],3) for a in i.get('addr_info',[]) if a.get('family')=='inet'}
+ if any(r['destination'].split('/')[0] in locals for r in policy['rules']):raise RuntimeError('LAN rules cannot target gateway local addresses')
+ for rule in policy['rules']:
+  actual=command_json(['ip','-j','-4','route','get',rule['destination'].split('/')[0],'from',peers[rule['publicKey']].split('/')[0],'iif',VPN_INTERFACE],3)
+  if len(actual)!=1 or actual[0].get('dev')!=rule['interface'] or actual[0].get('type','unicast')!='unicast':raise RuntimeError('Effective route differs from the approved LAN interface')
+ old=json.loads(VPN_POLICY.read_text()) if VPN_POLICY.exists() else {'rules':[]}
+ if 'PreUp' in original and 'iclusters-routing.py' not in original:raise RuntimeError('Existing gateway hooks require manual review')
+ helper=VPN_HELPER
+ helper.write_text(pathlib.Path(__file__).read_text());helper.chmod(0o600)
+ # PreUp installs a deny guard before the tunnel is brought up, including after reboot.
+ hook='PreUp = /usr/bin/python3 /etc/wireguard/iclusters-routing.py --vpn-firewall\n'
+ updated=original if hook.strip() in original else original.replace('[Interface]\n','[Interface]\n'+hook,1)
+ previous_forward=run(['sysctl','-n','net.ipv4.ip_forward'],timeout=3).strip()
+ try:
+  apply_vpn_firewall(policy,peers)
+  if policy['rules']:run(['sysctl','-w','net.ipv4.ip_forward=1'],timeout=3)
+  temporary=VPN_POLICY.with_suffix('.tmp');temporary.write_text(json.dumps(policy));temporary.chmod(0o600);temporary.replace(VPN_POLICY)
+  temporary=config.with_suffix('.tmp');temporary.write_text(updated);temporary.chmod(0o600);temporary.replace(config)
+ except Exception:
+  # If rollback itself fails, retain the deny guard and report the failure for inspection.
+  apply_vpn_firewall(old,peers)
+  VPN_POLICY.write_text(json.dumps(old));VPN_POLICY.chmod(0o600)
+  if previous_forward=='0':run(['sysctl','-w','net.ipv4.ip_forward=0'],timeout=3)
+  raise
+ return {'message':'LAN service policy applied. Update AllowedIPs in existing device profiles for permitted destinations. Verify from a remote device; existing host firewalls still apply.'}
+
 def operations_job(job):
  if job.get('host')!='node':raise RuntimeError('Operational actions only run on the paired host')
  body=json.loads(base64.b64decode(job.get('body','') or 'e30='))
@@ -269,19 +356,21 @@ def operations_job(job):
    except Exception:checks.append({'name':host,'status':'failed','message':'Check host DNS, outbound HTTPS, certificate trust and registry access.'})
   result={'checks':checks,'sampledAt':time.time()}
  elif operation=='install-tools':
-  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','smartmontools','nut-client'],timeout=180)
+  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','smartmontools','nut-client','nftables'],timeout=180)
   result={'message':'Monitoring tools installed. UPS readings require an existing local NUT server; no UPS shutdown policy was changed.'}
+ elif operation=='vpn-lan':
+  result=vpn_lan_change(body)
  elif operation=='vpn-setup':
   address=ipaddress.ip_interface(body.get('address',''))
   port=body.get('port')
-  if address.version!=4 or address.network.prefixlen!=24 or not address.ip.is_private or address.ip in (address.network.network_address,address.network.broadcast_address) or type(port)!=int or not 1024<=port<=65535:raise RuntimeError('Use a private IPv4 /24 gateway address and port 1024–65535')
+  if address.version!=4 or address.network.prefixlen!=24 or not any(address.ip in ipaddress.ip_network(n) for n in ['10.0.0.0/8','172.16.0.0/12','192.168.0.0/16']) or address.ip in (address.network.network_address,address.network.broadcast_address) or type(port)!=int or not 1024<=port<=65535:raise RuntimeError('Use a private IPv4 /24 gateway address and port 1024–65535')
   directory=pathlib.Path('/etc/wireguard');config=directory/(VPN_INTERFACE+'.conf')
   if config.exists():raise RuntimeError('Managed VPN already exists; it will not be overwritten')
   interfaces=command_json(['ip','-j','address'],3)
   for interface in interfaces:
    for item in interface.get('addr_info',[]):
     if item.get('family')=='inet' and address.network.overlaps(ipaddress.ip_network(str(item['local'])+'/'+str(item['prefixlen']),strict=False)):raise RuntimeError('VPN subnet overlaps an existing host network')
-  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','wireguard-tools'],timeout=180)
+  run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','wireguard-tools','nftables'],timeout=180)
   directory.mkdir(mode=0o700,parents=True,exist_ok=True)
   key=run(['wg','genkey'],timeout=5).strip()
   fd=os.open(str(config),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
@@ -292,7 +381,7 @@ def operations_job(job):
  elif operation in ('vpn-add','vpn-remove'):
   key=body.get('publicKey','')
   if not re.fullmatch(r'[A-Za-z0-9+/]{43}=',key) or len(base64.b64decode(key))!=32:raise RuntimeError('Invalid WireGuard public key')
-  config=pathlib.Path('/etc/wireguard')/(VPN_INTERFACE+'.conf')
+  config=VPN_CONFIG
   if not config.is_file():raise RuntimeError('Set up the managed VPN gateway first')
   existing=run(['wg','show',VPN_INTERFACE,'allowed-ips'],timeout=3).splitlines()
   if operation=='vpn-add':
@@ -305,8 +394,17 @@ def operations_job(job):
    run(['wg','set',VPN_INTERFACE,'peer',key,'allowed-ips',str(address)],timeout=5)
   else:
    if not any(line.split('\t')[0]==key for line in existing):raise RuntimeError('Device peer no longer exists')
+   # Remove grants before the live peer, including existing flows.
+   if VPN_POLICY.exists():
+    policy=json.loads(VPN_POLICY.read_text());policy['rules']=[r for r in policy['rules'] if r['publicKey']!=key]
+    apply_vpn_firewall(policy,{k:v for k,v in vpn_peers().items() if k!=key})
+    VPN_POLICY.write_text(json.dumps(policy));VPN_POLICY.chmod(0o600)
+   original=config.read_text();sections=original.split('[Peer]')
+   persistent=sections[0]+''.join('[Peer]'+section for section in sections[1:] if not re.search(r'^PublicKey\s*=\s*'+re.escape(key)+r'\s*$',section,re.M))
+   temporary=config.with_suffix('.tmp');temporary.write_text(persistent);temporary.chmod(0o600);temporary.replace(config)
    run(['wg','set',VPN_INTERFACE,'peer',key,'remove'],timeout=5)
-  try:run(['wg-quick','save',VPN_INTERFACE],timeout=5)
+  try:
+   if operation=='vpn-add':run(['wg-quick','save',VPN_INTERFACE],timeout=5)
   except Exception:raise RuntimeError('Live VPN peer changed but persistence failed. Inspect the gateway configuration before restarting it.')
   result={'message':'Device approved.' if operation=='vpn-add' else 'Device access revoked.'}
  else:raise RuntimeError('Unsupported operational action')
@@ -371,7 +469,17 @@ def poll_once(config,reads,writes,completed,ready):
 
 def main():
  global CONFIG
- parser=argparse.ArgumentParser();parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--vpn-firewall',action='store_true');parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
+ if args.vpn_firewall:
+  policy=json.loads(VPN_POLICY.read_text()) if VPN_POLICY.exists() else {'rules':[]}
+  # Before interface startup, derive peers from persistent configuration.
+  content=pathlib.Path('/etc/wireguard/icvpn.conf').read_text();peers={}
+  for section in content.split('[Peer]')[1:]:
+   key=re.search(r'^PublicKey\s*=\s*(\S+)',section,re.M);address=re.search(r'^AllowedIPs\s*=\s*(\S+)',section,re.M)
+   if key and address:peers[key.group(1)]=address.group(1)
+  apply_vpn_firewall(policy,peers)
+  if policy.get('rules'):run(['sysctl','-w','net.ipv4.ip_forward=1'],timeout=3)
+  return
  if args.pair_stdin:
   args.pair=sys.stdin.readline().strip()
   if not args.pair:raise SystemExit('Pairing code is required')

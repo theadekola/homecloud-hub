@@ -66,6 +66,7 @@ export async function operationalAction(id,input){
  const node=agentNodes().find(n=>n.id===id);if(!node?.online)fail('Paired host is offline or unavailable',503);
  if(node.version<7)fail('Update this connector to version 7 for operational tools',409);
  if(updating.has(id)||[...jobs.values()].some(j=>j.agent===id&&j.operation==='operations'))fail('Another operational action or connector update is running on this host',409);
+ if(input.action==='vpn-lan'&&node.version<8)fail('Update this connector to version 8 for LAN access',409);
  const body=validateOperationalAction(input),duration=['vpn-setup','install-tools'].includes(body.action)?360000:25000;
  const result=await queueAgentRead({agent:id,id:id+':node'},{operation:'operations',path:'',method:'POST',body:Buffer.from(JSON.stringify(body)).toString('base64')},duration);
  if(result.status!==200)fail('Operational action failed',502);

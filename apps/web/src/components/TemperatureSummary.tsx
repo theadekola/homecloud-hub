@@ -1,0 +1,8 @@
+import {useApi} from '../hooks';
+import {Link} from 'react-router-dom';
+import {Card,Badge} from './UI';
+import ReportLoading from './ReportLoading';
+export default function TemperatureSummary(){
+ const live=useApi<any>('/operations/health',null,30000);
+ return <Card><h3>Hardware temperatures</h3>{live.loading&&!live.data?<ReportLoading message="Reading host temperatures…"/>:live.error?<p role="alert">Temperature measurements unavailable. {live.error}</p>:!(live.data?.nodes||[]).length?<p>No paired hosts report temperatures.</p>:(live.data.nodes||[]).map((node:any)=>{const readings=[...(node.report?.temperatures||[]),...(node.report?.disks||[])].filter((r:any)=>typeof r.celsius==='number'&&Number.isFinite(r.celsius));const peak=readings.length?Math.max(...readings.map((r:any)=>r.celsius)):null;return <div key={node.id} className="temperature-host"><strong>{node.name}</strong> <Badge tone={node.status!=='current'?'gray':peak!==null&&peak>=80?'red':'blue'}>{node.status==='current'&&peak!==null?peak+' °C maximum':node.status}</Badge><small className="muted"> {node.report?.receivedAt?new Date(node.report.receivedAt).toLocaleString():'No sample'}</small>{node.status==='current'?readings.length?<details><summary>{readings.length} sensor readings</summary>{readings.map((r:any,i:number)=><p key={i}>{r.name}: {r.celsius} °C</p>)}</details>:<p>No supported readings available.</p>:<p>Current temperature unavailable. Last readings do not establish hardware health.</p>}</div>})}<p className="muted">80 °C is a general warning threshold. Verify unusual readings and manufacturer limits.</p><Link className="btn secondary" to="/monitoring?tab=Hardware%20%26%20Diagnostics">Hardware &amp; Diagnostics</Link></Card>;
+}

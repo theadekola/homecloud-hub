@@ -256,4 +256,15 @@ class LanPolicyTests(unittest.TestCase):
   script=agent.vpn_firewall({'rules':[]},self.peers)
   self.assertIn('iifname "icvpn" drop',script);self.assertNotIn('masquerade',script)
 
+class TemperatureTests(unittest.TestCase):
+ def test_temperature_sources_preserve_126_and_fault_metadata(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);hw=root/'hwmon0';hw.mkdir();(hw/'name').write_text('dell_smm');(hw/'temp8_input').write_text('126000')
+   cpu=root/'hwmon1';cpu.mkdir();(cpu/'name').write_text('coretemp');(cpu/'temp1_input').write_text('62000');(cpu/'temp1_label').write_text('Package id 0');(cpu/'temp1_crit').write_text('100000');(cpu/'temp1_max').write_text('80000');(cpu/'temp1_fault').write_text('0')
+   rows=agent.collect_temperatures(root,root/'missing');self.assertEqual(rows[0]['celsius'],126);self.assertEqual(rows[0]['rawMilliCelsius'],126000);self.assertIsNone(rows[0]['fault']);self.assertEqual(rows[0]['label'],'');self.assertEqual(rows[0]['source'],str(hw/'temp8_input'));self.assertEqual(rows[1]['label'],'Package id 0');self.assertEqual(rows[1]['criticalCelsius'],100);self.assertFalse(rows[1]['fault'])
+ def test_failed_and_invalid_temperatures_are_not_zero_or_healthy(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);hw=root/'hwmon0';hw.mkdir();(hw/'name').write_text('fixture');(hw/'temp1_input').write_text('invalid');(hw/'temp1_fault').write_text('1');(hw/'temp2_input').write_text('500000')
+   rows=agent.collect_temperatures(root,root/'missing');self.assertIsNone(rows[0]['celsius']);self.assertTrue(rows[0]['fault']);self.assertIsNone(rows[1]['celsius'])
+
 if __name__=='__main__':unittest.main()

@@ -17,3 +17,13 @@ test('LAN grants require explicit authorization and private server service bound
  for(const change of [{authorized:false},{rules:[{...rule,destination:'0.0.0.0/0'}]},{rules:[{...rule,interface:'lo'}]},{rules:[{...rule,port:65536}]},{rules:[{...rule,protocol:'all'}]},{clientNetworks:['invalid']}])assert.throws(()=>validateOperationalAction({...body,...change}));
  assert.deepEqual(validateOperationalAction({...body,rules:[]}).rules,[]);
 });
+
+test('temperature provenance retains reported 126 and fault readings cannot resolve heat alerts',()=>{
+ const report=publicOperations({temperatures:[{name:'Dell / temp8_input',celsius:126,rawMilliCelsius:126000,source:'/sys/class/hwmon/hwmon1/temp8_input',fault:null},{name:'CPU',celsius:60,fault:true}]});
+ assert.equal(report.temperatures[0].rawMilliCelsius,126000);assert.equal(report.temperatures[0].fault,null);
+ const view={nodes:[{id:'node',name:'node',status:'current',report:{...report,disks:[],ups:[]}}]},conditions=operationalConditions(view);
+ assert.equal(conditions.length,2);assert.match(conditions[0].details,/126/);assert.match(conditions[1].title,/sensor fault/);
+ assert.equal(operationalRecovery({key:'operations:node:temperature:CPU',connectorId:'operations:node'},view),false);
+ const faultAlert={key:'operations:node:sensor-fault:CPU',connectorId:'operations:node'};
+ report.temperatures[1].fault=null;assert.equal(operationalRecovery(faultAlert,view),false);report.temperatures[1].fault=false;assert.equal(operationalRecovery(faultAlert,view),true);
+});

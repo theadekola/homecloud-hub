@@ -11,7 +11,7 @@ def update(payload,root=pathlib.Path('/'),run=subprocess.run):
     installed=ast.parse(agent.read_bytes())
     versions=[n.value.value for n in installed.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='VERSION' for t in n.targets) and isinstance(n.value,ast.Constant) and isinstance(n.value.value,int)]
     if versions and max(versions)>payload['version']: raise RuntimeError('Update i-Clusters before updating this newer connector')
-    source=base64.b64decode(payload['source'],validate=True)
+    source=payload['source'].encode('utf-8') if payload.get('sourceEncoding')=='utf8' else base64.b64decode(payload['source'],validate=True)
     if hashlib.sha256(source).hexdigest()!=payload['revision']: raise RuntimeError('Connector checksum mismatch')
     tree=ast.parse(source);compile(tree,str(agent),'exec')
     if not any(isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='VERSION' for t in n.targets) and isinstance(n.value,ast.Constant) and n.value.value==payload['version'] for n in tree.body): raise RuntimeError('Connector version mismatch')

@@ -17,7 +17,7 @@ test('real SSH echo reaches HTTP stream immediately for node VM and CT; access r
   const echo=reader.read(),start=Date.now();assert.equal((await fetch(origin+`/api/ssh/session/${id}`,{headers,method:'POST',body:JSON.stringify({input:'hello 😀\r'})})).status,200);
   let deadline;const chunk=await Promise.race([echo,new Promise((_,reject)=>deadline=setTimeout(()=>reject(Error('Echo exceeded one second')),1000))]);clearTimeout(deadline);assert.ok(Date.now()-start<1000);assert.equal(JSON.parse(new TextDecoder().decode(chunk.value)).output,'hello 😀\r');
   assert.equal((await fetch(origin+`/api/ssh/session/${id}`,{headers})).status,409);controller.abort();await reader.cancel().catch(()=>{});
-  await new Promise(r=>setTimeout(r,10));assert.equal(shellSession(id,'alice').onOutput,null);users.alice.status='inactive';assert.equal((await fetch(endpoint,{headers})).status,401);users.alice.status='active';
+  const cleanupDeadline=Date.now()+1000;while(shellSession(id,'alice').onOutput&&Date.now()<cleanupDeadline)await new Promise(r=>setTimeout(r,10));assert.equal(shellSession(id,'alice').onOutput,null);users.alice.status='inactive';assert.equal((await fetch(endpoint,{headers})).status,401);users.alice.status='active';
   shellSession(id,'alice').mode='sftp';assert.equal((await fetch(endpoint,{headers})).status,400);shellSession(id,'alice').mode='shell';closeShell(id,'alice');
  }assert.equal(writes.length,3);}finally{for(const id of sessions)try{closeShell(id,'alice')}catch{}for(const client of clients)client.end();server.closeAllConnections();await new Promise(r=>server.close(r));await new Promise(r=>ssh.close(r));fs.rmSync(process.env.DATA_DIR,{recursive:true,force:true})}
 });

@@ -17,6 +17,14 @@ async function client(){
 const response=(status,body={})=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage,sessionStorage:globalThis.sessionStorage};
 try{
+ await test('container review carries its name and host, and host changes cancel before the mutation retry',async()=>{
+  const c=await client();c.setDockerHost('original');let calls=0,detail;
+  window.dispatchEvent=e=>{if(e.type==='homecloud-ssh-approval'){detail=e.detail;c.setDockerHost('other');e.detail.resolve('grant')}};
+  globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM restart',sshTarget:'vm:node:100'})};
+  await assert.rejects(c.confirmedApi('/actions/docker/container/c/restart',{method:'POST',body:'{}'},{title:'Restart container app',description:'Restart app on engine-a'}),/host changed/);
+  assert.equal(calls,1);assert.equal(detail.title,'Restart container app');assert.equal(detail.description,'Restart app on engine-a');assert.equal(detail.dockerHost,'original');
+ });
+
  await test('monitoring tools confirmation uses the application dialog and rejects an incorrect approval',async()=>{
   const c=await client();let calls=0,detail;window.prompt=()=>{throw Error('Native prompt must not open')};
   window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){detail=e.detail;detail.resolve('wrong phrase')}};

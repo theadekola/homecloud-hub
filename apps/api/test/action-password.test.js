@@ -37,3 +37,15 @@ test('root and sudo privilege checks use fixed commands and send the fresh sudo 
 });
 
 test('saved SSH credentials cannot authorize protected actions',async()=>{const {connectSSH}=await import('../src/ssh-access.js');for(const input of [{saved:true},{useSavedPassword:true}])await assert.rejects(connectSSH({mode:'authorize',...input},'alice'),{status:403});});
+test('every protected container lifecycle action requires a challenge before Docker execution',async()=>{
+ const {createApp}=await import('../src/app.js'),app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:req.headers['x-role']||'owner'};next()},audit:async()=>{}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{for(const operation of ['stop','restart','pause','unpause','remove']){const url=`http://127.0.0.1:${server.address().port}/api/actions/docker/container/fixture/${operation}`,r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(r.status,409,operation);assert.match((await r.json()).confirmationPhrase,/CONFIRM/);const denied=await fetch(url,{method:'POST',headers:{'x-role':'viewer','Content-Type':'application/json'},body:'{}'});assert.equal(denied.status,403);}}
+ finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});
+test('container approval maps each protected action to its actual guest and cannot be reused for another action',async()=>{
+ for(const operation of ['stop','restart','pause','unpause','remove']){
+  const p=`/actions/docker/container/container-a/${operation}`,approval=await resolveActionApproval(p,{},'POST',{...context,dockerHost:'a:qemu/101'});
+  assert.equal(approval.target,'vm:pve:101');assert.equal(approval.scope,'vm:pve:101|docker:a:qemu/101');
+  const token=issueGrant('alice','POST',p,{},approval.scope);assert.equal(consumeGrant(token,'alice','POST','/actions/docker/container/other/stop',{},approval.scope),false);assert.equal(consumeGrant(token,'alice','POST',p,{},approval.scope),false);
+ }
+});

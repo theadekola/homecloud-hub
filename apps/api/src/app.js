@@ -323,7 +323,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
    }
    if(provider==='docker'&&resourceType==='container')return dockerAction(resourceId,operation,body);
    throw httpError('Unsupported provider/resource');
- },req=>{if(req.params.provider==='docker'&&req.params.resourceType==='container'&&req.params.action==='remove'&&!['admin','owner'].includes(req.user.role))throw httpError('Container removal requires admin access',403);return ['stop','shutdown','reboot','reset','suspend','delete','delete-snapshot','remove','kill'].includes(req.params.action);});
+ },req=>{if(req.params.provider==='docker'&&req.params.resourceType==='container'&&req.params.action==='remove'&&!['admin','owner'].includes(req.user.role))throw httpError('Container removal requires admin access',403);return (req.params.provider==='docker'&&req.params.resourceType==='container'&&['stop','restart','pause','unpause','remove'].includes(req.params.action))||['stop','shutdown','reboot','reset','suspend','delete','delete-snapshot','remove','kill'].includes(req.params.action);});
  read('/proxmox/create-options/:node',req=>creationOptions(req.params.node,pve),'operator');
  action('post','/proxmox/creation/:receipt/ha','admin','proxmox.creation.ha',req=>completeCreationHa(req.params.receipt,req.user.sub,pve),true);
  read('/proxmox/ct-templates/:node',req=>proxmoxCtTemplates(req.params.node),'operator');

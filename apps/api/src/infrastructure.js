@@ -1,3 +1,4 @@
+import {truenasTestError} from './truenas-test-error.js';
 import {storageAppliesToNode} from './storage-scope.js';
 import {runtimeEnvironment} from './runtime-configuration.js';
 import {validateBackupSelection} from './backup-validation.js';
@@ -148,7 +149,7 @@ async function truenasCall(method,params=[],env=runtimeEnvironment(),options={})
 }
 export async function truenasSnapshot(){
   const info=await truenas('system.info');const errors=[];
-  const query=async(method,params=[])=>{try{return await truenas(method,params);}catch(e){errors.push(`${method}: ${e.message}`);return [];}};
+  const query=async(method,params=[])=>{try{return await truenas(method,params);}catch(e){errors.push(`${method}: ${truenasTestError(e)}`);return [];}};
   const [pools,datasets,snapshots,disks,alerts,jobs,schedules]=await Promise.all([
     query('pool.query'),query('pool.dataset.query',[[],{extra:{flat:true}}]),query('pool.snapshot.query',[[],{limit:1000}]),query('disk.query'),query('alert.list'),query('core.get_jobs',[[],{limit:100}]),query('pool.snapshottask.query')]);
   const number=v=>{if(v==null)return null;const n=Number(v?.parsed??v?.rawvalue??v?.value??v);return Number.isFinite(n)?n:null;};

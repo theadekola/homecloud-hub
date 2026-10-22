@@ -9,3 +9,11 @@ test('response-time summaries are bounded, route-only, and expire old samples',(
 test('missing measurements never resolve an existing hardware alert',()=>{const alert={key:'operations:node:disk:/dev/sda',connectorId:'operations:node'},view={nodes:[{id:'node',status:'current',report:{disks:[],temperatures:[],ups:[]}}]};assert.equal(operationalRecovery(alert,view),false);view.nodes[0].report.disks=[{name:'/dev/sda',healthy:null}];assert.equal(operationalRecovery(alert,view),false);view.nodes[0].report.disks[0].healthy=true;assert.equal(operationalRecovery(alert,view),true);view.nodes[0].status='stale';assert.equal(operationalRecovery(alert,view),false)});
 
 test('repeated heartbeats do not make a frozen operational sample fresh',()=>{const input={sampledAt:123},first=publicOperations(input,1000);const repeat=publicOperations(input,200000,first);assert.equal(repeat.receivedAt,1000);assert.equal(operationsView([{online:true,version:7,operations:repeat}],200000).nodes[0].status,'stale')});
+
+test('LAN grants require explicit authorization and private server service boundaries',()=>{
+ const rule={publicKey:'A'.repeat(43)+'=',destination:'192.168.20.10/32',protocol:'tcp',port:8006,interface:'vmbr0',nat:false};
+ const body={action:'vpn-lan',authorized:true,rules:[rule],clientNetworks:['192.168.1.0/24']};
+ assert.deepEqual(validateOperationalAction(body),body);
+ for(const change of [{authorized:false},{rules:[{...rule,destination:'0.0.0.0/0'}]},{rules:[{...rule,interface:'lo'}]},{rules:[{...rule,port:65536}]},{rules:[{...rule,protocol:'all'}]},{clientNetworks:['invalid']}])assert.throws(()=>validateOperationalAction({...body,...change}));
+ assert.deepEqual(validateOperationalAction({...body,rules:[]}).rules,[]);
+});

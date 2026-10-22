@@ -17,6 +17,14 @@ async function client(){
 const response=(status,body={})=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:globalThis.localStorage,sessionStorage:globalThis.sessionStorage};
 try{
+ await test('monitoring tools confirmation uses the application dialog and rejects an incorrect approval',async()=>{
+  const c=await client();let calls=0,detail;window.prompt=()=>{throw Error('Native prompt must not open')};
+  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){detail=e.detail;detail.resolve('wrong phrase')}};
+  globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM HOST.MONITORING-TOOLS.INSTALL host nonce',approvalDescription:'Install tools'})};
+  await assert.rejects(c.confirmedApi('/operations/host/tools',{method:'POST',body:'{"action":"install-tools"}'}),/cancelled/);
+  assert.equal(calls,1);assert.equal(detail.path,'/operations/host/tools');assert.equal(detail.description,'Install tools');assert.match(detail.phrase,/HOST.MONITORING-TOOLS.INSTALL/);
+ });
+
  await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
   const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-api-write')return;assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
  });
@@ -53,7 +61,7 @@ try{
  await test('confirmation retries stay on the original Docker host even when selection changes',async()=>{
   const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];
   globalThis.fetch=async(url,options)=>{calls.push(new Headers(options.headers));return calls.length===1?response(409,{confirmationPhrase:'CONFIRM host-a'}):response(200,{ok:true});};
-  window.prompt=()=>{c.setDockerHost('node-b:lxc/101');return 'CONFIRM host-a'};
+  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM host-a')}};
   await c.confirmedApi('/docker/volume/data',{method:'DELETE'});
   assert.equal(calls[0].get('X-HomeCloud-Docker-Host'),'node-a:lxc/101');assert.equal(calls[1].get('X-HomeCloud-Docker-Host'),'node-a:lxc/101');
   assert.equal(calls[1].get('X-HomeCloud-Confirm'),'CONFIRM host-a');
@@ -61,7 +69,7 @@ try{
  await test('direct Engine confirmation does not switch to a subsequently selected agent',async()=>{
   const c=await client();const calls=[];
   globalThis.fetch=async(url,options)=>{calls.push(new Headers(options.headers));return calls.length===1?response(409,{confirmationPhrase:'CONFIRM direct'}):response(200);};
-  window.prompt=()=>{c.setDockerHost('node-b:lxc/101');return 'CONFIRM direct'};
+  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM direct')}};
   await c.confirmedApi('/docker/prune/volumes',{method:'POST'});assert.equal(calls[1].get('X-HomeCloud-Docker-Host'),'');
  });
  await test('request headers and cancellation signals reach fetch',async()=>{
@@ -77,7 +85,7 @@ try{
   assert.equal(calls[0][1],'node-a:lxc/101');assert.equal(calls[1][1],'node-a:lxc/101');assert.equal(calls[2][1],null);
  });
  await test('cancelled confirmation never submits the destructive retry',async()=>{
-  const c=await client();let calls=0;globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
+  const c=await client();let calls=0;window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation')e.detail.reject(Error('Confirmation cancelled'))};globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
   await assert.rejects(c.confirmedApi('/docker/volume/data',{method:'DELETE'}),/cancelled/);assert.equal(calls,1);
  });
  await test('temporary account-service failures retain both access and refresh tokens',async()=>{

@@ -16,6 +16,16 @@ class Maintenance(unittest.TestCase):
   with patch.object(m.os,'geteuid',return_value=0),patch.object(m.time,'sleep'):result=m.update(payload,root,run)
   self.assertTrue(result['installed']);self.assertEqual(agent.read_text(),'VERSION=5\n');self.assertEqual(config.read_bytes(),before);self.assertEqual(config.stat().st_mode&0o777,0o600)
   self.assertTrue(all(c[0]=='systemctl' and c[-1]=='homecloud-node-agent.service' for c in calls));backup=root/result['backup'];self.assertEqual((backup/'config.json').stat().st_mode&0o777,0o600);self.assertEqual(backup.stat().st_mode&0o777,0o700)
+ def test_utf8_source_checks_checksum_before_installing(self):
+  for tamper in [False,True]:
+   root,config,agent,calls,run,payload=self.fixture();payload['sourceEncoding']='utf8';payload['source']='VERSION=5\n';before=config.read_bytes()
+   if tamper:payload['source']+='tampered=True\n'
+   with patch.object(m.os,'geteuid',return_value=0),patch.object(m.time,'sleep'):
+    if tamper:
+     with self.assertRaisesRegex(RuntimeError,'checksum'):m.update(payload,root,run)
+     self.assertEqual(calls,[]);self.assertEqual(agent.read_text(),'VERSION=4\n')
+    else:self.assertTrue(m.update(payload,root,run)['installed']);self.assertEqual(agent.read_text(),'VERSION=5\n')
+   self.assertEqual(config.read_bytes(),before)
  def test_wrong_pair_and_checksum_never_restart(self):
   for change in [{'id':'other'},{'tokenHash':'0'*64},{'revision':'0'*64},{'version':6}]:
    root,config,agent,calls,run,payload=self.fixture();payload.update(change)

@@ -25,4 +25,8 @@ try{
   assert.match(empty,/Unavailable/);assert.match(empty,/No supported temperature measurements/);assert.doesNotMatch(empty,/0 °C maximum/);
   const failed=render({error:'Connection unavailable'});assert.match(failed,/role="alert"/);assert.match(failed,/Temperature measurements unavailable/);
  });
+ test('CPU maximum stays distinct from an unlabelled 126 degree Dell reading and explicit faults',()=>{
+  const html=render({data:{nodes:[{id:'one',name:'node01',status:'current',report:{temperatures:[{name:'dell_smm / temp8_input',driver:'dell_smm',celsius:126,rawMilliCelsius:126000,source:'/sys/class/hwmon/hwmon1/temp8_input'},{name:'coretemp / Package id 0',driver:'coretemp',celsius:62},{name:'Faulty',celsius:180,fault:true}]}}]}});
+  assert.match(html,/126 °C maximum/);assert.match(html,/CPU package\/core maximum: 62 °C/);assert.match(html,/126000 millidegrees Celsius/);assert.match(html,/Unlabelled sensor/);assert.match(html,/Fault reported; excluded/);assert.doesNotMatch(html,/180 °C maximum/);
+ });
 }finally{delete globalThis.__temperatureFixture;fs.rmSync(directory,{recursive:true,force:true})}

@@ -17,6 +17,17 @@ class Services(unittest.TestCase):
   for change in ({'id':'wrong'},{'tokenHash':'bad'},{'target':'node; reboot'},{'action':'arbitrary'},{'action':'connector-start','target':'qemu/100'}):
    with self.assertRaises(RuntimeError):m.diagnose({**p,**change},root,lambda *a,**k:calls.append(a))
   self.assertEqual(calls,[])
+ def test_monitoring_install_requires_exact_pairing_host_and_verifies_packages(self):
+  root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
+  def run(args,**kw):
+   calls.append((args,kw))
+   return ''.join(package+' install ok installed\n' for package in ('smartmontools','nut-client','nftables')) if args[0]=='dpkg-query' else ''
+  result=m.diagnose({**p,'action':'monitoring-tools'},root,run)
+  self.assertTrue(result['installed']);self.assertEqual(len(calls),3);self.assertEqual(calls[0][0],['apt-get','update']);self.assertEqual(calls[1][0],['apt-get','install','-y','smartmontools','nut-client','nftables']);self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes());self.assertNotIn('restart',str(calls))
+  calls.clear()
+  with self.assertRaises(RuntimeError):m.diagnose({**p,'action':'monitoring-tools','target':'qemu/100'},root,run)
+  self.assertEqual(calls,[])
+  with self.assertRaisesRegex(RuntimeError,'could not be verified'):m.diagnose({**p,'action':'monitoring-tools'},root,lambda *a,**kw:'')
  def test_connector_check_is_read_only_and_redacts_logs(self):
   root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
   def run(args,**kw):

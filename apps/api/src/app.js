@@ -475,7 +475,7 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  read('/operations/performance',()=>reportPerformance.snapshot(),'admin');
  read('/operations/health',()=>operationsView(operationalNodes()),'admin');
  action('post','/operations/:id/network-check','owner','network.diagnose',req=>operationalAction(req.params.id,{action:'network-check'}));
- action('post','/operations/:id/tools','owner','host.monitoring-tools.install',req=>operationalAction(req.params.id,{action:'install-tools'}),true);
+ action('post','/operations/:id/tools','owner','host.monitoring-tools.install',req=>connectionService.perform(req.params.id,{...req.body,action:'monitoring-tools',target:'node'}));
  action('post','/operations/:id/vpn','owner','vpn.configure',req=>{if(!['vpn-setup','vpn-add','vpn-remove','vpn-lan'].includes(req.body.action))throw httpError('Unsupported VPN action');return operationalAction(req.params.id,req.body)},true);
  read('/diagnostics',req=>providerDiagnostics({hostId:typeof req.query.dockerHost==='string'?req.query.dockerHost:undefined}),'owner');
  action('post','/configuration/ai/models','owner','configuration.models',async req=>({models:await listAIModels(validateConfiguration('ai',req.body.configuration??{},configuration.resolve('ai')))}));

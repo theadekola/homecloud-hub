@@ -39,12 +39,13 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   return body;
 }
 
-export async function confirmedApi<T=any>(path:string, options:RequestInit={}):Promise<T>{
+export async function confirmedApi<T=any>(path:string, options:RequestInit={},review?:{title?:string;description?:string}):Promise<T>{
  const host=localStorage.getItem('homecloud_docker_host')||'';let confirmation:string|undefined,grant='';
  for(let attempt=0;attempt<4;attempt++){
+  if(review&&host!==(localStorage.getItem('homecloud_docker_host')||''))throw new Error('Docker host changed. Action cancelled.');
   try{return await api<T>(path,{...options,headers:{...Object.fromEntries(new Headers(options.headers).entries()),'X-HomeCloud-Docker-Host':host,...(grant?{'X-HomeCloud-SSH-Grant':grant}:{})}},confirmation)}catch(e:any){
-   if(e.status===409&&e.body?.confirmationPhrase){const phrase=e.body.confirmationPhrase;if(e.body.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,description:e.body.approvalDescription,path,dockerHost:host,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));confirmation=phrase;continue;}const entered=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-action-confirmation',{detail:{phrase,path,description:e.body.approvalDescription,resolve,reject}})));if(entered!==phrase)throw new Error('Confirmation cancelled');confirmation=phrase;continue;}
-   if(e.status===428&&e.body?.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,description:e.body.approvalDescription,path,dockerHost:host,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));continue;}
+   if(e.status===409&&e.body?.confirmationPhrase){const phrase=e.body.confirmationPhrase;if(e.body.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,title:review?.title,description:review?.description||e.body.approvalDescription,path,dockerHost:host,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));confirmation=phrase;continue;}const entered=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-action-confirmation',{detail:{phrase,path,title:review?.title,description:review?.description||e.body.approvalDescription,resolve,reject}})));if(entered!==phrase)throw new Error('Confirmation cancelled');confirmation=phrase;continue;}
+   if(e.status===428&&e.body?.sshTarget){grant=await new Promise<string>((resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{target:e.body.sshTarget,title:review?.title,description:review?.description||e.body.approvalDescription,path,dockerHost:host,method:options.method||'POST',body:JSON.parse(String(options.body||'{}')),resolve,reject}})));continue;}
    throw e;
   }
  }

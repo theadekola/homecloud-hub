@@ -1,3 +1,4 @@
+import ContainerSSHApproval from './ContainerSSHApproval';
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {api} from '../api';
 import {Modal,ConnectionSuccess} from './UI';
@@ -11,7 +12,7 @@ export function SSHApproval(){
   const receive=(e:any)=>{pending.push(e.detail);void next();};window.addEventListener('homecloud-ssh-approval',receive);
   return()=>{stopped=true;window.removeEventListener('homecloud-ssh-approval',receive);active?.cancel?.();active?.reject(new Error('Authentication cancelled'));for(const item of pending)item.reject(new Error('Authentication cancelled'));};
  },[]);
- return <Modal open={!!request} title={`Authenticate ${request?.target||''}`} onClose={()=>complete.current(undefined,request?.serial)}>{request?.loading?<p role="status">Preparing host authentication… Loading saved connection details. You can close this prompt to cancel.</p>:request&&<SSHLogin key={request.serial} target={request.target} action={request} connection={request.connection} onConnected={r=>complete.current(r.token,request.serial)}/>}</Modal>;
+ return <Modal open={!!request} title={request?.title||`Authenticate ${request?.target||''}`}  onClose={()=>complete.current(undefined,request?.serial)}>{request?.loading?<p role="status">Preparing host authentication… Loading saved connection details. You can close this prompt to cancel.</p>:request&&(/^\/actions\/docker\/container\/[^/]+\/(?:stop|restart|pause|unpause|remove)$/.test(request.path)?<ContainerSSHApproval key={request.serial} request={request} connection={request.connection} onApproved={token=>complete.current(token,request.serial)} onCancel={()=>complete.current(undefined,request.serial)}/>:<SSHLogin key={request.serial} target={request.target} action={request} connection={request.connection} onConnected={r=>complete.current(r.token,request.serial)}/>)}</Modal>;
 }
 export function SSHLogin({target,host='',action,connection,editing=false,mode='shell',onConnected}:{target:string;host?:string;action?:any;connection?:any;editing?:boolean;mode?:'shell'|'sftp';onConnected:(r:any)=>void}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[fingerprint,setFingerprint]=useState(''),[showPassword,setShowPassword]=useState(false),[connected,setConnected]=useState<any>(null);const pendingConnection=useRef<any>(null),mounted=useRef(true);

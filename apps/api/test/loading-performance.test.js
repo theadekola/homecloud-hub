@@ -56,3 +56,14 @@ test('cached summary routes still authenticate every request and isolate actors,
  const read=async(path='/docker',headers={})=>{const res=await fetch(`http://127.0.0.1:${server.address().port}/api${path}`,{headers});return {status:res.status,body:await res.json()}};
  try{const [a,b]=await Promise.all([read(),read()]);assert.equal(a.status,200);assert.deepEqual(a,b);const baseline=reads;await read('/docker',{'X-HomeCloud-Refresh':'1'});assert.ok(reads>baseline);const refreshed=reads;await read('/docker',{'x-actor':'b'});assert.ok(reads>refreshed);const actor=reads;await read('/docker',{'x-role':'owner'});assert.ok(reads>actor);const role=reads;await read('/docker?scope=other');assert.ok(reads>role);const before=reads;assert.equal((await read('/docker',{'x-deny':'1'})).status,401);assert.equal(reads,before);}finally{providers.docker.configured=configured;server.closeAllConnections();await new Promise(r=>server.close(r))}
 });
+test('slow fleet refresh preserves dated service observations without fabricating recovery',async()=>{
+ const gate=deferred(),state=memory();let slow=false;
+ const host={id:'a:node',node:'node01',name:'Engine',status:'reachable',sampledAt:new Date().toISOString(),inventory:{host:{hostname:'host'},containers:[]}};
+ const monitor=createMonitor({},state,async()=>[],async()=>slow?gate.promise:{hosts:[host]});
+ await monitor.sample(true);slow=true;const updating=monitor.sample(true);await tick();
+ try{const partial=await monitor.sample();const service=partial.services.find(s=>s.id==='docker:a:node');assert.equal(service.status,'reachable');assert.equal(service.refreshing,true);assert.equal(service.sampledAt,host.sampledAt);assert.equal(partial.services.some(s=>s.id==='docker-fleet'),false);assert.equal(state.get().metrics.length,1);}finally{gate.resolve({hosts:[{...host,status:'error',error:'offline',inventory:undefined}]});await updating;}
+ const failed=await monitor.sample();assert.equal(failed.services.find(s=>s.id==='docker:a:node').status,'error');assert.equal(failed.services.find(s=>s.id==='docker:a:node').refreshing,undefined);
+});
+test('expired service observations do not count as reachable during a refresh',async()=>{
+ const {progressServices}=await import('../src/monitor.js');const pending=[{id:'docker-fleet',status:'pending'}];assert.deepEqual(progressServices(pending,[{id:'docker:a',status:'reachable'}],'2026-01-01T00:00:00Z',Date.parse('2026-01-01T00:04:00Z')),pending);
+});

@@ -1,3 +1,4 @@
+import {readTrueNASBatch} from './truenas-session.js';
 import {truenasTestError} from './truenas-test-error.js';
 import {storageAppliesToNode} from './storage-scope.js';
 import {runtimeEnvironment} from './runtime-configuration.js';
@@ -148,10 +149,12 @@ async function truenasCall(method,params=[],env=runtimeEnvironment(),options={})
   });
 }
 export async function truenasSnapshot(){
-  const info=await truenas('system.info');const errors=[];
-  const query=async(method,params=[])=>{try{return await truenas(method,params);}catch(e){errors.push(`${method}: ${truenasTestError(e)}`);return [];}};
-  const [pools,datasets,snapshots,disks,alerts,jobs,schedules]=await Promise.all([
-    query('pool.query'),query('pool.dataset.query',[[],{extra:{flat:true}}]),query('pool.snapshot.query',[[],{limit:1000}]),query('disk.query'),query('alert.list'),query('core.get_jobs',[[],{limit:100}]),query('pool.snapshottask.query')]);
+  const env=runtimeEnvironment();if(!truenasConfigured(env))throw httpError('TrueNAS is not configured',503);
+  const calls=[['system.info'],['pool.query'],['pool.dataset.query',[[],{extra:{flat:true}}]],['pool.snapshot.query',[[],{limit:1000}]],['disk.query'],['alert.list'],['core.get_jobs',[[],{limit:100}]],['pool.snapshottask.query']];
+  const results=await readTrueNASBatch(calls,env);
+  if(results[0].error)throw results[0].error;
+  const info=results[0].value,errors=[];
+  const [pools,datasets,snapshots,disks,alerts,jobs,schedules]=results.slice(1).map((result,index)=>{if(result.error){errors.push(`${calls[index+1][0]}: ${truenasTestError(result.error)}`);return [];}if(!Array.isArray(result.value)){errors.push(`${calls[index+1][0]}: Invalid TrueNAS inventory response`);return [];}return result.value;});
   const number=v=>{if(v==null)return null;const n=Number(v?.parsed??v?.rawvalue??v?.value??v);return Number.isFinite(n)?n:null;};
   return {info,pools:pools.map(p=>{const root=datasets.find(d=>d.name===p.name);const used=number(root?.used),available=number(root?.available);return {id:String(p.id),provider:'truenas',name:p.name,type:'ZFS',status:p.status,used,available,capacity:used==null||available==null?null:used+available,usage:used==null||available==null?null:Math.round(used/(used+available)*100)};}),
     datasets:datasets.map(d=>({id:d.id,name:d.name,type:d.type,used:number(d.used),available:number(d.available),mountpoint:d.mountpoint?.value??null})),

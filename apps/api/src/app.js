@@ -1,3 +1,4 @@
+import {dashboardHistory} from './dashboard-history.js';
 import {createReportPerformance} from './report-performance.js';
 import {createRecoveryTests} from './recovery-tests.js';
 import {operationsView} from './operations-health.js';
@@ -225,7 +226,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  };
  read('/discovery',async()=>discovered(await monitor.sample()));
  read('/dashboard',async req=>{
-   const s=await sampleView(req),inventory=discovered(s);return {sampledAt:s.sampledAt,refreshing:!!s.refreshing,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:s.metrics,alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
+   const s=await sampleView(req),inventory=discovered(s);return {sampledAt:s.sampledAt,refreshing:!!s.refreshing,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:dashboardHistory(s.metrics),alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
 
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:discoveredContainerCount(s,inventory),alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });

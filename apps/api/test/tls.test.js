@@ -1,3 +1,4 @@
+import {readTrueNASBatch} from '../src/truenas-session.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -55,6 +56,12 @@ await test('TLS connectors authenticate, surface provider errors and support bot
     assert.equal(seen.filter(r=>r.method==='auth.login_with_api_key').length,before,'No API key is sent before certificate identity is verified');
    }finally{apiServer.closeAllConnections();await new Promise(r=>apiServer.close(r));}
    const result=await truenas('pool.snapshot.query');assert.equal(result[0].id,'pool/data@snapshot');assert.ok(seen.some(r=>r.method==='zfs.snapshot.query'));
+   const batchLogins=seen.filter(r=>r.method==='auth.login_with_api_key').length;
+   const batch=await readTrueNASBatch([['system.info'],['pool.snapshot.query'],['disk.query']],{TRUENAS_URL:base,TRUENAS_API_KEY:'test-key',TRUENAS_TLS_CA:cert});
+   assert.equal(batch[0].value.hostname,'fixture-nas');assert.ok(batch.every(r=>!r.error));assert.equal(seen.filter(r=>r.method==='auth.login_with_api_key').length,batchLogins+1);
+   const beforeUntrustedBatch=seen.filter(r=>r.method==='auth.login_with_api_key').length;
+   await assert.rejects(readTrueNASBatch([['system.info']],{TRUENAS_URL:base,TRUENAS_API_KEY:'test-key'}),/self-signed certificate/);
+   assert.equal(seen.filter(r=>r.method==='auth.login_with_api_key').length,beforeUntrustedBatch);
    process.env.TRUENAS_API_MODE='legacy';const legacy=await truenas('pool.snapshot.query');assert.equal(legacy[0].id,'pool/data@snapshot');delete process.env.TRUENAS_API_MODE;
    rejected=true;await assert.rejects(truenas('pool.dataset.query'),/authentication rejected/);rejected=false;
    // Certificate failure must be visible; no global TLS bypass is allowed.

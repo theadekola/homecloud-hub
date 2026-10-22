@@ -14,6 +14,15 @@ export const providers={
   proxmox:{configured:proxmoxConfigured,read:proxmoxSnapshot},docker:{configured:dockerConfigured,read:dockerSnapshot},
   truenas:{configured:truenasConfigured,read:truenasSnapshot}
 };
+// Retain recent, explicitly dated observations while replacements are still pending.
+export function progressServices(services,previous=[],sampledAt,now=Date.now()){
+ const recent=row=>{const at=row.sampledAt||sampledAt;return Number.isFinite(Date.parse(at))&&now-Date.parse(at)<=180000?{...row,refreshing:true,sampledAt:at}:null};
+ return services.flatMap(service=>{
+  if(service.status!=='pending')return [service];
+  const candidates=service.id==='docker-fleet'?previous.filter(row=>String(row.id).startsWith('docker:')):previous.filter(row=>row.id===service.id);
+  const kept=candidates.map(recent).filter(Boolean);return kept.length?kept:[service];
+ });
+}
 export function alertConditions(snapshot,rules){
   const conditions=snapshot.operations?operationalConditions(snapshot.operations):[];
   for(const service of snapshot.services)if(['error','partial'].includes(service.status))conditions.push({key:`connection:${service.id||service.name}`,connectorId:service.id||service.provider,title:service.status==='partial'?'Incomplete monitoring':'Connection failed',source:service.name,provider:service.provider,severity:service.status==='partial'?'warning':'critical',details:service.error});
@@ -42,12 +51,13 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
    if(!source?.configured())result={service:{id:name,name,provider:name,status:'not-configured',response:null}};
    else try{const data=await source.read(),errors=data.errors||[];result={data,service:{id:name,name,provider:name,status:errors.length?'partial':'reachable',response:Date.now()-started,...(errors.length?{error:errors.join('; ')}:{})}};}
    catch(error){result={service:{id:name,name,provider:name,status:'error',response:Date.now()-started,error:error.message}};}
+   result.service.sampledAt=new Date().toISOString();
    if(ticket===generation&&readings.get(name)===row){row.result=result;row.time=Date.now();row.pending=null;}
    return result;
   }));row.pending=work;readings.set(name,row);return work;
  }
  async function sample(force=false){
-  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});latest.alerts=persistence.get().alerts;if(inFlight&&progress){const current={...latest,...progress,refreshing:true};return {...current,hosts:hosts(current)};}return latest;}
+  if(!force&&latest){if(!inFlight&&Date.now()-completed>=10000)void sample(true).catch(()=>{});latest.alerts=persistence.get().alerts;if(inFlight&&progress){const current={...latest,...progress,services:progressServices(progress.services,latest.services,latest.sampledAt),refreshing:true};return {...current,hosts:hosts(current)};}return latest;}
   if(!inFlight){
    const ticket=generation,snapshot=empty();progress=snapshot;
    for(const [name,source] of Object.entries(sources))snapshot.services.push({id:name,name,provider:name,status:source.configured()?'pending':'not-configured',response:null});
@@ -55,7 +65,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
    const work=agentContext.run({host:''},async()=>{
     await Promise.all([
      ...Object.keys(sources).map(async name=>{const result=await collect(name,true);if(result.data)snapshot[name]=result.data;snapshot.services=snapshot.services.map(s=>s.id===name?result.service:s);}),
-     (async()=>{let services;try{snapshot.dockerFleet=await fleet();services=snapshot.dockerFleet.hosts.map(h=>({id:`docker:${h.id}`,name:`Docker ${h.node} / ${h.name}`,provider:'docker',hostId:h.id,status:h.status,response:h.response??null,error:h.error}));}catch{services=[{id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'error',error:'Docker host inventory failed'}];}snapshot.services=[...snapshot.services.filter(s=>s.id!=='docker-fleet'),...services];})(),
+     (async()=>{let services;try{snapshot.dockerFleet=await fleet();services=snapshot.dockerFleet.hosts.map(h=>({id:`docker:${h.id}`,name:`Docker ${h.node} / ${h.name}`,provider:'docker',hostId:h.id,status:h.status,response:h.response??null,error:h.error,sampledAt:h.sampledAt}));}catch{services=[{id:'docker-fleet',name:'Docker host monitoring',provider:'docker',status:'error',error:'Docker host inventory failed'}];}snapshot.services=[...snapshot.services.filter(s=>s.id!=='docker-fleet'),...services];})(),
      (async()=>{try{snapshot.services.push(...await checkServices());}catch(e){snapshot.services.push({name:'Additional service configuration',status:'error',error:e.message});}})()
     ]);
     snapshot.operations=operationsView(operationalNodes());

@@ -95,7 +95,7 @@ test('volume cells and keyboard open inspection without duplicate nested button 
  await page.click(row.querySelectorAll('td')[2]);assert.ok(page.container.querySelector('.modal'));assert.equal(calls.filter(p=>p==='/docker/volume/vol-one').length,1);
  await page.click(page.container.querySelector('.modal [aria-label="Close dialog"]')||page.container.querySelector('.modal .modal-close'));
  await act(async()=>{row.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0))});assert.ok(page.container.querySelector('.modal'));assert.equal(calls.filter(p=>p==='/docker/volume/vol-one').length,2);
- await page.click(page.container.querySelector('.modal [aria-label="Close dialog"]'));const selection=page.dom.window.getSelection();const range=page.dom.window.document.createRange();range.selectNodeContents(row.querySelector('.volume-path'));selection.addRange(range);await page.click(row.querySelectorAll('td')[2]);assert.equal(page.container.querySelector('.modal'),null);selection.removeAllRanges();await page.click(row.querySelector('[aria-label="Inspect app-data"]'));assert.equal(calls.filter(p=>p==='/docker/volume/vol-one').length,3);
+ await page.click(page.container.querySelector('.modal [aria-label="Close dialog"]'));const getSelection=page.dom.window.getSelection;page.dom.window.getSelection=()=>({toString:()=>'/var/lib/docker/volumes/app-data'});await page.click(row.querySelectorAll('td')[2]);assert.equal(page.container.querySelector('.modal'),null);page.dom.window.getSelection=getSelection;await page.click(row.querySelector('[aria-label="Inspect app-data"]'));assert.equal(calls.filter(p=>p==='/docker/volume/vol-one').length,3);
  }finally{await page.close()}
 });
 

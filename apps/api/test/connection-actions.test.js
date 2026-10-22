@@ -28,3 +28,18 @@ test('malformed SSH JSON cannot escape the transport result handler or leak host
   await assert.rejects(executeConnectionAction(client,'root',input.password,'fixed command'),error=>[422,502].includes(error.status)&&!error.message.includes('private host output'));
  }
 });
+
+test('monitoring tools requires fresh paired-host approval and verified installation',async()=>{
+ const f=fixture({run:async()=>({action:'monitoring-tools',target:'node',installed:true,message:'Verified'})});
+ const body={...input,action:'monitoring-tools',target:'node'};
+ for(const change of [{confirm:false},{password:''},{target:'qemu/100'},{fingerprint:'wrong'}])await assert.rejects(f.service.perform('paired',{...body,...change}));
+ assert.equal(f.calls.filter(c=>c.startsWith('python3')).length,0);
+ assert.equal((await f.service.perform('paired',body)).installed,true);
+ const g=fixture({run:async()=>({action:'monitoring-tools',target:'node',installed:false})});await assert.rejects(g.service.perform('paired',body),e=>e.status===502);
+});
+test('monitoring tools route is owner-only, fixes the target and never audits supplied credentials',async()=>{
+ process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);
+ const {createApp}=await import('../src/app.js'),calls=[],audits=[],app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:req.headers['x-role']||'viewer'};next()},connectionService:{perform:async(id,body)=>{calls.push({id,body});return {installed:true,message:'Verified'}}},audit:async(_req,...args)=>audits.push(args),monitor:{invalidate(){}}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ const url=`http://127.0.0.1:${server.address().port}/api/operations/paired/tools`;
+ try{for(const role of ['viewer','operator','admin'])assert.equal((await fetch(url,{method:'POST',headers:{'x-role':role,'Content-Type':'application/json'},body:JSON.stringify(input)})).status,403);assert.equal(calls.length,0);const r=await fetch(url,{method:'POST',headers:{'x-role':'owner','Content-Type':'application/json'},body:JSON.stringify(input)});assert.equal(r.status,200);assert.equal(calls[0].id,'paired');assert.equal(calls[0].body.target,'node');assert.equal(calls[0].body.action,'monitoring-tools');assert.ok(!JSON.stringify(audits).includes(input.password));}finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

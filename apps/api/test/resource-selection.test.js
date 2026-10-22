@@ -44,7 +44,7 @@ try{
   assert.equal((await call('/operations/health','','viewer')).status,403);
   assert.equal((await call('/operations/performance','','admin')).status,200);
   for(const role of ['viewer','operator','admin','auditor'])assert.equal((await call('/operations/unknown/vpn','',role,'POST')).status,403);
-  assert.equal((await call('/operations/unknown/tools','','owner','POST')).status,409);
+  assert.equal((await call('/operations/unknown/tools','','owner','POST')).status,404); // Tools require a registered paired host and fresh SSH approval.
   assert.equal((await call('/operations/unknown/vpn','','owner','POST')).status,409);
   assert.equal((await call('/recovery-tests','','viewer')).status,403);
   assert.equal((await call('/recovery-tests','','operator','POST')).status,403);

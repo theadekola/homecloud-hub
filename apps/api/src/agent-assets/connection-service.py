@@ -1,6 +1,6 @@
 """Fixed, pairing-bound connection diagnostics and service starts over SSH."""
 import ast,base64,hashlib,hmac,json,os,pathlib,re,subprocess,sys,time
-ACTIONS=('connector-check','connector-start','docker-check','docker-start')
+ACTIONS=('connector-check','connector-start','docker-check','docker-start','monitoring-tools')
 
 def execute(args,timeout=40,input=None):
     result=subprocess.run(args,capture_output=True,text=True,timeout=timeout,input=input)
@@ -40,7 +40,7 @@ def service_reading(text):
 def diagnose(payload,root=pathlib.Path('/'),run=execute):
     action=payload.get('action');target=payload.get('target')
     if action not in ACTIONS or not isinstance(target,str) or not re.fullmatch(r'node|(?:qemu|lxc)/[0-9]+',target): raise RuntimeError('Unsupported connection action or target')
-    if action.startswith('connector-') and target!='node': raise RuntimeError('Connector actions must target the paired host')
+    if (action.startswith('connector-') or action=='monitoring-tools') and target!='node': raise RuntimeError('Connector actions must target the paired host')
     if os.geteuid()!=0: raise RuntimeError('Root or sudo access is required')
     config=root/'etc/homecloud-node-agent.json'
     if config.is_symlink() or not config.is_file(): raise RuntimeError('Existing standard connector installation required')
@@ -49,6 +49,13 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
     if paired.get('kind','proxmox')=='docker' and target!='node': raise RuntimeError('Standalone connector cannot access Proxmox guests')
     starting=action.endswith('-start');docker=action.startswith('docker-');unit='docker.service' if docker else 'homecloud-node-agent.service'
     if config.read_bytes()!=original: raise RuntimeError('Pairing changed; no action was performed')
+    if action=='monitoring-tools':
+        run(['apt-get','update'],timeout=120)
+        run(['apt-get','install','-y','smartmontools','nut-client','nftables'],timeout=180)
+        packages=('smartmontools','nut-client','nftables')
+        output=run(['dpkg-query','-W','-f=${Package} ${Status}\n',*packages],timeout=10)
+        if not all(package+' install ok installed' in output.splitlines() for package in packages): raise RuntimeError('Monitoring package installation could not be verified. Check package-manager status before retrying.')
+        return {'action':action,'target':'node','installed':True,'message':'Monitoring tools installed and package status verified. Measurements refresh within one minute. UPS readings require an existing local NUT server; no UPS shutdown policy was changed.'}
     output=guest_run(target,service_script(unit,starting,docker),run)
     parts=output.split('\n__VERSION__\n',1);service=service_reading(parts[0]);result={'action':action,'target':target,'service':service,'active':service['ActiveState']=='active'}
     if docker:

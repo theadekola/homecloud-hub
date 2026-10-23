@@ -1,3 +1,4 @@
+import {createGuestAddressReader} from './guest-addresses.js';
 import {dockerPullProgress} from './docker-pull-progress.js';
 import {publicComposeLabels} from './docker-public.js';
 import {createGuestFilesystemReader} from './guest-filesystem-cache.js';
@@ -49,6 +50,7 @@ export async function pve(path, init={}, config=clusterConfig()){
 const form = obj => new URLSearchParams(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)]));
 
 export function proxmoxConfigured(){const c=clusterConfig();return !!(c.url&&c.tokenId&&c.tokenSecret)}
+const readGuestAddresses=createGuestAddressReader();
 const readGuestFilesystems=createGuestFilesystemReader(guestFilesystemUsage);
 export async function proxmoxSnapshot(query=pve){
   const inventory=await query('/cluster/resources');
@@ -91,7 +93,8 @@ export async function proxmoxSnapshot(query=pve){
   const running=resources.filter(r=>r.type==='qemu'&&r.status==='running');
   const identity=createHash('sha256').update(JSON.stringify(clusterConfig())).digest('hex');
   const vmFilesystems=await readGuestFilesystems(running,query,identity);
-  const guests=type=>resources.filter(r=>r.type===type).map(r=>({id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,nodeAvailable:!unavailable.has(r.node),reportedStatus:r.reportedStatus,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.used??null):(r.disk??null),diskTotal:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.total??null):(r.maxdisk??null),diskFree:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.free??null):null,diskCapacity:r.maxdisk??null,diskPercent:type==='qemu'?percent(vmFilesystems.get(String(r.vmid))?.used,vmFilesystems.get(String(r.vmid))?.total):percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
+  const addressReadings=await readGuestAddresses(resources.filter(r=>['qemu','lxc'].includes(r.type)),query,identity);
+  const guests=type=>resources.filter(r=>r.type===type).map(r=>({...addressReadings.get(`${r.node}/${r.type}/${r.vmid}`),id:String(r.vmid),name:r.name||String(r.vmid),node:r.node,type,status:r.status,nodeAvailable:!unavailable.has(r.node),reportedStatus:r.reportedStatus,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:r.mem==null?null:r.mem,memoryTotal:r.maxmem??null,memoryPercent:percent(r.mem,r.maxmem),disk:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.used??null):(r.disk??null),diskTotal:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.total??null):(r.maxdisk??null),diskFree:type==='qemu'?(vmFilesystems.get(String(r.vmid))?.free??null):null,diskCapacity:r.maxdisk??null,diskPercent:type==='qemu'?percent(vmFilesystems.get(String(r.vmid))?.used,vmFilesystems.get(String(r.vmid))?.total):percent(r.disk,r.maxdisk),uptime:r.uptime??null}));
   let clusterStatus=[];
   try{clusterStatus=await query('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();

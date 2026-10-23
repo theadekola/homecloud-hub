@@ -10,3 +10,6 @@ test('search retains the parent branch and unknown parents never assert running 
  const input={nodes:[{name:'one',status:'online'},{name:'two',status:'online'}],vms:[{id:'1',name:'api',node:'one'},{id:'2',name:'db',node:'two'}],lxc:[{id:'3',name:'cache',node:'missing',status:'running'}]};
  const result=clusterTopology(input,'cache');assert.equal(result.nodes.length,1);assert.equal(result.nodes[0].name,'missing');assert.equal(topologyState(result.nodes[0].guests[0],result.nodes[0].status),'unknown');assert.equal(clusterTopology(input,'one').nodes[0].guests.length,1);assert.equal(clusterTopology(input,'not found').nodes.length,0);
 });
+test('a node listed online without a successful direct status read remains unconfirmed',()=>{
+ const view=clusterTopology({nodes:[{name:'one',status:'online'}],nodeCoverage:[{node:'one',status:'partial',readings:['qemu']}],vms:[{id:1,node:'one',status:'running'}]});assert.equal(view.nodes[0].status,'unknown');assert.equal(view.nodes[0].reportedStatus,'online');assert.equal(topologyState(view.nodes[0].guests[0],view.nodes[0].status),'unknown');
+});

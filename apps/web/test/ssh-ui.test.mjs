@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {fileURLToPath,pathToFileURL} from 'node:url';
-import React,{act} from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter} from 'react-router-dom';import {JSDOM} from 'jsdom';import {build} from 'esbuild';
+import React,{act} from 'react';import {createRoot} from 'react-dom/client';import {MemoryRouter,Link} from 'react-router-dom';import {JSDOM} from 'jsdom';import {build} from 'esbuild';
 const rootPath=fileURLToPath(new URL('../',import.meta.url));
 async function component(file){
  const directory=fs.mkdtempSync(path.join(rootPath,'node_modules','audit-ui-'));
@@ -12,7 +12,7 @@ async function mounted(file,props,api,mobile=true,strict=false,initialEntries=['
  dom.window.scrollTo=()=>{};dom.window.HTMLElement.prototype.attachEvent=()=>{};dom.window.HTMLElement.prototype.detachEvent=()=>{};
  setup(dom.window);
  const built=await component(file),container=dom.window.document.getElementById('root'),root=createRoot(container);const Component=built.module[exportName];
- const render=async values=>{await act(async()=>{root.render(React.createElement(strict?React.StrictMode:React.Fragment,null,React.createElement(MemoryRouter,{initialEntries},React.createElement(Component,values))));await new Promise(r=>setTimeout(r,0));});};
+ const render=async values=>{await act(async()=>{root.render(React.createElement(strict?React.StrictMode:React.Fragment,null,React.createElement(MemoryRouter,{initialEntries},React.createElement(React.Fragment,null,...(file==='components/PersistentShell.tsx'?[React.createElement(Link,{key:'dashboard',to:'/'},'Test dashboard'),React.createElement(Link,{key:'shell',to:'/tools/shell'},'Test shell')]:[]),React.createElement(Component,values)))));await new Promise(r=>setTimeout(r,0));});};
  await render(props);
  return {dom,container,render,click:async button=>{assert.ok(button,'Expected control is rendered');await act(async()=>{button.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,0));});},close:async()=>{await act(async()=>root.unmount());await new Promise(r=>setTimeout(r,10));dom.window.close();built.cleanup();for(const k of Object.keys(originals)){if(originals[k]===undefined)delete globalThis[k];else globalThis[k]=originals[k];}if(navigatorDescriptor)Object.defineProperty(globalThis,'navigator',navigatorDescriptor);else delete globalThis.navigator;delete globalThis.__auditApi;delete globalThis.__auditConfirmed;}};
 }
@@ -208,4 +208,20 @@ test('SSH approval appears while saved connection lookup is pending and cancella
   await act(async()=>{window.dispatchEvent(new CustomEvent('homecloud-ssh-approval',{detail:{path:'/docker/updates/id/install',body:{},method:'POST',target:'vm:node01:101',resolve(){},reject(){}}}));await tick()});assert.match(page.container.querySelector('[role=dialog]').textContent,/vm:node01:101/);assert.ok(page.container.querySelector('form'));
   await act(async()=>{finishLookup({});await tick()});assert.match(page.container.querySelector('[role=dialog]').textContent,/vm:node01:101/);
  }finally{finishLookup({});await page.close()}
+});
+
+test('shell survives route navigation with its existing terminal and disconnect releases exactly once',async()=>{
+ const calls=[];const page=await mounted('components/PersistentShell.tsx',{authorized:true},async(p,init)=>{calls.push({p,init});if(p==='/proxmox')return {nodes:[{name:'pve',ip:'192.0.2.10',status:'online'}]};if(p==='/ssh/connect')return {id:'persistent-fixture'};return {output:'',closed:false}},true,false,['/tools/shell?target=node:pve']);
+ try{
+ await act(async()=>{await tick()});const terminal=page.container.querySelector('.ssh-terminal');assert.ok(terminal);assert.ok(document.documentElement.classList.contains('shell-scroll-locked'));
+ await page.click([...page.container.querySelectorAll('a')].find(a=>a.textContent==='Test dashboard'));assert.equal(page.container.querySelector('.ssh-terminal'),terminal);assert.equal(page.container.querySelector('[hidden]').hidden,true);assert.equal(document.documentElement.classList.contains('shell-scroll-locked'),false);assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,0);
+ await page.click([...page.container.querySelectorAll('a')].find(a=>a.textContent==='Test shell'));assert.equal(page.container.querySelector('.ssh-terminal'),terminal);assert.equal(calls.filter(c=>c.p==='/ssh/connect').length,1);
+ await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Disconnect'));await tick();assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);assert.equal(page.container.querySelector('.ssh-terminal'),null);
+ }finally{await page.close()}
+ assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);
+});
+
+test('persistent shell is lazy and loss of authorization releases its sessions',async()=>{
+ const calls=[];const page=await mounted('components/PersistentShell.tsx',{authorized:true},async(p,init)=>{calls.push({p,init});if(p==='/proxmox')return {nodes:[{name:'pve',ip:'192.0.2.10'}]};if(p==='/ssh/connect')return {id:'revoked-fixture'};return {output:'',closed:false}},true,false,['/']);
+ try{assert.equal(page.container.querySelector('.shell-page'),null);assert.equal(calls.length,0);await page.click([...page.container.querySelectorAll('a')].find(a=>a.textContent==='Test shell'));await act(async()=>{await tick()});await page.click(page.container.querySelector('[aria-label="Connect to pve"]'));await tick();assert.ok(page.container.querySelector('.ssh-terminal'));await page.render({authorized:false});await tick();assert.equal(page.container.querySelector('.shell-page'),null);assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1)}finally{await page.close()}
 });

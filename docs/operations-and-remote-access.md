@@ -108,3 +108,9 @@ Container **Stop, Restart, Pause, Unpause and Remove** require a server confirma
 Docker Networks initially shows the full-width table. **View** opens the selected network's details beside it, and **Close** at the top hides those details. Filtering out or removing the selected network closes its panel instead of selecting another deletion target. The former permanent Connected Containers card is removed; **View Containers** remains available within the details.
 
 The table's **Container IPs** come from each container's reported network endpoint (`IPAddress` / `GlobalIPv6Address`). It does not substitute the IPAM subnet or gateway. Subnet/gateway information remains labelled in the details panel. Multiple network attachments may give a container multiple IP addresses. Host networking does not allocate a separate container IP; an absent address stays unavailable. A Docker bridge address is an internal endpoint and does not by itself establish LAN/VPN reachability. Published ports are reached through the Docker host as configured by the operator.
+
+### Shell sessions during page navigation
+
+After opening Tools → Shell, its workspace stays mounted within the signed-in application. Navigating to another page hides the workspace while retaining each SSH connection, terminal output, and active session tab. Return to Tools → Shell to resume. Hidden terminals cannot receive clipboard input and do not lock page scrolling.
+
+Use **Disconnect** or a session tab's close button to end that session. Signing out, losing the required admin/owner role, or closing/reloading the application releases the workspace. Existing server inactivity limits, authentication expiry, remote host disconnects, and transport failures still apply. This does not provide detached sessions across browser reloads or server restarts; use a host-side tool such as `tmux` for that purpose. SFTP page lifecycle is unchanged.

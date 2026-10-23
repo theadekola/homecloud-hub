@@ -1,3 +1,4 @@
+import DistributionSummary from '../components/DistributionSummary';
 import ReportLoading from '../components/ReportLoading';
 import {reportValue} from '../components/ReportLoading';
 import Pagination from '../components/Pagination';
@@ -18,8 +19,7 @@ const duration=(value:any)=>{if(!Number.isFinite(value)||value<0)return 'Unknown
 const date=(value:any)=>Number.isFinite(value)&&value>0?new Date(value*1000).toLocaleString():'Not reported';
 const tone=(value:string)=>value==='Successful'?'green':value==='Failed'?'red':value==='Running'?'blue':'gray';
 function Ring({data,label,value,choose}:{data:{name:string;count:number;color:string}[];label:string;value:string|number;choose:(value:string)=>void}){
- const total=data.reduce((sum,row)=>sum+row.count,0);let start=0;const gradient=data.map(row=>{const old=start;start+=total?row.count/total*100:0;return `${row.color} ${old}% ${start}%`}).join(',');
- return <div className="report-distribution"><div className="report-ring" role="img" aria-label={`${value} ${label}`} style={{background:total?`conic-gradient(${gradient})`:'#19364a'}}><strong>{value}<small>{label}</small></strong></div><div className="report-legend">{data.map(row=><button key={row.name} onClick={()=>choose(row.name)}><i style={{background:row.color}}/><span>{row.name}</span><b>{row.count} <small>({total?Math.round(row.count/total*100):0}%)</small></b></button>)}</div></div>;
+ return <DistributionSummary items={data.map(row=>({id:row.name,name:row.name,value:row.count,color:row.color,onClick:()=>choose(row.name)}))} total={String(value)} label={label}/>;
 }
 export default function BackupReports({navigation,hours,setHours}:{navigation?:import('react').ReactNode;hours:string;setHours:(value:string)=>void}){
  const live=useApi<any>(`/proxmox/tasks?hours=${hours}`,null),storage=useApi<any>('/proxmox/storage',null),archives=useApi<any>('/restore',null);

@@ -20,3 +20,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter><App /></BrowserRouter>
   </React.StrictMode>
 );
+
+import './components/distribution-summary.css';

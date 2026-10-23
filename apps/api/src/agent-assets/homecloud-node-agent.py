@@ -191,12 +191,27 @@ def collect_network(root='/sys/class/net',boot_path='/proc/sys/kernel/random/boo
   rx=read_int('statistics/rx_bytes');tx=read_int('statistics/tx_bytes')
   rows.append({'name':name,'ifindex':entry.get('ifindex'),'mac':entry.get('address'),'addresses':addresses[:64],'speed':speed,'speedReason':reason,'rxBytes':str(rx) if rx is not None and rx>=0 else None,'txBytes':str(tx) if tx is not None and tx>=0 else None})
  return {'status':'ok','bootId':boot,'uptime':time.monotonic(),'interfaces':rows}
+DISK=None
+def collect_disk(diskstats='/proc/diskstats',sys_root='/sys/class/block',boot_path='/proc/sys/kernel/random/boot_id'):
+ devices=[]
+ for line in pathlib.Path(diskstats).read_text().splitlines():
+  fields=line.split()
+  if len(fields)<14:continue
+  name=fields[2];base=pathlib.Path(sys_root)/name
+  # Only leaf whole devices backed by hardware, exclude partitions and stacks.
+  if (base/'partition').exists() or not (base/'device').exists():continue
+  if (base/'slaves').exists() and any((base/'slaves').iterdir()):continue
+  if not fields[5].isdigit() or not fields[9].isdigit():continue
+  devices.append({'id':fields[0]+':'+fields[1],'read':fields[5],'write':fields[9]})
+ return {'status':'ok','bootId':pathlib.Path(boot_path).read_text().strip(),'uptime':time.monotonic(),'devices':devices[:512]}
 def network_scan():
- global NETWORK
+ global NETWORK,DISK
  while True:
   try:report=collect_network()
   except Exception:report={'status':'error'}
-  with LOCK:NETWORK=report
+  try:disk=collect_disk()
+  except Exception:disk={'status':'error'}
+  with LOCK:NETWORK=report;DISK=disk
   time.sleep(5)
 
 # Operational telemetry contains public measurements only; never send VPN secrets.
@@ -554,12 +569,12 @@ def poll_once(config,reads,writes,completed,ready):
  while len(results)<20:
   try:results.append(completed.get_nowait())
   except queue.Empty:break
- with LOCK:hosts=list(HOSTS);network=NETWORK;operations=OPERATIONS
+ with LOCK:hosts=list(HOSTS);network=NETWORK;operations=OPERATIONS;disk=DISK
  with PULL_PROGRESS_LOCK:progress=list(PULL_PROGRESS.values())[:20];PULL_PROGRESS.clear()
  pending_update,receipt=connector_update_receipt()
  nonce=uuid.uuid4().hex
  idle=reads.unfinished_tasks==0 and writes.unfinished_tasks==0
- try:response=post(config,'poll',{'connectorUpdatePending':pending_update,'connectorUpdateReceipt':receipt,'updateReady':idle,'updateNonce':nonce,'connectorUpdateError':AUTO_UPDATE_ERROR,'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,'operations':operations,**({'network':network} if network else {})})
+ try:response=post(config,'poll',{'connectorUpdatePending':pending_update,'connectorUpdateReceipt':receipt,'updateReady':idle,'updateNonce':nonce,'connectorUpdateError':AUTO_UPDATE_ERROR,'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,'operations':operations,'disk':disk,**({'network':network} if network else {})})
  except Exception:
   for result in results:completed.put(result)
   with PULL_PROGRESS_LOCK:

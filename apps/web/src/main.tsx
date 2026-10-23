@@ -22,3 +22,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 
 import './components/distribution-summary.css';
+
+import './components/cluster-topology.css';

@@ -6,11 +6,12 @@ import {networkConfig} from '../network-config';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Route,Globe,Layers,RefreshCw,Eye,Pencil,Search,Settings,Network,FileText} from 'lucide-react';
-import {useApi} from '../hooks';
+import {useApi,useResourceRefresh} from '../hooks';
 import {confirmedApi} from '../api';
 import {Card,Stat,Badge,Modal,usePopupSuccess} from '../components/UI';
 export default function NetworkRouting({navigation,onMap}:{navigation?:import('react').ReactNode;onMap:()=>void}){
  const cluster=useApi<any>('/proxmox',null);
+ const reports=useResourceRefresh(['/proxmox/network','/proxmox']);
  const live=useApi<any>('/proxmox/network',null),session=useApi<any>('/auth/me',null);
  const [search,setSearch]=useState(''),[family,setFamily]=useState('all'),[node,setNode]=useState('all'),[selected,setSelected]=useState(''),[edit,setEdit]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[reviewNode,setReviewNode]=useState('');
  const [success,setSuccess]=usePopupSuccess(!!edit);
@@ -19,7 +20,7 @@ export default function NetworkRouting({navigation,onMap}:{navigation?:import('r
  const filtered=rows.filter((r:any)=>(family==='all'||r.family===family)&&(node==='all'||r.node===node)&&`${r.gateway} ${r.node} ${r.name} ${r.destination}`.toLowerCase().includes(search.toLowerCase()));
  const current=filtered.find((r:any)=>r.id===selected)||filtered[0];
  const save=async(e:any)=>{e.preventDefault();const form=new FormData(e.currentTarget);setBusy(true);setError('');try{await confirmedApi(`/proxmox/network/${encodeURIComponent(edit.node)}/${encodeURIComponent(edit.name)}`,{method:'PUT',body:JSON.stringify({iface:edit.name,type:edit.source.type,expectedConfig:networkConfig(edit.source),[edit.key]:form.get('gateway')})});setReviewNode(edit.node);setSuccess('Gateway configuration saved. Review and apply the staged changes in Proxmox.');setMessage('Gateway configuration staged. Review pending changes and apply them in the Proxmox node network panel.');await live.refresh()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- return <section className="network-routing"><div className="network-panel-head"><div><h2><PageIcon name="network" className="page-title-icon"/>Routing</h2><p className="muted small">Default gateways configured on your Proxmox interfaces.</p></div><div className="header-actions"><button className="btn secondary" aria-busy={live.loading||busy} disabled={live.loading||busy} onClick={()=>live.refresh()}><RefreshCw size={15}/> Refresh</button><button className="btn secondary" onClick={onMap}><Network size={13}/>View Network Map</button><Link className="btn primary" to="/proxmox?tab=Networks">Configure Gateway</Link></div></div>
+ return <section className="network-routing"><div className="network-panel-head"><div><h2><PageIcon name="network" className="page-title-icon"/>Routing</h2><p className="muted small">Default gateways configured on your Proxmox interfaces.</p></div><div className="header-actions"><button className="btn secondary" aria-busy={live.loading||busy||reports.refreshing} disabled={live.loading||busy||reports.refreshing} onClick={reports.refresh}><RefreshCw size={15}/> Refresh</button><button className="btn secondary" onClick={onMap}><Network size={13}/>View Network Map</button><Link className="btn primary" to="/proxmox?tab=Networks">Configure Gateway</Link></div></div>
  <div className="network-stats metric-grid"><Stat reading={live} label="Configured Routes" value={live.data?rows.length:'Unknown'} icon={<Route/>}/><Stat reading={live} label="Gateways" value={live.data?new Set(rows.map((r:any)=>r.gateway)).size:'Unknown'} icon={<Globe/>}/><Stat reading={live} label="Nodes with Gateways" value={live.data?new Set(rows.map((r:any)=>r.node)).size:'Unknown'} icon={<Layers/>}/><Stat reading={live} label="IPv4 Defaults" value={live.data?rows.filter((r:any)=>r.family==='IPv4').length:'Unknown'} icon={<Route/>}/><Stat reading={live} label="IPv6 Defaults" value={live.data?rows.filter((r:any)=>r.family==='IPv6').length:'Unknown'} icon={<Route/>}/></div>
  {(error||live.error)&&<p className="error" role="alert">{error||live.error}</p>}{message&&<p role="status">{message}</p>}{reviewNode&&<ReviewApply node={reviewNode} url={cluster.data?.cluster?.url}/>}
  {navigation}

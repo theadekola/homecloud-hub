@@ -65,3 +65,17 @@ export async function refreshResources(prefixes:string[]){
 
 // Clears only in-memory API reads, preserving credentials and browser preferences.
 export function clearApiCache(){clear();}
+
+/** Refresh every mounted report in a workspace and share repeated clicks. */
+export function useResourceRefresh(prefixes:string[]){
+ const latest=useRef(prefixes),pending=useRef<Promise<void>|null>(null),mounted=useRef(true),[refreshing,setRefreshing]=useState(false);latest.current=prefixes;
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
+ const refresh=useCallback(()=>{if(pending.current)return pending.current;setRefreshing(true);const work=refreshResources(latest.current).finally(()=>{pending.current=null;if(mounted.current)setRefreshing(false)});pending.current=work;return work;},[]);
+ return {refresh,refreshing};
+}
+
+/** Include locally managed reports (for example log panes) in page refreshes. */
+export function useRefreshHandler(path:string,handler:()=>Promise<unknown>){
+ const latest=useRef(handler);latest.current=handler;
+ useEffect(()=>{const refresh=(event:Event)=>{const detail=(event as CustomEvent).detail;if(Array.isArray(detail?.prefixes)&&Array.isArray(detail.requests)&&detail.prefixes.some((p:string)=>path===p||path.startsWith(p+'/')))detail.requests.push(Promise.resolve().then(()=>latest.current()));};window.addEventListener('homecloud-resource-refresh',refresh);return()=>window.removeEventListener('homecloud-resource-refresh',refresh)},[path]);
+}

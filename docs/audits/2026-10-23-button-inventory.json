@@ -1,0 +1,6517 @@
+{
+  "scope": "Static JSX button templates in pages and components; runtime provider actions require separate verification",
+  "files": 107,
+  "buttons": 749,
+  "issues": [],
+  "inventory": [
+    {
+      "file": "src/App.tsx",
+      "buttons": [
+        {
+          "line": 29,
+          "label": "Retry connection",
+          "handler": "{check}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 36,
+          "label": "Retry",
+          "handler": "{()=>session.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/main.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/pages/AI.tsx",
+      "buttons": [
+        {
+          "line": 8,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/ActiveAlerts.tsx",
+      "buttons": [
+        {
+          "line": 27,
+          "label": "\"Reset alert filters\"",
+          "handler": "{()=>{setSearch('');setStatus('active');setSeverity('all');setSource('all');setProvider('all');setPeriod('all')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 28,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 28,
+          "label": "{`Details for alert ${r.id}`}",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 28,
+          "label": "{`Acknowledge alert ${r.id}`}",
+          "handler": "{()=>acknowledge(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "{`Resolve alert ${r.id}`}",
+          "handler": "{()=>resolve(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setStatus('active');setSource(name);setSeverity('all');setProvider('all');setPeriod('all');setSearch('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 33,
+          "label": "View Channels",
+          "handler": "{onNotifications}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "Create Alert Rule",
+          "handler": "{onCreate}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "View Notifications",
+          "handler": "{onNotifications}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "View All",
+          "handler": "{onView}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": "{onView}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/AlertHistory.tsx",
+      "buttons": [
+        {
+          "line": 27,
+          "label": "Refresh History",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{exportData}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "\"Reset history filters\"",
+          "handler": "{()=>{setSearch('');setSeverity('all');setSource('all');setProvider('all');setStatus('all');setRange({from:'',to:''});setDraftFrom('');setDraftTo('');setError('",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Apply",
+          "handler": "{apply}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Clear History",
+          "handler": "{()=>setClearing(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Date &amp; Time",
+          "handler": "{()=>setAscending(!ascending)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "{r.details}",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "{`History details ${r.id}`}",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setHelp(!help)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{if(r.name!=='other')setSeverity(r.name)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSource(name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "View All",
+          "handler": "{()=>{setStatus('resolved');setAscending(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onDetails(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/AlertNotifications.tsx",
+      "buttons": [
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>test(channels)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "Configure Channels",
+          "handler": "{()=>configure()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh()}}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "\"Refresh notifications\"",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(r)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "{r.error||r.alert?.details||''}",
+          "handler": "{()=>setSelected(r)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "{`Notification details ${r.id||i}`}",
+          "handler": "{()=>setSelected(r)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "Configuration Help",
+          "handler": "{()=>configure()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 43,
+          "label": "Setup Help",
+          "handler": "{()=>configure()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 43,
+          "label": "{`Configure ${c}`}",
+          "handler": "{()=>configure(c)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 43,
+          "label": "Configure Channels",
+          "handler": "{()=>configure()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "Send Test",
+          "handler": "{()=>test([helpChannel])}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/AlertRules.tsx",
+      "buttons": [
+        {
+          "line": 27,
+          "label": "View Alert History",
+          "handler": "{onHistory}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "Refresh Rules",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Create Alert Rule",
+          "handler": "{create}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setMetric(value)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "Reset",
+          "handler": "{()=>{setSearch('');setStatus('all');setMetric('all');setTarget('all')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>openEdit(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "{`Enable ${r.name}`}",
+          "handler": "{()=>run(`/alerts/rules/${encodeURIComponent(r.id)}`,'PUT',{enabled:!enabled(r)},enabled(r)?'Rule disabled.':'Rule enabled.')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "{`Edit rule ${r.id}`}",
+          "handler": "{()=>openEdit(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "{`Duplicate rule ${r.id}`}",
+          "handler": "{()=>run('/alerts/rules','POST',{name:r.name+' (copy)',provider:r.provider,metric:r.metric,threshold:r.threshold,severity:r.severity},'Rule copy created.')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "{`Delete rule ${r.id}`}",
+          "handler": "{()=>{setError('');setDeleteRow(r)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "Reload Rule",
+          "handler": "{()=>openEdit(latest)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": "{reset}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{const match=rules.find(x=>x.id===r.id);if(match)openEdit(match)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setStatus(value)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 36,
+          "label": "View Notifications",
+          "handler": "{onNotifications}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "Delete Rule",
+          "handler": "{()=>run(`/alerts/rules/${encodeURIComponent(deleteRow.id)}`,'DELETE',undefined,'Rule deleted.',edit?.id===deleteRow.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "View All",
+          "handler": "{onView}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "(dynamic/icon)",
+          "handler": "{onView}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Alerts.tsx",
+      "buttons": [
+        {
+          "line": 25,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 25,
+          "label": "Alert Rules",
+          "handler": "{()=>changeTab('Alert Rules')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 25,
+          "label": "Create Alert Rule",
+          "handler": "{openCreate}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>run(`/alerts/${encodeURIComponent(current.id)}/acknowledge`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Resolve",
+          "handler": "{()=>run(`/alerts/${encodeURIComponent(current.id)}/resolve`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Audit.tsx",
+      "buttons": [
+        {
+          "line": 34,
+          "label": "Export Logs",
+          "handler": "{()=>setExportOpen(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 34,
+          "label": "Create Audit Report",
+          "handler": "{report}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setStatus(filter==='success'?'success':filter==='failed'?'failure':'all');if(filter==='recent')setPeriod('1');if(filter==='all')reset();if(filter==='users",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Retry",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "\"More audit filters\"",
+          "handler": "{()=>setAdvanced(!advanced)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "\"Reset audit filters\"",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "\"Refresh audit logs\"",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "Clear Filters",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "Time",
+          "handler": "{()=>setAscending(!ascending)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "\"View complete event details\"",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "{`View audit event ${r.id}`}",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "\"Close log details\"",
+          "handler": "{()=>setClosed(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "View All Logs for this User",
+          "handler": "{()=>{setUser(selected.user||'system');setClosed(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "Filter by this Resource",
+          "handler": "{()=>setResource(selected.resource||'')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "Cancel",
+          "handler": "{()=>setExportOpen(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "Download Logs",
+          "handler": "{exportLogs}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/BackupDestinations.tsx",
+      "buttons": [
+        {
+          "line": 64,
+          "label": "Test All",
+          "handler": "{()=>test(raw)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 64,
+          "label": "Add Destination",
+          "handler": "{()=>{setError('');setModal('add')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 65,
+          "label": "{`Inspect ${title}`}",
+          "handler": "{()=>{if(index<3){reset();setStatus(index===1?'online':index===2?'attention':'all')}else setModal('summary')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 67,
+          "label": "Show all nodes",
+          "handler": "{()=>{const next=new URLSearchParams(params);next.delete('node');setParams(next)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 68,
+          "label": "Retry",
+          "handler": "{()=>{setError('');refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 70,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 71,
+          "label": "Reset Filters",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Show Details",
+          "handler": "{()=>setClosed(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 72,
+          "label": "Check Selected",
+          "handler": "{testSelected}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 72,
+          "label": "Clear Selection",
+          "handler": "{()=>setChecked([])}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 73,
+          "label": "{`Inspect destination ${row.id}`}",
+          "handler": "{()=>{setSelected(row.id);setClosed(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 73,
+          "label": "{`Actions for destination ${row.id}`}",
+          "handler": "{()=>{setSelected(row.id);setClosed(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 74,
+          "label": "Reset Filters",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 104,
+          "label": "Edit",
+          "handler": "{()=>setTab('Settings')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 104,
+          "label": "\"Close destination details\"",
+          "handler": "{onClose}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 110,
+          "label": "(dynamic/icon)",
+          "handler": "{toggle}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 113,
+          "label": "(dynamic/icon)",
+          "handler": "{check}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 113,
+          "label": "Browse Archives",
+          "handler": "{()=>setBrowse(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 120,
+          "label": "{`${row.name} / ${row.node}`}",
+          "handler": "{()=>select(row)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 121,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>selectCategory(row.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 122,
+          "label": "Retry History",
+          "handler": "{()=>detail.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/BackupReports.tsx",
+      "buttons": [
+        {
+          "line": 58,
+          "label": "\"Refresh reports\"",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 58,
+          "label": "Export Report",
+          "handler": "{()=>exportReport()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "{`Inspect ${title}`}",
+          "handler": "{()=>{if(index<3){setStatus(index===1?'Successful':index===2?'Failed':'all');setPage(0)}else if(index===3)build('performance','Performance Report');else build('",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "Retry",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 62,
+          "label": "Clear Filters",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 62,
+          "label": "Report Coverage",
+          "handler": "{()=>setModal('coverage')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 63,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setStatus(status===row.name?'all':row.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 66,
+          "label": ":",
+          "handler": "{()=>setStatus(row.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 67,
+          "label": "{`Filter reports to ${row.node}`}",
+          "handler": "{()=>{setNode(row.node);setPage(0)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 70,
+          "label": "View all",
+          "handler": "{()=>{setLimit(20);setPage(0)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 70,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>inspect(row)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 70,
+          "label": "{`Inspect report ${row.upid}`}",
+          "handler": "{event=>{event.stopPropagation();setSelected(row.upid);setModal('details')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Coverage",
+          "handler": "{()=>setModal('coverage')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>build(kind,title)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Create Report",
+          "handler": "{()=>build('complete','Backup Report')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Report Details",
+          "handler": "{()=>inspect(current)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Inspect Task Logs",
+          "handler": "{()=>setLogTask(current)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 75,
+          "label": "Open Task Logs",
+          "handler": "{()=>{setLogTask(current);setModal(null)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 77,
+          "label": "Cancel",
+          "handler": "{()=>setModal(null)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 77,
+          "label": "Download Report",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 83,
+          "label": "Previous Lines",
+          "handler": "{()=>setOffset(Math.max(0,offset-500))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 83,
+          "label": "Next Lines",
+          "handler": "{()=>setOffset(offset+500)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 83,
+          "label": "Refresh Logs",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Backups.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/pages/ClusterNodes.tsx",
+      "buttons": [
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{chooseNode(name,'Services');}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "View",
+          "handler": "{()=>{chooseNode(n.name);}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "Add Node",
+          "handler": "{()=>setJoining(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 45,
+          "label": "\"List view\"",
+          "handler": "{()=>setGrid(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 45,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setGrid(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 46,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{chooseNode(n.name);}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 47,
+          "label": "Shell",
+          "handler": "{()=>navigate(`/tools/shell?target=${encodeURIComponent(`node:${selected}`)}`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 47,
+          "label": "Reboot",
+          "handler": "{()=>perform(`/proxmox/node/${encodeURIComponent(selected)}/power/reboot`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 47,
+          "label": "Shutdown",
+          "handler": "{()=>perform(`/proxmox/node/${encodeURIComponent(selected)}/power/shutdown`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 50,
+          "label": "View Configuration",
+          "handler": "{()=>setTab('Configuration')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 50,
+          "label": "View All Services →",
+          "handler": "{()=>setTab('Services')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 50,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setTab('Services')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>perform(`/proxmox/node/${encodeURIComponent(selected)}/service/${encodeURIComponent(s.service)}/${operation}`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Status",
+          "handler": "{()=>inspect(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "Logs",
+          "handler": "{()=>inspect(t,true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 56,
+          "label": "Edit in Proxmox",
+          "handler": "{openConsole}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Open Proxmox",
+          "handler": "{openConsole}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Refresh Cluster",
+          "handler": "{async()=>{await refresh();setJoining(false);}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 64,
+          "label": "Refresh Logs",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Dashboard.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/pages/Docker.tsx",
+      "buttons": [
+        {
+          "line": 52,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>changeView(v)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 53,
+          "label": "Refresh Docker",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "{`Actions for ${r.name}`}",
+          "handler": "{event=>{event.stopPropagation();cancelLogs();setSelectedId(r.id);setError('');setModal('Container Actions');}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 60,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>execute(`/docker/stack/${encodeURIComponent(r.id)}/${a}`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 60,
+          "label": "Remove",
+          "handler": "{()=>execute(`/docker/${view==='Volumes'?'volume':'network'}/${encodeURIComponent(r.id)}`,'DELETE')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "Refresh Logs",
+          "handler": "{()=>inspect(selected)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "(dynamic/icon)",
+          "handler": "{async()=>{if(await action(selected,a))setModal('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "Logs",
+          "handler": "{()=>inspect(selected)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/DockerEvents.tsx",
+      "buttons": [
+        {
+          "line": 29,
+          "label": "Export Events",
+          "handler": "{exportEvents}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Clear View",
+          "handler": "{()=>{setCutoff(data.until);setSelected(null)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 34,
+          "label": "Event Log",
+          "handler": "{()=>setTimeline(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "Event Timeline",
+          "handler": "{()=>setTimeline(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "Reset",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "(dynamic/icon)",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 34,
+          "label": "View",
+          "handler": "{()=>{setSelected(e);setCopy('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "View",
+          "handler": "{()=>{setSelected(e);setCopy('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "Close",
+          "handler": "{()=>{setSelected(null);setCopy('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "Copy Event",
+          "handler": "{async()=>{try{await navigator.clipboard.writeText(JSON.stringify(detail,null,2));setCopy('Copied')}catch{setCopy('Copy unavailable; select the event JSON manua",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/DockerImages.tsx",
+      "buttons": [
+        {
+          "line": 24,
+          "label": "Pull Image",
+          "handler": "{()=>setModal('Pull Image')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Clean Up",
+          "handler": "{()=>run('/docker/prune/images')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Build Image",
+          "handler": "{()=>setModal('Build Image')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>inspect(i)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "Inspect",
+          "handler": "{()=>inspect(i)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "Run Container",
+          "handler": "{()=>setModal('Run Container')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Pull",
+          "handler": "{()=>run('/docker/image/pull','POST',{image:selected.tags[0]})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Tag",
+          "handler": "{()=>setModal('Tag Image')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Delete",
+          "handler": "{()=>run(`/docker/image/${encodeURIComponent(selected.id)}`,'DELETE')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/DockerNetworks.tsx",
+      "buttons": [
+        {
+          "line": 23,
+          "label": "Prune Networks",
+          "handler": "{()=>run('/docker/prune/networks')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Create Network",
+          "handler": "{()=>setModal('Create Network')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{event=>openDetails(n.id,event.currentTarget)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "View",
+          "handler": "{event=>openDetails(n.id,event.currentTarget)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Close",
+          "handler": "{closeDetails}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Inspect",
+          "handler": "{()=>setModal('Inspect Network')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "View Containers",
+          "handler": "{()=>setModal('Connected Containers')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Delete",
+          "handler": "{()=>run(`/docker/network/${encodeURIComponent(selected.id)}`,'DELETE')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setDriver(d);setPage(0)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "Create Network",
+          "handler": "{()=>setModal('Create Network')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Prune Networks",
+          "handler": "{()=>run('/docker/prune/networks')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Network Troubleshoot",
+          "handler": "{()=>setModal('Inspect Network')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/DockerStacks.tsx",
+      "buttons": [
+        {
+          "line": 23,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setId(s.id);setError('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 28,
+          "label": "View",
+          "handler": "{()=>{setId(s.id);setError('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>action(a)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Inspect Services",
+          "handler": "{inspect}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "Export Inventory",
+          "handler": "{exportInventory}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "View Logs",
+          "handler": "{()=>log(c)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/DockerVolumes.tsx",
+      "buttons": [
+        {
+          "line": 29,
+          "label": "Prune Unused Anonymous Volumes",
+          "handler": "{()=>run('/docker/prune/volumes')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Create Volume",
+          "handler": "{()=>{setError('');setModal('Create Volume')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "Refresh",
+          "handler": "{reload}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "{v.name}",
+          "handler": "{()=>inspect(v)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "Inspect",
+          "handler": "{()=>inspect(v)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "Remove",
+          "handler": "{()=>run(`/docker/volume/${encodeURIComponent(selected.id)}`,'DELETE')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Login.tsx",
+      "buttons": [
+        {
+          "line": 16,
+          "label": "Retry",
+          "handler": "{checkSetup}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 20,
+          "label": "{showPassword?'Hide password':'Show password'}",
+          "handler": "{()=>setShowPassword(v=>!v)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 21,
+          "label": "Back to sign in",
+          "handler": "{()=>{setChallenge('');setFactor('');setMessage('');setError('')}}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 24,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/LxcContainers.tsx",
+      "buttons": [
+        {
+          "line": 44,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "+ Create Container",
+          "handler": "{()=>setModal('create')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "\"List view\"",
+          "handler": "{()=>setLayout('list')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setLayout('grid')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(ct.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 65,
+          "label": "Refresh Templates",
+          "handler": "{()=>setTemplateRevision(v=>v+1)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 66,
+          "label": "Cancel",
+          "handler": "{()=>setModal(null)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 66,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 84,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setTab(item)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 86,
+          "label": "Snapshot",
+          "handler": "{snapshot}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Backup",
+          "handler": "{backup}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Console",
+          "handler": "{openConsole}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Start",
+          "handler": "{()=>run('start')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Shell",
+          "handler": "{()=>navigate(`/tools/shell?target=${encodeURIComponent(`lxc:${ct.node}:${ct.id}`)}`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Shutdown",
+          "handler": "{()=>run('shutdown')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 86,
+          "label": "Reboot",
+          "handler": "{()=>run('reboot')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Monitoring.tsx",
+      "buttons": [
+        {
+          "line": 26,
+          "label": "(dynamic/icon)",
+          "handler": "{onClick}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 28,
+          "label": "Retry network",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "Customize",
+          "handler": "{()=>setCustomize(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 44,
+          "label": "\"Refresh monitoring\"",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 44,
+          "label": "\"Export monitoring\"",
+          "handler": "{exportReport}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 46,
+          "label": "Retry",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 47,
+          "label": "(dynamic/icon)",
+          "handler": "{onClick}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "CPU",
+          "handler": "{()=>setCpuVisible(!cpuVisible)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 48,
+          "label": "Memory",
+          "handler": "{()=>setMemoryVisible(!memoryVisible)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 48,
+          "label": "Details",
+          "handler": "{()=>inspect('Resource measurements')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected({kind:'Service details',service:s})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "{`Inspect service ${s.name}`}",
+          "handler": "{()=>setSelected({kind:'Service details',service:s})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "Docker host monitoring →",
+          "handler": "{()=>inspect('Docker host monitoring')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected({kind:'Alert details',alert:a})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "View all →",
+          "handler": "{()=>inspect('Monitored hosts')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected({kind:'Host details',host:h})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "View all →",
+          "handler": "{()=>inspect('Top measured resources')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected({kind:'Resource details',resource:r})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "Done",
+          "handler": "{()=>setSuccess('Monitoring preferences applied successfully.')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Network.tsx",
+      "buttons": [
+        {
+          "line": 32,
+          "label": "Refresh",
+          "handler": "{()=>Promise.all([live.refresh(),cluster.refresh()])}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "Export",
+          "handler": "{exportReport}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Details",
+          "handler": "{()=>setSelected(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/NetworkDNS.tsx",
+      "buttons": [
+        {
+          "line": 20,
+          "label": "Refresh",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 20,
+          "label": "Configure DNS",
+          "handler": "{()=>{setError('');setEdit(current)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Edit Settings",
+          "handler": "{()=>{setError('');setEdit(current)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 25,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSearch(search===address?'':address)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "Reload Configuration",
+          "handler": "{reload}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/NetworkDevices.tsx",
+      "buttons": [
+        {
+          "line": 25,
+          "label": "Refresh Devices",
+          "handler": "{()=>{live.refresh();agents.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 25,
+          "label": "Export",
+          "handler": "{exportReport}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(item.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/NetworkRouting.tsx",
+      "buttons": [
+        {
+          "line": 23,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "View Network Map",
+          "handler": "{onMap}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setFamily(family===f?'all':f)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setNode(node===n.node?'all':n.node)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/NetworkTraffic.tsx",
+      "buttons": [
+        {
+          "line": 13,
+          "label": "Refresh Traffic Sources",
+          "handler": "{()=>refreshResources(['/proxmox/network'])}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Export CSV",
+          "handler": "{()=>exportData(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Export JSON",
+          "handler": "{()=>exportData()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Overview.tsx",
+      "buttons": [
+        {
+          "line": 33,
+          "label": "Retry overview",
+          "handler": "{forceRefresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "Add Widget",
+          "handler": "{()=>setCustomize(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 48,
+          "label": "\"Refresh live measurements\"",
+          "handler": "{forceRefresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "\"Export overview report\"",
+          "handler": "{()=>downloadReport({...data,selectedNode:node,history})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 65,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>path?navigate(path):assess()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 68,
+          "label": "(dynamic/icon)",
+          "handler": "{assess}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 76,
+          "label": "Done",
+          "handler": "{()=>setSuccess('Overview preferences saved successfully.')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Proxmox.tsx",
+      "buttons": [
+        {
+          "line": 50,
+          "label": "Services",
+          "handler": "{()=>openNodeServices(r.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "…",
+          "handler": "{()=>inspectTask(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "View log",
+          "handler": "{()=>inspectTask(r,true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setView(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 52,
+          "label": "\"Refresh Proxmox\"",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Create VM",
+          "handler": "{()=>create('Create VM')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "Create CT",
+          "handler": "{()=>create('Create CT')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 60,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setView(target)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 64,
+          "label": "View Full Health →",
+          "handler": "{()=>setView('Nodes')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": "{click}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 75,
+          "label": "Close",
+          "handler": "{()=>setTaskResult(null)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 78,
+          "label": "→",
+          "handler": "{onClick}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/ProxmoxBackups.tsx",
+      "buttons": [
+        {
+          "line": 49,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 49,
+          "label": "Create Backup",
+          "handler": "{()=>{setError('');setModal('run');}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 52,
+          "label": "Inspect backup destinations",
+          "handler": "{onStorage}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Run",
+          "handler": "{()=>runJob(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Toggle",
+          "handler": "{()=>toggle(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Policy",
+          "handler": "{()=>{setCurrent(r);setModal('policy');}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Restore",
+          "handler": "{()=>navigate(restoreLocation(r.id))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 57,
+          "label": "View Reports",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "Successful",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "Failed",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "Restore",
+          "handler": "{()=>navigate(restoreLocation(p.id))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 58,
+          "label": "View Reports",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "View All",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "(dynamic/icon)",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Manage Schedules",
+          "handler": "{()=>navigate('/schedules')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Add Schedule",
+          "handler": "{()=>{navigate('/backups?tab=Schedules&action=create');}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "Configure Policy",
+          "handler": "{()=>navigate('/retention')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Manage Targets",
+          "handler": "{onStorage}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Run Backup Now",
+          "handler": "{()=>setModal('run')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "Restore Backup",
+          "handler": "{()=>navigate('/restore')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "Browse Archives",
+          "handler": "{()=>{setView('archives');setStatus('all');}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "Inspect Backup Logs",
+          "handler": "{onTasks}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 60,
+          "label": "Edit Policy",
+          "handler": "{()=>navigate('/retention')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 60,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/ProxmoxNetworks.tsx",
+      "buttons": [
+        {
+          "line": 36,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setCurrent(null);setAddType('bridge');setError('');setModal('add');}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "{`View ${r.name} on ${r.node}`}",
+          "handler": "{event=>{event.stopPropagation();interfaceView?(setCurrent(r),setSelectedNode(r.node),setDetailTab('Overview')):inspect(r)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "{`Edit ${r.name} on ${r.node}`}",
+          "handler": "{event=>{event.stopPropagation();inspect(r,true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setDetailTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "Edit Configuration",
+          "handler": "{()=>inspect(current,true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setMapFull(!mapFull)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setSelectedNode(n.node);setNode(n.node);}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>inspect(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 45,
+          "label": "Reload Configuration",
+          "handler": "{reloadEdit}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 45,
+          "label": "Cancel",
+          "handler": "{()=>setModal(null)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 45,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 45,
+          "label": "Edit Configuration",
+          "handler": "{()=>inspect(current,true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 45,
+          "label": "Open Firewall",
+          "handler": "{()=>openNode('firewall')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 49,
+          "label": "{`Inspect ${r.name} on ${r.node}`}",
+          "handler": "{event=>{event.stopPropagation();inspect(r)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "Refresh Readings",
+          "handler": "{details.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/ProxmoxStorage.tsx",
+      "buttons": [
+        {
+          "line": 29,
+          "label": "Refresh",
+          "handler": "{live.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 29,
+          "label": "Add Storage",
+          "handler": "{()=>add('dir')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>selectStorage(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/ProxmoxTasks.tsx",
+      "buttons": [
+        {
+          "line": 44,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 44,
+          "label": "Run Task",
+          "handler": "{()=>setRun(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 49,
+          "label": "{`View task ${t.upid}`}",
+          "handler": "{event=>{event.stopPropagation();select(t)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 50,
+          "label": "Clear",
+          "handler": "{()=>setCategory('all')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "\"Close task details\"",
+          "handler": "{close}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 51,
+          "label": "Stop Task",
+          "handler": "{stop}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 52,
+          "label": "Previous lines",
+          "handler": "{()=>setOffset(Math.max(0,offset-500))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 52,
+          "label": "Next lines",
+          "handler": "{()=>setOffset(offset+500)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 52,
+          "label": "Download page",
+          "handler": "{download}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Create VM",
+          "handler": "{()=>navigate('/proxmox?action=Create%20VM')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "Create Container",
+          "handler": "{()=>navigate('/proxmox?action=Create%20CT')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "Run Backup",
+          "handler": "{()=>navigate('/backups?action=Run%20Backup')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Restore.tsx",
+      "buttons": [
+        {
+          "line": 43,
+          "label": "Refresh",
+          "handler": "{()=>Promise.all([live.refresh(),tasks.refresh()])}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 43,
+          "label": "\"Export restore points\"",
+          "handler": "{exportPoints}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 44,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{if(i===4){setOperation(operations.find((r:any)=>backupOutcome(r)==='Successful'));return;}resetFilters();if(i===1)setType('archive');if(i===2||i===3){cons",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 46,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "\"Reset restore filters\"",
+          "handler": "{resetFilters}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 48,
+          "label": "\"List view\"",
+          "handler": "{()=>setLayout('list')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 48,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setLayout('grid')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 49,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>select(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 49,
+          "label": "{`Restore ${r.id}`}",
+          "handler": "{()=>{select(r);restore(r)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 49,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>select(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 53,
+          "label": "\"Close restore point details\"",
+          "handler": "{()=>setClosed(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 53,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>restore(current)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setType(r.name==='VM'?'qemu':r.name==='LXC'?'lxc':'snapshot')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setType(r.name==='VM'?'qemu':r.name==='LXC'?'lxc':'snapshot')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 54,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setOperation(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>rollback(modal)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 57,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Retention.tsx",
+      "buttons": [
+        {
+          "line": 54,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "\"Export retention policies\"",
+          "handler": "{exportPolicies}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Create Policy",
+          "handler": "{()=>openEdit()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 56,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 57,
+          "label": "\"Reset retention filters\"",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "\"Retention list view\"",
+          "handler": "{()=>setLayout('list')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 57,
+          "label": "\"Retention grid view\"",
+          "handler": "{()=>setLayout('grid')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>select(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "{`Inspect ${r.key}`}",
+          "handler": "{()=>select(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "{`Edit ${r.key}`}",
+          "handler": "{()=>openEdit(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 58,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>select(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "\"Close retention details\"",
+          "handler": "{()=>setClosed(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "Edit Policy",
+          "handler": "{()=>openEdit(current)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 61,
+          "label": "Preview Cleanup",
+          "handler": "{()=>openCleanup(current)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 62,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{const policy=rows.find(p=>p.key===r.key);if(policy){reset();select(policy)}else{setGroupKey(r.key);setModal('group')}}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 63,
+          "label": "Learn More",
+          "handler": "{()=>setModal('help')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 66,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 67,
+          "label": "Run Cleanup",
+          "handler": "{runCleanup}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 72,
+          "label": "Retry activity",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 72,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Schedules.tsx",
+      "buttons": [
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r.name)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 50,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 50,
+          "label": "Import Schedule",
+          "handler": "{()=>{setError('');setImportText('');setModal('import')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 50,
+          "label": "Create Schedule",
+          "handler": "{openCreate}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 51,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{if(i===0)reset();if(i===1){reset();setStatus('active')}if(i===2)calendar();if(i===3){setResultStatus('all');setModal('results')}}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "\"Refresh schedules\"",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 56,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setSelected(r.key);setDetailsOpen(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 56,
+          "label": "{`Run ${r.key}`}",
+          "handler": "{()=>action(r,'run')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 56,
+          "label": "{`Toggle ${r.key}`}",
+          "handler": "{()=>action(r,'toggle')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 56,
+          "label": "{`Details ${r.key}`}",
+          "handler": "{()=>{setSelected(r.key);setDetailsOpen(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "Delete Schedule",
+          "handler": "{()=>{setDeleteRow(current);setError('');setModal('delete')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 59,
+          "label": "Details →",
+          "handler": "{()=>{setResultStatus('all');setModal('results')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setResultStatus(label);setModal('results')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "View all",
+          "handler": "{calendar}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{reset();setSelected(r.key);setDetailsOpen(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 62,
+          "label": "\"Previous schedule month\"",
+          "handler": "{()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 62,
+          "label": "\"Next schedule month\"",
+          "handler": "{()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 62,
+          "label": "{`${day} ${month.toLocaleDateString([],{month:'long',year:'numeric'})}: ${dayRuns(day).length} reported runs`}",
+          "handler": "{()=>{setCalendarDay(dayKey(new Date(month.getFullYear(),month.getMonth(),day)));setModal('calendar')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 62,
+          "label": "View Calendar",
+          "handler": "{calendar}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 63,
+          "label": "Create Schedule",
+          "handler": "{openCreate}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "Import Schedule",
+          "handler": "{()=>{setError('');setImportText('');setModal('import')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "Run Now",
+          "handler": "{()=>current&&action(current,'run')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 63,
+          "label": "Schedule Templates",
+          "handler": "{()=>{setError('');setModal('templates')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 68,
+          "label": "Retry targets",
+          "handler": "{()=>Promise.all([resources.refresh(),guests.refresh()])}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 68,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 69,
+          "label": "Review Schedule",
+          "handler": "{importSchedule}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Daily Proxmox Backup",
+          "handler": "{()=>template('proxmox',{name:'Daily backup',schedule:'daily'})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Weekly Proxmox Backup",
+          "handler": "{()=>template('proxmox',{name:'Weekly backup',schedule:'sun 03:00'})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 71,
+          "label": "Daily Dataset Snapshot",
+          "handler": "{()=>template('truenas',{hour:2,minute:0,lifetime:7})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 74,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>action(deleteRow,'delete')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Settings.tsx",
+      "buttons": [
+        {
+          "line": 25,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>change(name)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>section(name)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 43,
+          "label": "Retry settings",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 68,
+          "label": "Restore Imported Settings",
+          "handler": "{()=>void restore()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 68,
+          "label": "Discard Import",
+          "handler": "{()=>setImported(null)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 68,
+          "label": "Export Settings",
+          "handler": "{onExport}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Shell.tsx",
+      "buttons": [
+        {
+          "line": 38,
+          "label": "Refresh Hosts",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setActive(t.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "{`Close ${t.name} session`}",
+          "handler": "{()=>closeTab(t.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "\"Open new connection tab\"",
+          "handler": "{()=>setActive('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setList(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "\"List view\"",
+          "handler": "{()=>setList(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 43,
+          "label": "{`Connection settings for ${r.name}`}",
+          "handler": "{e=>{e.stopPropagation();setConnection({...r,address:r.address||'',editing:!!savedConnections.data?.[r.target]})}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Storage.tsx",
+      "buttons": [
+        {
+          "line": 52,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 52,
+          "label": "Add Storage",
+          "handler": "{()=>setModal('Add Storage')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 53,
+          "label": "Dismiss",
+          "handler": "{()=>setMessage('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>change(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 60,
+          "label": "Create Dataset",
+          "handler": "{()=>setModal('Create Dataset')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 61,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setSelected(`${r.provider}:${r.id}`);setInspecting(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "Snapshot",
+          "handler": "{()=>{setSelected(r.name);setModal('Create Snapshot')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 61,
+          "label": "Rollback",
+          "handler": "{()=>execute(`/truenas/snapshot/${enc(r.id)}/rollback`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 61,
+          "label": "Delete",
+          "handler": "{()=>execute(`/truenas/snapshot/${enc(r.id)}`,'DELETE')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 62,
+          "label": "Close",
+          "handler": "{()=>setInspecting(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 63,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setSelected(`${r.provider}:${r.id}`);setInspecting(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 66,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StorageConfiguration.tsx",
+      "buttons": [
+        {
+          "line": 18,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 18,
+          "label": "Add Storage",
+          "handler": "{()=>{setError('');setAdding(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(tab)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 20,
+          "label": "View Node Availability",
+          "handler": "{()=>onTab('Storage Pools')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StorageDatasets.tsx",
+      "buttons": [
+        {
+          "line": 32,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "Create Dataset",
+          "handler": "{()=>open('Create Dataset')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 36,
+          "label": "Dismiss",
+          "handler": "{()=>setMessage('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "Inspect",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "Snapshot",
+          "handler": "{()=>open('Take Snapshot')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 38,
+          "label": "Browse",
+          "handler": "{()=>read('Browse')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 38,
+          "label": "Export",
+          "handler": "{exportResource}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "Create Dataset",
+          "handler": "{()=>open('Create Dataset')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "Create ZFS Volume",
+          "handler": "{()=>open('Create ZFS Volume')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "Clone Snapshot",
+          "handler": "{()=>open('Clone Dataset')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "View Permissions",
+          "handler": "{()=>read('Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "Browse Dataset",
+          "handler": "{()=>read('Browse')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 41,
+          "label": "Set Permissions",
+          "handler": "{()=>open('Set Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StorageDisks.tsx",
+      "buttons": [
+        {
+          "line": 26,
+          "label": "Scan Disks",
+          "handler": "{live.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 26,
+          "label": "(dynamic/icon)",
+          "handler": "{smart}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(d)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "Refresh S.M.A.R.T.",
+          "handler": "{smart}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "View Details",
+          "handler": "{()=>setFull(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(d)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "Export",
+          "handler": "{exportReport}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "View Full S.M.A.R.T. Data",
+          "handler": "{()=>setFull(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StoragePerformance.tsx",
+      "buttons": [
+        {
+          "line": 18,
+          "label": "Refresh",
+          "handler": "{live.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 18,
+          "label": "Export Report",
+          "handler": "{exportReport}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 20,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 22,
+          "label": "View Details",
+          "handler": "{()=>onTab('Storage Pools')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "View Datasets",
+          "handler": "{()=>onTab('Datasets / Volumes')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "View Shares",
+          "handler": "{()=>onTab('Shares')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StorageShares.tsx",
+      "buttons": [
+        {
+          "line": 31,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Mount Remote NFS",
+          "handler": "{()=>open('Mount Remote NFS')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Create Share",
+          "handler": "{()=>{setProtocol('smb');open('Create Share')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 33,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 34,
+          "label": "Dismiss",
+          "handler": "{()=>setMessage('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setSelected(r.id)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 35,
+          "label": "Inspect",
+          "handler": "{()=>{setSelected(r.id);setError('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 36,
+          "label": "Edit Share",
+          "handler": "{()=>open('Edit Share')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>run(`${endpoint}/toggle`,'POST',{})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Delete",
+          "handler": "{()=>run(endpoint,'DELETE',{})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Permissions",
+          "handler": "{()=>read('permissions','Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Browse Files",
+          "handler": "{()=>read('browse','Browse Share')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Create Share",
+          "handler": "{()=>{setProtocol('smb');open('Create Share')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Mount Remote NFS",
+          "handler": "{()=>open('Mount Remote NFS')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Check Path &amp; Service",
+          "handler": "{()=>read('check','Check Share')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Manage Permissions",
+          "handler": "{()=>read('permissions','Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Browse Files",
+          "handler": "{()=>read('browse','Browse Share')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 39,
+          "label": "Set Unix Permissions",
+          "handler": "{()=>open('Set Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/StorageSnapshots.tsx",
+      "buttons": [
+        {
+          "line": 36,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Schedule Snapshot",
+          "handler": "{()=>{const chosen=targets.find((t:any)=>t.id===target&&t.provider==='truenas');navigate('/backups?tab=Schedules&action=create&provider=truenas'+(chosen?'&datas",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Create Snapshot",
+          "handler": "{()=>setModal('Create Snapshot')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 38,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onTab(t)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 39,
+          "label": "Dismiss",
+          "handler": "{()=>setMessage('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(r.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "Inspect",
+          "handler": "{()=>setSelected(r.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "Restore",
+          "handler": "{()=>operation('rollback')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 41,
+          "label": "Clone",
+          "handler": "{()=>{setError('');setCloneTarget({...current});setModal('Clone')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 41,
+          "label": "Delete",
+          "handler": "{()=>operation('delete')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 41,
+          "label": "Browse Files",
+          "handler": "{browseFiles}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 42,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>run(`/truenas/schedule/${s.id}/toggle`,'POST',{})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 44,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/pages/Users.tsx",
+      "buttons": [
+        {
+          "line": 19,
+          "label": "Retry activity",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 33,
+          "label": "Refresh",
+          "handler": "{reports.refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 33,
+          "label": "Add User",
+          "handler": "{()=>{setError('');setCreate(true)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 34,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{reset();setRole(r);setStatus(s)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Retry",
+          "handler": "{()=>{setError('');live.refresh();session.refresh()}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "\"Reset filters\"",
+          "handler": "{reset}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "\"List view\"",
+          "handler": "{()=>setGrid(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 37,
+          "label": "\"Card view\"",
+          "handler": "{()=>setGrid(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(u)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>choose(u)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "{`View ${u.name}`}",
+          "handler": "{()=>choose(u)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 40,
+          "label": "\"Close user details\"",
+          "handler": "{()=>setClosed(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 41,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setTab('Roles & Permissions')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 45,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setError('');setConfirm({...selected})}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 47,
+          "label": "Cancel",
+          "handler": "{()=>setCreate(false)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 47,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "Cancel",
+          "handler": "{()=>setConfirm(null)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 48,
+          "label": "(dynamic/icon)",
+          "handler": "{toggle}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 54,
+          "label": "Retry",
+          "handler": "{()=>session.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "Accounts",
+          "handler": "{()=>change('Accounts')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 58,
+          "label": "Audit Logs",
+          "handler": "{()=>change('Audit Logs')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/pages/VirtualMachines.tsx",
+      "buttons": [
+        {
+          "line": 45,
+          "label": "Refresh",
+          "handler": "{refresh}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 45,
+          "label": "+ Create VM",
+          "handler": "{()=>setModal('create')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 47,
+          "label": "Open installation console",
+          "handler": "{()=>openConsole({...created,id:created.vmid})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 58,
+          "label": "\"List view\"",
+          "handler": "{()=>setLayout('list')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 58,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setLayout('grid')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 59,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(vm.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 66,
+          "label": "Refresh ISO list",
+          "handler": "{()=>setMediaRevision(value=>value+1)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 67,
+          "label": "Cancel",
+          "handler": "{()=>setModal(null)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 85,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setTab(item)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 87,
+          "label": "Snapshot",
+          "handler": "{snapshot}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Backup",
+          "handler": "{backup}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Console",
+          "handler": "{openConsole}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Start",
+          "handler": "{()=>run('start')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Shell",
+          "handler": "{()=>navigate(`/tools/shell?target=${encodeURIComponent(`vm:${vm.node}:${vm.id}`)}`)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Shutdown",
+          "handler": "{()=>run('shutdown')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 87,
+          "label": "Reboot",
+          "handler": "{()=>run('reboot')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/AboutSettings.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/AccountSecurity.tsx",
+      "buttons": [
+        {
+          "line": 10,
+          "label": "I saved my recovery codes",
+          "handler": "{()=>{setCodes([]);void status.refresh();void sessions.refresh()}}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 14,
+          "label": "Verify & Enable MFA",
+          "handler": "{()=>act('mfa/enable')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 14,
+          "label": "Cancel setup",
+          "handler": "{()=>setSetup(null)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 14,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>status.data.mfaEnabled?window.confirm('Disable MFA for your account and sign out all sessions?')&&act('mfa/disable'):act('mfa/setup')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 15,
+          "label": "Generate New Recovery Codes",
+          "handler": "{()=>window.confirm('Replace all recovery codes and sign out other devices?')&&act('mfa/recovery')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 16,
+          "label": "Change Password & Sign Out",
+          "handler": "{()=>act('password',{newPassword:next})}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 17,
+          "label": "Sign out",
+          "handler": "{()=>act('sessions/revoke',{id:s.id})}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 17,
+          "label": "Sign Out All Devices",
+          "handler": "{()=>window.confirm('Sign out every device, including this one?')&&act('sessions/revoke',{all:true})}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ActionConfirmation.tsx",
+      "buttons": [
+        {
+          "line": 19,
+          "label": "Confirm Action",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "Cancel",
+          "handler": "{()=>complete()}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 24,
+          "label": "Cancel",
+          "handler": "{()=>complete()}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 24,
+          "label": "Confirm",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/AppearanceSettings.tsx",
+      "buttons": [
+        {
+          "line": 5,
+          "label": "{`${editing?'Save':'Edit'} ${title}`}",
+          "handler": "{editing?onSave:onEdit}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 6,
+          "label": "(dynamic/icon)",
+          "handler": "{onClick}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 21,
+          "label": "{`Use accent ${accent}`}",
+          "handler": "{()=>update('accent',accent)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Reset to Default",
+          "handler": "{reset}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/AutomaticConnectorUpdates.tsx",
+      "buttons": [
+        {
+          "line": 7,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>save(true,['failed','unverified'].includes(live.data.state))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 7,
+          "label": "Disable automatic updates",
+          "handler": "{()=>save(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 7,
+          "label": "Disable automatic updates",
+          "handler": "{()=>save(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/BrandIcon.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/ClearAlertHistory.tsx",
+      "buttons": [
+        {
+          "line": 15,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 15,
+          "label": "Cancel schedule",
+          "handler": "{async()=>{setBusy(true);setError('');try{await api(`/alerts/history/cleanups/${encodeURIComponent(job.id)}`,{method:'DELETE'});await jobs.refresh()}catch(e:any",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ClusterConnection.tsx",
+      "buttons": [
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{load}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Add / Edit Cluster",
+          "handler": "{load}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 44,
+          "label": "Copy command",
+          "handler": "{copyCaCommand}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Cancel",
+          "handler": "{()=>setOpen(false)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Test Connection",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ClusterTopology.tsx",
+      "buttons": [
+        {
+          "line": 16,
+          "label": "\"Zoom out topology\"",
+          "handler": "{()=>setZoom(v=>Math.max(.7,Number((v-.1).toFixed(1))))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 16,
+          "label": "\"Zoom in topology\"",
+          "handler": "{()=>setZoom(v=>Math.min(1.3,Number((v+.1).toFixed(1))))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 16,
+          "label": "\"Reset topology zoom\"",
+          "handler": "{()=>setZoom(1)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 21,
+          "label": "{`Inspect node ${node.name}`}",
+          "handler": "{()=>setSelected(node)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 22,
+          "label": "{`Inspect ${guest.kind==='lxc'?'CT':'VM'} ${guest.id} on ${node.name}`}",
+          "handler": "{()=>setSelected(guest)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/ConfigurationDialog.tsx",
+      "buttons": [
+        {
+          "line": 25,
+          "label": "Retry Configuration",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{loadModels}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{save}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{test}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Close",
+          "handler": "{close}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Disconnect",
+          "handler": "{disable}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ConnectionActionDialog.tsx",
+      "buttons": [
+        {
+          "line": 26,
+          "label": "Read SSH Fingerprint",
+          "handler": "{()=>setRetry(v=>v+1)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 31,
+          "label": "Run Again",
+          "handler": "{()=>{setResult(null);setConsent(false)}}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "Close",
+          "handler": "{onClose}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/ConnectionHealthGuide.tsx",
+      "buttons": [
+        {
+          "line": 17,
+          "label": "Recheck Setup",
+          "handler": "{onRecheck}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 17,
+          "label": "Edit connection",
+          "handler": "{onEdit}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "Fix Guest Discovery Access",
+          "handler": "{()=>setRepair(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 20,
+          "label": "Go to Install &amp; Connect",
+          "handler": "{onSetup}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 21,
+          "label": "Update Connector",
+          "handler": "{onUpdate}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 21,
+          "label": "Check Installed Connector",
+          "handler": "{()=>startAction('connector-check')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 22,
+          "label": "Check Connector &amp; Logs",
+          "handler": "{()=>startAction('connector-check')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 22,
+          "label": "Start Connector",
+          "handler": "{()=>startAction('connector-start')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Check Docker",
+          "handler": "{()=>startAction('docker-check')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Start Docker",
+          "handler": "{()=>startAction('docker-start')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Check Docker Connection",
+          "handler": "{onRecheck}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 25,
+          "label": "Remove",
+          "handler": "{onRemove}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ConnectionManager.tsx",
+      "buttons": [
+        {
+          "line": 66,
+          "label": "(dynamic/icon)",
+          "handler": "{checkSetup}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 66,
+          "label": "Add Connection",
+          "handler": "{()=>choose('choose')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>changeSection('connected')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>changeSection('setup')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 67,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>changeSection('notifications')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 68,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>changeSection(id)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 69,
+          "label": "Retry connection checks",
+          "handler": "{checkSetup}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 72,
+          "label": "( )",
+          "handler": "{()=>setFilter(kind)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 72,
+          "label": "\"Grid view\"",
+          "handler": "{()=>setView('grid')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 72,
+          "label": "\"List view\"",
+          "handler": "{()=>setView('list')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 74,
+          "label": "Open",
+          "handler": "{()=>test(r,true)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 74,
+          "label": "Test",
+          "handler": "{()=>test(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 74,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setSelected(r.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 74,
+          "label": "Update Connector",
+          "handler": "{()=>setUpdateNode(r.connector)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 74,
+          "label": "Remove",
+          "handler": "{()=>remove(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 75,
+          "label": "Clear filters",
+          "handler": "{()=>{setSearch('');setFilter('all')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 76,
+          "label": "Update connector ·",
+          "handler": "{()=>setUpdateNode(n)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 78,
+          "label": "Add Connection",
+          "handler": "{()=>choose('choose')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 82,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{if(['truenas','ai'].includes(id)){choose('');setConfiguration(id)}else if(id==='notifications'){choose('');changeSection('notifications')}else choose(id)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 82,
+          "label": "Direct Docker API",
+          "handler": "{()=>choose('direct')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 83,
+          "label": "Back to connection types",
+          "handler": "{()=>choose('choose')}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 84,
+          "label": "Pair Proxmox Node",
+          "handler": "{()=>choose('proxmox-node')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 88,
+          "label": "Configure TrueNAS",
+          "handler": "{()=>{choose('');setConfiguration('truenas')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 88,
+          "label": "Configure AI Assistant",
+          "handler": "{()=>{choose('');setConfiguration('ai')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/ConnectorUpdateDialog.tsx",
+      "buttons": [
+        {
+          "line": 19,
+          "label": "Read SSH Fingerprint",
+          "handler": "{()=>setRetry(v=>v+1)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 22,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 22,
+          "label": "Close",
+          "handler": "{onClose}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/ContainerSSHApproval.tsx",
+      "buttons": [
+        {
+          "line": 16,
+          "label": "Read SSH Fingerprint",
+          "handler": "{()=>{setError('');setRetry(v=>v+1)}}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "Cancel",
+          "handler": "{onCancel}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/DataTable.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/Discovery.tsx",
+      "buttons": [
+        {
+          "line": 8,
+          "label": "Export inventory",
+          "handler": "{()=>downloadReport({resources:rows,reports})}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/DistributionSummary.tsx",
+      "buttons": [
+        {
+          "line": 5,
+          "label": "{r.title||`${r.name}${r.detail?` / ${r.detail}`:''}`}",
+          "handler": "{r.onClick}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/DockerConnection.tsx",
+      "buttons": [
+        {
+          "line": 11,
+          "label": "(dynamic/icon)",
+          "handler": "{load}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 11,
+          "label": "Test Connection",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 11,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/DockerHostSelector.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/DockerMonitoring.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/DockerUpdates.tsx",
+      "buttons": [
+        {
+          "line": 39,
+          "label": "(dynamic/icon)",
+          "handler": "{check}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 41,
+          "label": "Review & Install",
+          "handler": "{()=>open(r)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 43,
+          "label": "Recover Interrupted Update",
+          "handler": "{recover}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 43,
+          "label": "(dynamic/icon)",
+          "handler": "{install}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/EditableSettingsSection.tsx",
+      "buttons": [
+        {
+          "line": 12,
+          "label": "{`Save ${title}`}",
+          "handler": null,
+          "form": true,
+          "type": "\"submit\"",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "{`Edit ${title}`}",
+          "handler": "{()=>{current.current=value;baseline.current=value;dirty.current=false;setDraft(value);setSaved(false);setError('');setEditing(true)}}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/EmptyStateArtwork.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/GuestBootstrap.tsx",
+      "buttons": [
+        {
+          "line": 16,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/GuestConnections.tsx",
+      "buttons": [
+        {
+          "line": 21,
+          "label": "Recheck VMs",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Fix Permissions",
+          "handler": "{()=>setRepair(g.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>{setGuest(g);setResult(null);setCheckError('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 26,
+          "label": "Recheck Guest Agent",
+          "handler": "{async()=>{setBusy(true);setCheckError('');try{let response=await api('/connections/proxmox/guests?refresh=1');const deadline=Date.now()+60000;while(response.re",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 37,
+          "label": "Set Up Docker",
+          "handler": "{()=>{setTarget(r);setError('');setMessage('')}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 38,
+          "label": "(dynamic/icon)",
+          "handler": "{install}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 38,
+          "label": "Pause verification",
+          "handler": "{()=>{setWaiting('');setMessage('Verification paused. Recheck when this guest is ready.')}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 38,
+          "label": "Recheck Docker Connection",
+          "handler": "{()=>setWaiting(target.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/GuestCreateFields.tsx",
+      "buttons": [
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{complete}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/GuestPermissionRepair.tsx",
+      "buttons": [
+        {
+          "line": 18,
+          "label": "Recheck VM Access",
+          "handler": "{()=>{setSelected([]);setConsent(false);setPassword('');setOtp('');setReload(n=>n+1)}}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 24,
+          "label": "Retry connection",
+          "handler": "{()=>setReload(n=>n+1)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 25,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 25,
+          "label": "Close",
+          "handler": "{close}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/HeaderNotifications.tsx",
+      "buttons": [
+        {
+          "line": 16,
+          "label": "{`Notifications: ${label}`}",
+          "handler": "{()=>setOpen(v=>!v)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 18,
+          "label": "\"Close notifications\"",
+          "handler": "{close}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 19,
+          "label": "Refresh",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 19,
+          "label": "(dynamic/icon)",
+          "handler": "{read}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/IntegrationChecks.tsx",
+      "buttons": [
+        {
+          "line": 11,
+          "label": "(dynamic/icon)",
+          "handler": "{check}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 11,
+          "label": "Download Diagnostics",
+          "handler": "{download}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/IntegrationsSettings.tsx",
+      "buttons": [
+        {
+          "line": 13,
+          "label": "Retry Rule Readings",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/LanAccessPolicy.tsx",
+      "buttons": [
+        {
+          "line": 6,
+          "label": "Remove Grant",
+          "handler": "{()=>{setRules(rows=>rows.filter((_,n)=>n!==i));setAccepted(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 6,
+          "label": "Add Service Grant",
+          "handler": "{()=>{setRules(rows=>[...rows,{publicKey:'',destination:'',protocol:'tcp',port:443,interface:'',nat:false}]);setAccepted(false)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 6,
+          "label": "Apply LAN Service Policy",
+          "handler": "{()=>apply({authorized:true,rules,clientNetworks:networks.split(',').map(v=>v.trim()).filter(Boolean)})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 6,
+          "label": "Disable LAN Access",
+          "handler": "{()=>apply({authorized:true,rules:[],clientNetworks:[]})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/Layout.tsx",
+      "buttons": [
+        {
+          "line": 73,
+          "label": "\"Close navigation\"",
+          "handler": "{closeMenu}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 85,
+          "label": "{mobile?(menuOpen?'Close navigation':'Open navigation'):(collapsed?'Expand navigation':'Collapse navigation')}",
+          "handler": "{()=>mobile?setMenuOpen(v=>!v):setCollapsed(v=>!v)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 86,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setProfileOpen(v=>!v)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 86,
+          "label": "Sign out",
+          "handler": "{signOut}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/NodeAgents.tsx",
+      "buttons": [
+        {
+          "line": 28,
+          "label": "Install &amp; Connect",
+          "handler": "{()=>{setError('');setBootstrap({node:{...n,name:n.hostname||n.name},guest:h});}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "Install &amp; Connect",
+          "handler": "{()=>install(n,h)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 28,
+          "label": "Connect",
+          "handler": "{()=>choose(n.id+':'+h.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Recheck Setup",
+          "handler": "{()=>startWaiting(pendingConnection)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Refresh Hosts",
+          "handler": "{async()=>{setBusy(true);try{await Promise.all([nodes.refresh(),hosts.refresh()])}finally{setBusy(false)}}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Verify Direct Engine",
+          "handler": "{verifyDirect}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Pair Proxmox Node",
+          "handler": "{pair}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setExpanded(value=>!value)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Cancel Verification",
+          "handler": "{()=>{setWaiting('');setMessage('Connection verification cancelled.')}}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Revoke Agent",
+          "handler": "{()=>revoke(n)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 30,
+          "label": "Recheck and Connect",
+          "handler": "{()=>startWaiting(bootstrap.node.id+':'+bootstrap.guest.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/NodeAvailability.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/NotificationChannelIcon.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/NotificationFilterPicker.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/NotificationSettings.tsx",
+      "buttons": [
+        {
+          "line": 30,
+          "label": "Retry Notifications",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "Setup",
+          "handler": "{()=>setGuide(channel)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "Test",
+          "handler": "{()=>test([channel])}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>test(channels)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 36,
+          "label": "Refresh Delivery Status",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/OperationsHealth.tsx",
+      "buttons": [
+        {
+          "line": 27,
+          "label": "Refresh Readings",
+          "handler": "{()=>Promise.all([live.refresh(),performance.refresh()])}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>run('vpn-setup',{address,port:Number(port)})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{pair}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Download Device Profile",
+          "handler": "{download}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "Clear Profile",
+          "handler": "{()=>setProfile('')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "Revoke Access",
+          "handler": "{()=>run('vpn-remove',{publicKey:p.publicKey})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Install Monitoring Tools",
+          "handler": "{()=>setToolsNode(node)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>run('network-check')}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/PageIcon.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/Pagination.tsx",
+      "buttons": [
+        {
+          "line": 24,
+          "label": "Previous",
+          "handler": "{()=>onPageChange(current-1)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 26,
+          "label": "Next",
+          "handler": "{()=>onPageChange(current+1)}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/PairConnector.tsx",
+      "buttons": [
+        {
+          "line": 26,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Copy Installer Command",
+          "handler": "{()=>copy(command)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 30,
+          "label": "Copy Address",
+          "handler": "{()=>copy(origin)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 31,
+          "label": "Copy Pairing Code",
+          "handler": "{()=>copy(pairing.code)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 32,
+          "label": "(dynamic/icon)",
+          "handler": "{verify}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 32,
+          "label": "Open Docker Hosts",
+          "handler": "{()=>navigate('/docker')}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/PersistentShell.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/ProviderJobs.tsx",
+      "buttons": [
+        {
+          "line": 9,
+          "label": "Refresh Jobs",
+          "handler": "{()=>live.refresh()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/RecoveryTests.tsx",
+      "buttons": [
+        {
+          "line": 12,
+          "label": "Refresh Recovery Tests",
+          "handler": "{()=>Promise.all([live.refresh(),archives.refresh()])}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "Restore Stopped Test VM",
+          "handler": "{()=>run('/recovery-tests',{archiveId,vmid:Number(vmid),node,storage})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "Check Restore & Isolate",
+          "handler": "{()=>run(`/recovery-tests/${r.id}/isolate`,{})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "Boot Isolated Test VM",
+          "handler": "{()=>run(`/recovery-tests/${r.id}/boot`,{})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "View Verification",
+          "handler": "{()=>inspect(r.id)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 12,
+          "label": "Close",
+          "handler": "{()=>setDetails(null)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 12,
+          "label": "Record Verified Recovery",
+          "handler": "{()=>run(`/recovery-tests/${details.test.id}/verify`,{files,services,notes})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/ReportLoading.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/SFTPBrowser.tsx",
+      "buttons": [
+        {
+          "line": 23,
+          "label": "Disconnect",
+          "handler": "{onDisconnect}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "SFTP Files",
+          "handler": "{()=>setSettings(false)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "Connection Info",
+          "handler": "{()=>setSettings(true)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 23,
+          "label": "\"Back\"",
+          "handler": "{async()=>{if(await load(history[index-1])!==undefined)setIndex(index-1)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "\"Forward\"",
+          "handler": "{async()=>{if(await load(history[index+1])!==undefined)setIndex(index+1)}}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "\"Parent folder\"",
+          "handler": "{()=>navigate(parent(directory))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "\"Refresh files\"",
+          "handler": "{()=>load(directory)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Upload",
+          "handler": "{()=>upload.current?.click()}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "New Folder",
+          "handler": "{()=>setDialog({action:'mkdir',title:'New Folder'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "New File",
+          "handler": "{()=>setDialog({action:'write',title:'New File'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setDialog({action:'delete',names:selected,title:'Delete selected items'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "Retry and replace conflicting or partial files",
+          "handler": "{()=>setDialog({action:'replace-upload',names:retryFiles.map(f=>f.name),title:'Replace uploaded files?'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "..",
+          "handler": "{()=>navigate(parent(directory))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>navigate(join(directory,e.name))}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "{`Download ${e.name}`}",
+          "handler": "{()=>download(e)}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "{`Rename ${e.name}`}",
+          "handler": "{()=>setDialog({action:'rename',name:e.name,title:'Rename item'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "{`Delete ${e.name}`}",
+          "handler": "{()=>setDialog({action:'delete',names:[e.name],title:'Delete item'})}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 23,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/SSHAccess.tsx",
+      "buttons": [
+        {
+          "line": 26,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 26,
+          "label": "{showPassword?'Hide password':'Show password'}",
+          "handler": "{()=>setShowPassword(!showPassword)}",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 26,
+          "label": "Forget saved connection",
+          "handler": "{async()=>{setBusy(true);try{await api('/ssh/connections',{method:'DELETE',body:JSON.stringify({target})});localStorage.removeItem('homecloud-ssh-'+target);setS",
+          "form": true,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/SSHTerminal.tsx",
+      "buttons": [
+        {
+          "line": 55,
+          "label": "Copy",
+          "handler": "{copy}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Paste",
+          "handler": "{paste}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Select All",
+          "handler": "{selectAll}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "\"Fullscreen terminal\"",
+          "handler": "{async()=>{try{await fullscreenTerminal(shellRef.current)}catch(e:any){setError(e.message||'Fullscreen unavailable')}}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Disconnect",
+          "handler": "{()=>{setId('');onDisconnect?.()}}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Copy",
+          "handler": "{copy}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Paste",
+          "handler": "{paste}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 55,
+          "label": "Select All",
+          "handler": "{()=>{selectAll();setClipboard(null)}}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 55,
+          "label": "Insert into Terminal",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/SecuritySettings.tsx",
+      "buttons": [
+        {
+          "line": 22,
+          "label": "Retry Security Policy",
+          "handler": "{()=>security.refresh()}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 26,
+          "label": "Sign Out This Browser",
+          "handler": "{signOut}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 27,
+          "label": "(dynamic/icon)",
+          "handler": "{loadLogs}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 27,
+          "label": "Download Audit Logs",
+          "handler": "{downloadLogs}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/SessionPreferences.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/StorageRegistration.tsx",
+      "buttons": [
+        {
+          "line": 10,
+          "label": "(dynamic/icon)",
+          "handler": null,
+          "form": true,
+          "type": "default",
+          "guarded": true
+        }
+      ]
+    },
+    {
+      "file": "src/components/SystemSettings.tsx",
+      "buttons": [
+        {
+          "line": 14,
+          "label": "(dynamic/icon)",
+          "handler": "{onClear}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 14,
+          "label": "(dynamic/icon)",
+          "handler": "{onRefresh}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        },
+        {
+          "line": 14,
+          "label": "Reload Interface",
+          "handler": "{onReload}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/TableActions.tsx",
+      "buttons": [
+        {
+          "line": 14,
+          "label": "{label}",
+          "handler": null,
+          "form": false,
+          "type": "{props.type||'button'}",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/TemperatureReadingDetails.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/TemperatureSummary.tsx",
+      "buttons": [
+        {
+          "line": 29,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>setExpanded(!expanded)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/TrueNASCertificateGuide.tsx",
+      "buttons": []
+    },
+    {
+      "file": "src/components/UI.tsx",
+      "buttons": [
+        {
+          "line": 23,
+          "label": "(dynamic/icon)",
+          "handler": "{onClick}",
+          "form": false,
+          "type": "default",
+          "guarded": true
+        },
+        {
+          "line": 42,
+          "label": "\"Close dialog\"",
+          "handler": "{onClose}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": false
+        },
+        {
+          "line": 60,
+          "label": "(dynamic/icon)",
+          "handler": "{()=>onChange(i)}",
+          "form": false,
+          "type": "default",
+          "guarded": false
+        }
+      ]
+    },
+    {
+      "file": "src/components/UpdateButton.tsx",
+      "buttons": [
+        {
+          "line": 28,
+          "label": "{statusError?'Retry update status':running?'Updating software':requested?'Checking for software updates':status?.available?'Install software update':'Check for software updates'}",
+          "handler": "{statusError?()=>retry.current():update}",
+          "form": false,
+          "type": "\"button\"",
+          "guarded": true
+        }
+      ]
+    }
+  ]
+}

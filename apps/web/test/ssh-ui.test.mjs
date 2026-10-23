@@ -132,7 +132,7 @@ test('Network Manage Device selects the requested Docker host before navigation'
 });
 test('Network honours DNS tab deep links and tab clicks',async()=>{
  const page=await mounted('pages/Network.tsx',{},async()=>({resolvers:[],interfaces:[],networks:[],services:[],connectors:[],nodes:[]}),true,false,['/network?tab=DNS']);
- try{assert.ok(page.container.querySelector('.network-dns'));await page.click([...page.container.querySelectorAll('.tabs button')].find(b=>b.textContent==='Network Map'));assert.ok(page.container.querySelector('.network-map'));}finally{await page.close()}
+ try{assert.ok(page.container.querySelector('.network-dns'));await page.click([...page.container.querySelectorAll('.tabs button')].find(b=>b.textContent==='Network Map'));assert.ok(page.container.querySelector('.cluster-topology'));}finally{await page.close()}
 });
 test('shared dialogs trap keyboard focus, close with Escape and restore focus',async()=>{
  let closed=0;const page=await mounted('components/UI.tsx',{open:false,title:'Fixture',onClose(){closed++},children:React.createElement('button',null,'Last control')},async()=>({}),true,false,['/'],'Modal');

@@ -10,7 +10,7 @@ export function overviewData(data:any,backup:any,node:string,search:string){
  const alerts=(data.alerts||[]).filter((a:any)=>a.status!=='resolved'&&(!node||belongs(a)));
  const reporting=nodes.filter((n:any)=>n.status==='online');
  const proxmox=(data.services||[]).find((s:any)=>s.provider==='proxmox'||s.name==='proxmox');
- const inventoryKnown=proxmox?.status==='reachable';
+ const inventoryKnown=data.resourceInventoryComplete===true||proxmox?.status==='reachable';
  const dockerKnown=(data.services||[]).filter((s:any)=>s.provider==='docker'||s.name==='docker').every((s:any)=>s.status==='reachable');
  const backupErrors=backup?.errors||[];
  const backupKnown=!!backup&&(backup.archiveInventory?backup.archiveInventory.configured===true&&backup.archiveInventory.complete===true:!backupErrors.length);

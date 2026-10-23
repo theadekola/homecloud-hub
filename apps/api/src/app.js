@@ -226,7 +226,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  };
  read('/discovery',async()=>discovered(await monitor.sample()));
  read('/dashboard',async req=>{
-   const s=await sampleView(req),inventory=discovered(s);return {sampledAt:s.sampledAt,refreshing:!!s.refreshing,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:dashboardHistory(s.metrics),alerts:s.alerts,...inventory,nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
+   const s=await sampleView(req),inventory=discovered(s);return {sampledAt:s.sampledAt,refreshing:!!s.refreshing,services:s.services.filter(x=>x.status!=='not-configured'),hosts:s.hosts,metrics:dashboardHistory(s.metrics),alerts:s.alerts,...inventory,resourceInventoryComplete:s.proxmox?.resourceInventoryComplete===true,nodeCoverage:s.proxmox?.nodeCoverage||[],nodes:s.proxmox?.nodes||[],guests:[...(s.proxmox?.vms||[]),...(s.proxmox?.lxc||[])],storage:s.proxmox?.storage||[],
 
      stats:{servers:s.hosts.length,vms:s.proxmox?.vms.length??null,lxc:s.proxmox?.lxc.length??null,containers:discoveredContainerCount(s,inventory),alerts:s.alerts.filter(a=>a.status==='active').length,connected:s.services.filter(x=>x.status==='reachable').length,configured:s.services.filter(x=>x.status!=='not-configured').length}};
  });
@@ -239,7 +239,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const readArchives=req=>readCache.run('backup-archives:'+connectionScope(),()=>backupArchives(),{force:forceRead(req)});
  read('/proxmox/storage',req=>readStorage(req));
  read('/proxmox/storage/configuration',()=>storageConfiguration());
- read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
+ read('/network/dns',async()=>{const nodes=await pve('/nodes'),resolvers=[],errors=[];await Promise.all(nodes.map(async n=>{try{if(n.status==='offline')throw new Error('Node is offline');resolvers.push({node:n.node,...await pve(`/nodes/${encode(n.node)}/dns`)});}catch(e){errors.push(`${n.node}: ${e.message}`);}}));return {resolvers,errors,sampledAt:new Date().toISOString()};});
  action('put','/network/dns/:node','admin','network.dns.configure',req=>networkDnsWrite(req.params.node,req.body),true);
  read('/network/firewall/:node',req=>networkFirewall(req.params.node));
  action('post','/network/firewall/:node/rules','admin','firewall.rule.create',req=>{const b=req.body;if(!['in','out'].includes(b.type)||!['ACCEPT','DROP','REJECT'].includes(b.action))throw httpError('Invalid rule direction or action');const body={type:b.type,action:b.action,enable:0};for(const k of ['source','dest','proto','dport','comment'])if(typeof b[k]==='string'&&b[k].trim())body[k]=b[k].trim();return pveWrite(`/nodes/${encode(req.params.node)}/firewall/rules`,'POST',body);},true);

@@ -7,7 +7,7 @@ export async function storageInventory(query=pve){
  const nodes=await query('/nodes');if(!Array.isArray(nodes)||nodes.some(n=>!n||typeof n.node!=='string'||!n.node.trim()))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});let configs=[];if(!nodes.length)errors.push('No Proxmox nodes are visible; storage inventory could not be verified.');
  try{configs=await query('/storage');if(!Array.isArray(configs)||configs.some(config=>!config||typeof config.storage!=='string'||!config.storage))throw new Error('Invalid storage configuration response');}catch(e){configs=[];errors.push(`Storage configuration: ${e.message}`);}
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
-  try{const entries=await query(`/nodes/${encode(node.node)}/storage`);
+  try{if(node.status==='offline')throw new Error('Node is offline');const entries=await query(`/nodes/${encode(node.node)}/storage`);
    if(!Array.isArray(entries)||entries.some(row=>!row||typeof row.storage!=='string'||!row.storage))throw new Error('Invalid node storage response');
    const reported=new Set(entries.map(row=>row.storage));
    const rows=[...entries,...configs.filter(config=>!reported.has(config.storage)&&(!config.nodes||storagePlacement(config,node.node).applicable)).map(config=>({storage:config.storage,reported:false}))];
@@ -24,7 +24,7 @@ export async function storageInventory(query=pve){
   }catch(e){errors.push(`${node.node} storage: ${e.message}`);
    // Keep assigned registrations visible even if the node cannot be queried.
    for(const config of configs){const placement=storagePlacement(config,node.node);if(!placement.applicable)continue;
-    resources.push({id:`${node.node}/${config.storage}`,name:config.storage,node:node.node,type:config.type||'Unknown',shared:[1,true,'1'].includes(config.shared)?true:[0,false,'0'].includes(config.shared)?false:null,...placement,scopeVerified:true,status:[1,true,'1'].includes(config.disable)?'disabled':'unknown',reported:false,capacity:null,used:null,available:null,usage:null,content:config.content||null,availabilityReason:`Storage is registered for ${node.node}, but its measurements could not be read: ${e.message}`,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
+    resources.push({id:`${node.node}/${config.storage}`,name:config.storage,node:node.node,type:config.type||'Unknown',shared:[1,true,'1'].includes(config.shared)?true:[0,false,'0'].includes(config.shared)?false:null,...placement,scopeVerified:true,status:[1,true,'1'].includes(config.disable)?'disabled':node.status==='offline'?'offline':'unknown',reported:false,capacity:null,used:null,available:null,usage:null,content:config.content||null,availabilityReason:`Storage is registered for ${node.node}, but its measurements could not be read: ${e.message}`,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
    }
   }
  }));
@@ -43,7 +43,7 @@ export function storageSummary(pools,coverage={complete:true}){
  const unique=[...groups.values()],online=unique.filter(p=>['online','ONLINE'].includes(p.status)),measured=online.filter(p=>p.capacity>0&&Number.isFinite(p.used)&&Number.isFinite(p.available));
  const uncertain=unique.some(p=>p.provider==='proxmox'&&p.shared==null);
  const complete=coverage.complete!==false&&!uncertain&&online.length>0&&measured.length===online.length;
- return {notAssigned:pools.filter(p=>p.applicable===false).length,pools:unique.length,online:online.length,measured:measured.length,complete,coverage,measuredCapacity:measured.reduce((n,p)=>n+p.capacity,0),capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
+ return {notAssigned:pools.filter(p=>p.applicable===false).length,pools:unique.length,online:online.length,measured:measured.length,complete,coverage,measuredCapacity:measured.reduce((n,p)=>n+p.capacity,0),measuredUsed:measured.length?measured.reduce((n,p)=>n+p.used,0):null,measuredAvailable:measured.length?measured.reduce((n,p)=>n+p.available,0):null,capacity:complete?measured.reduce((n,p)=>n+p.capacity,0):null,used:complete?measured.reduce((n,p)=>n+p.used,0):null,available:complete?measured.reduce((n,p)=>n+p.available,0):null,distribution:measured.map(p=>({...p,key:`${p.provider}:${p.id}`}))};
 }
 export function createStorage(input,write=pveWrite){
  const type=required(input.type,'Type'),storage=required(input.storage,'Storage ID');

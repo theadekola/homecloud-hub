@@ -16,3 +16,11 @@ export function proxmoxAvailability(data:any){
   coverage:`${online.length}/${nodes.length} nodes online · CPU ${cpu.length}/${online.length} · memory ${memory.length}/${online.length} · storage ${storage.length}/${(data?.storage||[]).length} entries measured`,
  };
 }
+
+export function guestAvailability(rows:any[]){
+ const live=rows.filter(row=>row.nodeAvailable!==false&&row.status!=='unknown');
+ const memory=live.filter(row=>measured(row.memory)&&measured(row.memoryTotal)&&row.memoryTotal>0);
+ const disk=live.filter(row=>measured(row.disk)&&measured(row.diskTotal)&&row.diskTotal>0);
+ return {memory:total(memory,'memory'),memoryTotal:total(memory,'memoryTotal'),disk:total(disk,'disk'),diskTotal:total(disk,'diskTotal'),
+  coverage:`Memory ${memory.length}/${rows.length} · disk ${disk.length}/${rows.length} guests measured. Missing or offline readings are excluded.`};
+}

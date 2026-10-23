@@ -134,3 +134,11 @@ Dashboard and Network Devices use resource-inventory coverage independently of o
 Storage, network, DNS and task collection skip explicitly offline nodes, preserve successful reads and retry returned nodes on subsequent automatic polling. Backup archive collection already isolates offline nodes and retains accessible archives. Storage Performance refreshes automatically by default; this can be turned off in its controls. An explicitly selected offline target remains distinct from another host; selecting or reporting another node never redirects management actions to it.
 
 To verify without disrupting services, use an already unavailable node: compare the available node's cards and resource rows with its provider API, confirm the missing-node notice, then observe normal polling after that node is restored by its administrator. Manual Refresh can request an immediate reread. Do not shut down production nodes merely to exercise these checks.
+
+### Clearing alert history
+
+Admins and owners can use **Alerts → Alert History → Clear History**, beside the date-filter Apply button. In the popup, choose From and To dates and either **Clear now** or **Schedule once**. Both dates are inclusive in the browser's local timezone, and the range applies to each alert's triggered date. The review popup shows the current matching count before confirmation.
+
+Only resolved records are removed. Active and acknowledged alerts, alert rules, provider data and audit logs are preserved. Clearing cannot be undone; Export History first if a copy is needed. Scheduled matching counts may change before execution as more records are resolved.
+
+One-time schedules are stored durably, listed in the popup and can be cancelled before execution. The server executes due schedules on its normal monitoring tick; a missed schedule runs after restart. Maintenance pauses execution. Completed schedules record their completion time and removed count. This is a bounded one-time date-range operation, not recurring retention or backup cleanup.

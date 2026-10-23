@@ -525,7 +525,7 @@ def install_connector_update(config,payload,nonce,root=pathlib.Path('/'),exec_pr
   atomic_connector_file(root/'pending.json',json.dumps(state).encode());atomic_connector_file(root/'rollback.py',ROLLBACK_SOURCE.encode())
   # Independent systemd timer survives a failed replacement process.
   try:
-   run_process(['systemd-run','--quiet','--unit=homecloud-connector-rollback-'+nonce,'--on-active=60s','/usr/bin/python3',str(root/'rollback.py'),nonce],check=True,capture_output=True,timeout=10)
+   run_process(['systemd-run','--quiet','--collect','--timer-property=AccuracySec=1s','--unit=homecloud-connector-rollback-'+nonce,'--on-active=60s','/usr/bin/python3',str(root/'rollback.py'),nonce],check=True,capture_output=True,timeout=10)
    if config_path.read_bytes()!=original_config:raise RuntimeError('Pairing changed')
    atomic_connector_file(target,source)
    exec_process(sys.executable,[sys.executable,str(target),'--config',str(config_path)])

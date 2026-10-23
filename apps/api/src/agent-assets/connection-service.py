@@ -2,10 +2,42 @@
 import ast,base64,hashlib,hmac,json,os,pathlib,re,subprocess,sys,time
 ACTIONS=('connector-check','connector-start','docker-check','docker-start','monitoring-tools')
 
+class MonitoringInstallError(RuntimeError):
+    def __init__(self,code,stage):
+        super().__init__('Monitoring package installation could not be verified. Check package-manager status before retrying.' if code=='PACKAGE_VERIFY_FAILED' else 'Monitoring package operation failed')
+        self.code=code;self.stage=stage
+
+def package_failure(text):
+    text=text.lower()
+    for code,patterns in (
+        ('PACKAGE_REPOSITORY_AUTH',('401 unauthorized','403 forbidden','authentication failed')),
+        ('PACKAGE_MANAGER_LOCKED',('could not get lock','unable to acquire','held by process')),
+        ('PACKAGE_DNS_FAILED',('temporary failure resolving','could not resolve','name or service not known')),
+        ('PACKAGE_DISK_FULL',('no space left on device',)),
+        ('PACKAGE_MANAGER_REPAIR',('dpkg was interrupted','unmet dependencies','dependency problems','dpkg returned an error code')),
+        ('PACKAGE_REPOSITORY_INVALID',('does not have a release file','is not signed','no_pubkey','expired','certificate verification failed')),
+        ('PACKAGE_NETWORK_FAILED',('could not connect','connection timed out','network is unreachable','failed to fetch','some index files failed')),
+    ):
+        if any(pattern in text for pattern in patterns):return code
+    return 'PACKAGE_COMMAND_FAILED'
+
 def execute(args,timeout=40,input=None):
-    result=subprocess.run(args,capture_output=True,text=True,timeout=timeout,input=input)
-    if result.returncode: raise RuntimeError('The service action failed. Check service installation, privileges and guest access, then recheck its status.')
-    if len(result.stdout)>131072: raise RuntimeError('Diagnostic response exceeded the supported size')
+    package=args[0]=='apt-get'
+    stage='package-index' if package and args[1]=='update' else 'package-install'
+    try:result=subprocess.run(args,capture_output=True,text=True,timeout=timeout,input=input,env={**os.environ,**({'DEBIAN_FRONTEND':'noninteractive'} if package else {})})
+    except subprocess.TimeoutExpired:
+        if package:raise MonitoringInstallError('PACKAGE_TIMEOUT',stage)
+        raise RuntimeError('The service action timed out. Recheck its status before retrying.')
+    except FileNotFoundError:
+        if package:raise MonitoringInstallError('PACKAGE_MANAGER_MISSING',stage)
+        raise RuntimeError('The required service command is unavailable on this host')
+    if package:
+        diagnostic=(result.stderr or '')+'\n'+(result.stdout or '')
+        # apt-get update may exit zero while retaining failed old indexes.
+        incomplete=args[1]=='update' and any(p in diagnostic.lower() for p in ('failed to fetch','some index files failed'))
+        if result.returncode or incomplete:raise MonitoringInstallError(package_failure(diagnostic),stage)
+    elif result.returncode:raise RuntimeError('The service action failed. Check service installation, privileges and guest access, then recheck its status.')
+    if len(result.stdout)>131072:raise RuntimeError('Diagnostic response exceeded the supported size')
     return result.stdout
 
 def guest_run(target,script,run=execute):
@@ -50,11 +82,15 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
     starting=action.endswith('-start');docker=action.startswith('docker-');unit='docker.service' if docker else 'homecloud-node-agent.service'
     if config.read_bytes()!=original: raise RuntimeError('Pairing changed; no action was performed')
     if action=='monitoring-tools':
+        packages=('smartmontools','nut-client','nftables')
+        def installed():
+            try:output=run(['dpkg-query','-W','-f=${Package} ${Status}\n',*packages],timeout=10)
+            except RuntimeError:return False
+            return all(package+' install ok installed' in output.splitlines() for package in packages)
+        if installed():return {'action':action,'target':'node','installed':True,'message':'Monitoring tools are already installed and package status verified. No package changes were required.'}
         run(['apt-get','update'],timeout=120)
         run(['apt-get','install','-y','smartmontools','nut-client','nftables'],timeout=180)
-        packages=('smartmontools','nut-client','nftables')
-        output=run(['dpkg-query','-W','-f=${Package} ${Status}\n',*packages],timeout=10)
-        if not all(package+' install ok installed' in output.splitlines() for package in packages): raise RuntimeError('Monitoring package installation could not be verified. Check package-manager status before retrying.')
+        if not installed():raise MonitoringInstallError('PACKAGE_VERIFY_FAILED','package-verification')
         return {'action':action,'target':'node','installed':True,'message':'Monitoring tools installed and package status verified. Measurements refresh within one minute. UPS readings require an existing local NUT server; no UPS shutdown policy was changed.'}
     output=guest_run(target,service_script(unit,starting,docker),run)
     parts=output.split('\n__VERSION__\n',1);service=service_reading(parts[0]);result={'action':action,'target':target,'service':service,'active':service['ActiveState']=='active'}
@@ -93,4 +129,4 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
 if __name__=='__main__':
     try: print(json.dumps(diagnose(json.loads(base64.b64decode(sys.argv[1],validate=True)))))
     except Exception as error:
-        print(json.dumps({'error':str(error) if isinstance(error,RuntimeError) else 'Connection action failed. Check host access, service installation and the selected target.'}));sys.exit(1)
+        print(json.dumps({'error':str(error) if isinstance(error,RuntimeError) else 'Connection action failed. Check host access, service installation and the selected target.',**({'code':error.code,'stage':error.stage} if isinstance(error,MonitoringInstallError) else {})}));sys.exit(1)

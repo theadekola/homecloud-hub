@@ -43,3 +43,9 @@ test('monitoring tools route is owner-only, fixes the target and never audits su
  const url=`http://127.0.0.1:${server.address().port}/api/operations/paired/tools`;
  try{for(const role of ['viewer','operator','admin'])assert.equal((await fetch(url,{method:'POST',headers:{'x-role':role,'Content-Type':'application/json'},body:JSON.stringify(input)})).status,403);assert.equal(calls.length,0);const r=await fetch(url,{method:'POST',headers:{'x-role':'owner','Content-Type':'application/json'},body:JSON.stringify(input)});assert.equal(r.status,200);assert.equal(calls[0].id,'paired');assert.equal(calls[0].body.target,'node');assert.equal(calls[0].body.action,'monitoring-tools');assert.ok(!JSON.stringify(audits).includes(input.password));}finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
 });
+test('monitoring package failures report their safe stage and cause without leaking repository output',async()=>{
+ for(const [code,expected] of [['PACKAGE_REPOSITORY_AUTH',/repository rejected access/],['PACKAGE_MANAGER_LOCKED',/holds the APT/],['PACKAGE_DNS_FAILED',/resolve a package repository/],['PACKAGE_TIMEOUT',/timed out/]]){
+  const client={exec(_command,callback){const stream=new EventEmitter();stream.stderr=new EventEmitter();stream.end=()=>queueMicrotask(()=>{stream.emit('data',Buffer.from(JSON.stringify({code,stage:'package-index',error:'password=private-repository-secret'})));stream.emit('close',1)});callback(null,stream)},end(){}};
+  await assert.rejects(executeConnectionAction(client,'root',input.password,'fixed command'),error=>expected.test(error.message)&&!error.message.includes('private-repository-secret')&&error.message.includes('SSH login succeeded'));
+ }
+});

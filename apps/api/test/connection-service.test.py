@@ -21,9 +21,9 @@ class Services(unittest.TestCase):
   root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
   def run(args,**kw):
    calls.append((args,kw))
-   return ''.join(package+' install ok installed\n' for package in ('smartmontools','nut-client','nftables')) if args[0]=='dpkg-query' else ''
+   return ''.join(package+' install ok installed\n' for package in ('smartmontools','nut-client','nftables')) if args[0]=='dpkg-query' and len(calls)>1 else ''
   result=m.diagnose({**p,'action':'monitoring-tools'},root,run)
-  self.assertTrue(result['installed']);self.assertEqual(len(calls),3);self.assertEqual(calls[0][0],['apt-get','update']);self.assertEqual(calls[1][0],['apt-get','install','-y','smartmontools','nut-client','nftables']);self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes());self.assertNotIn('restart',str(calls))
+  self.assertTrue(result['installed']);self.assertEqual(len(calls),4);self.assertEqual(calls[1][0],['apt-get','update']);self.assertEqual(calls[2][0],['apt-get','install','-y','smartmontools','nut-client','nftables']);self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes());self.assertNotIn('restart',str(calls))
   calls.clear()
   with self.assertRaises(RuntimeError):m.diagnose({**p,'action':'monitoring-tools','target':'qemu/100'},root,run)
   self.assertEqual(calls,[])
@@ -64,4 +64,20 @@ class Services(unittest.TestCase):
   root,p=self.fixture();calls=[]
   with patch.object(m.os,'geteuid',return_value=1001),self.assertRaisesRegex(RuntimeError,'Root or sudo access is required'):m.diagnose(p,root,lambda *a,**k:calls.append(a))
   self.assertEqual(calls,[])
+ def test_installed_packages_skip_repository_updates(self):
+  root,p=self.fixture();calls=[]
+  def run(args,**kw):
+   calls.append(args);return ''.join(package+' install ok installed\n' for package in ('smartmontools','nut-client','nftables'))
+  result=m.diagnose({**p,'action':'monitoring-tools'},root,run)
+  self.assertTrue(result['installed']);self.assertEqual(len(calls),1);self.assertEqual(calls[0][0],'dpkg-query')
+ def test_package_errors_are_classified_without_exposing_output(self):
+  from types import SimpleNamespace
+  for diagnostic,code in [('401 Unauthorized password=private-secret','PACKAGE_REPOSITORY_AUTH'),('Could not get lock held by process 12','PACKAGE_MANAGER_LOCKED'),('Temporary failure resolving host','PACKAGE_DNS_FAILED'),('No space left on device','PACKAGE_DISK_FULL'),('dpkg was interrupted','PACKAGE_MANAGER_REPAIR')]:
+   with patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=100,stdout='',stderr=diagnostic)),self.assertRaises(m.MonitoringInstallError) as raised:m.execute(['apt-get','update'])
+   self.assertEqual(raised.exception.code,code);self.assertEqual(raised.exception.stage,'package-index');self.assertNotIn('private-secret',str(raised.exception))
+ def test_partial_index_failures_and_timeouts_do_not_claim_success(self):
+  from types import SimpleNamespace
+  with patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='',stderr='Failed to fetch index; Some index files failed')),self.assertRaises(m.MonitoringInstallError):m.execute(['apt-get','update'])
+  with patch.object(m.subprocess,'run',side_effect=m.subprocess.TimeoutExpired('apt-get',5)),self.assertRaises(m.MonitoringInstallError) as raised:m.execute(['apt-get','install','-y','smartmontools'])
+  self.assertEqual(raised.exception.code,'PACKAGE_TIMEOUT');self.assertEqual(raised.exception.stage,'package-install')
 if __name__=='__main__':unittest.main()

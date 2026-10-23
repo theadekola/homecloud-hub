@@ -1,3 +1,4 @@
+import {createHistoryCleanup} from './alert-history-cleanup.js';
 import {dashboardHistory} from './dashboard-history.js';
 import {createReportPerformance} from './report-performance.js';
 import {createRecoveryTests} from './recovery-tests.js';
@@ -435,6 +436,12 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
 
  read('/header-notifications',req=>activity.read(req.user,req.user.role==='owner'?updates.status():null));
  app.post('/api/header-notifications/read',authorize('viewer'),(req,res)=>{res.set('Cache-Control','no-store');res.json(activity.markRead(req.user,req.body.sequence));});
+ const historyCleanup=createHistoryCleanup({get,mutate});
+ app.get('/api/alerts/history/cleanups',authorize('admin'),(req,res)=>res.json({jobs:historyCleanup.list()}));
+ app.post('/api/alerts/history/preview',authorize('admin'),(req,res)=>res.json(historyCleanup.preview(req.body)));
+ action('post','/alerts/history/clear','admin','alert.history.clear',req=>historyCleanup.clear(req.body),true);
+ action('post','/alerts/history/cleanups','admin','alert.history.schedule',req=>historyCleanup.schedule(req.body,req.user),true);
+ action('delete','/alerts/history/cleanups/:id','admin','alert.history.cancel',req=>historyCleanup.cancel(req.params.id));
  read('/alerts',async()=>{void monitor.sample().catch(()=>{});return {alerts:get().alerts,rules:get().rules};});
 
  action('post','/alerts/rules','admin','alert.rule.create',async req=>{const {name,metric,provider='all',severity='warning'}=req.body;if(!['cpu','memory','storage'].includes(metric)||!['all',...Object.keys(providers)].includes(provider)||!['critical','warning'].includes(severity))throw httpError('Invalid alert rule');const rule={id:crypto.randomUUID(),name:required(name,'Name'),metric,provider,severity,threshold:integer(req.body.threshold,'Threshold',1,100),enabled:true};mutate(s=>s.rules.push(rule));return rule;});

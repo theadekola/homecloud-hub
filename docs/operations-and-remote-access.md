@@ -4,11 +4,11 @@ These features are available for controlled evaluation. They do not change the c
 
 ## Hardware and power
 
-Open **Monitoring → Hardware & Diagnostics**. Update paired node connectors to version 7 through **Settings → Connections → Update Connector**. The connector collects Linux thermal/hwmon readings, SMART health and temperature, and local Network UPS Tools readings in a background cycle, waiting one minute between collections. Collection time depends on the number of devices. Freshness is shown separately from measurement availability. Offline, old, waiting and stale connectors do not establish hardware health.
+Open **Monitoring → Hardware & Diagnostics**. Update paired node connectors to version 7 through **Settings → Connections → Update Connector**. The connector collects SMART health and local Network UPS Tools readings in a background cycle, waiting one minute between collections. Collection time depends on the number of devices. Freshness is shown separately from measurement availability. Offline, old, waiting and stale connectors do not establish hardware health.
 
-**Install Monitoring Tools** installs `smartmontools` and `nut-client` on Debian/Ubuntu hosts after owner confirmation. It does not configure UPS drivers, an NUT server, battery shutdown policy, disk passthrough or unsupported USB bridges. Configure your actual UPS and vendor shutdown policy separately; no shutdown commands are issued by this feature. Sensors and disks that cannot be read show unavailable values. SMART collection requests standby preservation, never starts a disk self-test, and is bounded to 16 devices. Tools/device firmware may not report every measurement.
+**Install Monitoring Tools** installs `smartmontools` and `nut-client` on Debian/Ubuntu hosts after owner confirmation. It does not configure UPS drivers, an NUT server, battery shutdown policy, disk passthrough or unsupported USB bridges. Configure your actual UPS and vendor shutdown policy separately; no shutdown commands are issued by this feature. Disks that cannot be read show unavailable values. SMART collection requests standby preservation, never starts a disk self-test, and is bounded to 16 devices. Tools/device firmware may not report every measurement.
 
-Fresh failed SMART health, temperature at or above 80 °C and UPS on-battery/low-battery observations generate normal alerts and use existing notification channels. The temperature threshold is a general warning, not a manufacturer-specific failure limit. Missing readings do not resolve previous hardware alerts; explicit healthy measurements are required.
+Fresh failed SMART health and UPS on-battery/low-battery observations generate normal alerts and use existing notification channels. Missing readings do not resolve previous hardware alerts; explicit healthy measurements are required.
 
 ## Network and response-time diagnostics
 
@@ -78,22 +78,13 @@ For emergency local isolation, `sudo ip link set icvpn down` stops VPN traffic. 
 
 Automated tests cover validation, authorization boundaries, firewall generation, revoked-peer filtering and failed-change rollback with simulated commands. They do **not** establish Linux kernel firewall acceptance, provider compatibility, physical-device handshakes, real LAN isolation or routed/NAT connectivity. No live gateway/network access was available during this implementation. CGNAT traversal, relays, native clients and automatic endpoint discovery remain unimplemented. A publicly reachable UDP gateway or a separately reviewed relay/tunnel arrangement is still required.
 
-## Temperature visibility and TrueNAS authentication
-
-The Monitoring overview includes per-host maximum temperatures, individual readings and report freshness for administrators/owners. Missing or stale readings are not marked healthy. A reported 126 °C Dell hwmon sensor is retained as reported; verify its label, sensor support and manufacturer limits on the actual host before treating it as either genuine overheating or an unsupported/sentinel reading.
+## TrueNAS authentication
 
 TrueNAS monitoring now uses the same safe, actionable diagnostic messages as connection tests. An authentication rejection requires checking the saved API key, expiry/revocation, enabled user account and appropriate API permissions, then testing the connection and refreshing monitoring. Use the API protocol matching the installed TrueNAS version. Manually resolving an alert does not fix authentication. No credentials were changed and no live TrueNAS authentication was tested here.
 
-### Temperature source and validation
+## Hardware monitoring scope
 
-The overview shows the CPU package/core maximum separately from the maximum across all reported sensor types. The latter can be a different component and must not be interpreted as CPU temperature. Coretemp measurements are identified by their driver; this does not establish support for every CPU vendor.
-
-After updating the paired connector, expand **Sensor source & validation** to inspect the sysfs source, raw millidegree value, label, driver fault flag and available maximum/critical thresholds. The API whitelists these fields. Missing metadata means unknown, not healthy. A driver-reported fault excludes that reading from the gauge maximum and creates a sensor-fault warning; it cannot clear a prior high-temperature warning. Only explicit fault-free data can resolve the sensor-fault warning.
-
-A raw `126000` input converts to `126 °C`. Do not discard, clamp or classify it as false solely because of that number. A fixed unlabelled Dell SMM channel while CPU readings vary is evidence to investigate firmware/sensor support, not proof of physical temperature or proof of a harmless sentinel. Compare the named host's raw sysfs readings and `sensors` output, if installed, then validate through BIOS/manufacturer diagnostics during an agreed maintenance window. Reading the same sysfs value with another Linux tool is not independent physical verification. Do not change fan control, unload the driver, update firmware or stress production workloads just to silence an alert. See the [Linux Dell SMM driver documentation](https://docs.kernel.org/hwmon/dell-smm-hwmon.html).
-
-Existing connectors remain compatible and show their previous readings until updated. Update the application first, then paired connectors under **Settings → Connections** to obtain source/fault metadata. A controller-only update cannot add metadata to an older connector report. Retain the prior connector/configuration and use the documented connector update/rollback procedure if verification fails.
-
+Temperature collection, displays and alerts have been removed. Legacy connectors' temperature fields are ignored. Update paired connectors to stop their previous collection code. Existing HomeCloud temperature and sensor-fault alerts and their queued notifications are removed during controller startup; unrelated alerts, SMART health and UPS monitoring remain available.
 
 ### Monitoring-tool installation approval
 

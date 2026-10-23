@@ -220,38 +220,17 @@ VPN_INTERFACE='icvpn'
 def command_json(args,timeout=5):
  p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
  return json.loads(p.stdout)
-def collect_temperatures(hwmon_root='/sys/class/hwmon',thermal_root='/sys/class/thermal'):
- readings=[]
- def read(path):
-  try:return path.read_text().strip()
-  except OSError:return None
- def degrees(raw):
-  try:
-   value=float(raw)/1000
-   return value if -50<=value<=200 else None
-  except (TypeError,ValueError):return None
- for hwmon in sorted(pathlib.Path(hwmon_root).glob('hwmon*'))[:16]:
-  driver=read(hwmon/'name') or 'Unknown'
-  for sensor in sorted(hwmon.glob('temp*_input'))[:16]:
-   prefix=sensor.name.removesuffix('_input');raw=read(sensor);label=read(hwmon/(prefix+'_label'))
-   fault=read(hwmon/(prefix+'_fault'))
-   readings.append({'name':(driver+' / '+(label or sensor.name))[:80],'celsius':degrees(raw),'source':str(sensor),'driver':driver[:80],'label':(label or '')[:80],'rawMilliCelsius':int(raw) if raw and re.fullmatch(r'-?\d+',raw) else None,'fault':True if fault=='1' else False if fault=='0' else None,'maxCelsius':degrees(read(hwmon/(prefix+'_max'))),'criticalCelsius':degrees(read(hwmon/(prefix+'_crit')))})
- for zone in sorted(pathlib.Path(thermal_root).glob('thermal_zone*'))[:32]:
-  raw=read(zone/'temp');name=read(zone/'type') or zone.name
-  readings.append({'name':name[:80],'celsius':degrees(raw),'source':str(zone/'temp'),'driver':'thermal','label':name[:80],'rawMilliCelsius':int(raw) if raw and re.fullmatch(r'-?\d+',raw) else None,'fault':None})
- return readings[:32]
 def collect_operations():
- report={'sampledAt':time.time(),'temperatures':[],'disks':[],'ups':[],'vpn':{'status':'not-configured','peers':[]},'errors':[]}
- report['temperatures']=collect_temperatures()
+ report={'sampledAt':time.time(),'disks':[],'ups':[],'vpn':{'status':'not-configured','peers':[]},'errors':[]}
  try:
   devices=command_json(['smartctl','--scan','--json']).get('devices',[])[:16]
   for device in devices:
    name=device.get('name','')
    if not re.fullmatch(r'/dev/[A-Za-z0-9_./-]{1,100}',name):continue
    try:
-    data=command_json(['smartctl','-H','-A','-n','standby','--json',name],3)
-    report['disks'].append({'name':name,'healthy':data.get('smart_status',{}).get('passed'),'celsius':data.get('temperature',{}).get('current')})
-   except Exception:report['disks'].append({'name':name,'healthy':None,'celsius':None})
+    data=command_json(['smartctl','-H','-n','standby','--json',name],3)
+    report['disks'].append({'name':name,'healthy':data.get('smart_status',{}).get('passed')})
+   except Exception:report['disks'].append({'name':name,'healthy':None})
  except Exception:report['errors'].append('Disk health unavailable. Install smartmontools and check device support/permissions.')
  try:
   names=run(['upsc','-l','localhost'],timeout=3).splitlines()[:8]

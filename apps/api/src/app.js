@@ -1,3 +1,4 @@
+import {automaticConnectorUpdates} from './connector-auto-updates.js';
 import {createHistoryCleanup} from './alert-history-cleanup.js';
 import {dashboardHistory} from './dashboard-history.js';
 import {createReportPerformance} from './report-performance.js';
@@ -71,7 +72,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,autoConnectorUpdates=automaticConnectorUpdates,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
 
  const app=express(),readCache=createReadCache(),reportPerformance=createReportPerformance();
  app.use((req,res,next)=>{const started=performance.now();res.on('finish',()=>{if(req.method==='GET'&&req.route?.path)reportPerformance.record(req.route.path,performance.now()-started,res.statusCode)});next()});
@@ -88,7 +89,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
  app.get('/api/docker-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-docker-agent.sh',import.meta.url))));
  app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name,req.body.kind)));
- app.post('/api/node-agent/poll',(req,res,next)=>{req.nodeAgent=req.nodeAgent||authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));next();},agentPollLimiter,(req,res)=>res.json(pollAgent(req.nodeAgent,req.body)));
+ app.post('/api/node-agent/poll',(req,res,next)=>{req.nodeAgent=req.nodeAgent||authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));next();},agentPollLimiter,(req,res)=>{const result=pollAgent(req.nodeAgent,req.body);res.json({...result,...autoConnectorUpdates.poll(req.nodeAgent,req.body,result)})});
 
  app.post('/api/node-agent/setup-script',(req,res)=>{authenticateAgent(req.headers.authorization?.replace(/^Bearer /,''));res.json({script:readFileSync(new URL('./agent-assets/guest-docker-setup.sh',import.meta.url),'utf8')});});
  app.get('/api/auth/setup',async(req,res)=>{res.set('Cache-Control','no-store');res.json(await setupStatus(db));});
@@ -117,6 +118,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts().filter(h=>h.online||h.status==='connected'),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
  app.get('/api/node-agents/:id/ssh-target',authorize('owner'),async(req,res)=>{const node=agentNodes().find(n=>n.id===req.params.id);if(!node)throw httpError('Paired connector not found',404);res.set('Cache-Control','no-store');res.json(await connectorAddress(node));});
+ app.get('/api/node-agents/:id/automatic-updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(autoConnectorUpdates.status(req.params.id));});
+ app.put('/api/node-agents/:id/automatic-updates',authorize('owner'),async(req,res)=>{const result=autoConnectorUpdates.configure(req.params.id,req.body,req.user);await audit(req,'connector.automatic-updates',req.params.id,{enabled:result.enabled},'success');res.json(result);});
  app.get('/api/node-agents/:id/update',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({update:connectorUpdates.status(req.params.id)});});
  app.post('/api/node-agents/:id/update',authorize('owner'),async(req,res)=>{const update=connectorUpdates.request(req.params.id,req.body);res.locals.activityStatus='queued';await audit(req,'connector.update',req.params.id,{version:update.version,revision:update.revision},'queued');res.status(202).json({update});});
  app.post('/api/node-agents/:id/maintenance',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');const result=await connectionService.perform(req.params.id,req.body);await audit(req,'connection.'+result.action,req.params.id,{target:result.target,active:result.active},'success');res.json({result});});

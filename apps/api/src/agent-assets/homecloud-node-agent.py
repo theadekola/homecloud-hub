@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
-VERSION=8
+VERSION=9
 REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
 HOSTS=[]
 RESCAN=threading.Event()
@@ -454,7 +454,100 @@ def start_workers():
  for pending in [reads]*4+[writes]:threading.Thread(target=worker,args=(pending,),daemon=True).start()
  return reads,writes,completed,ready
 
+# Automatic updates are fixed local file replacement, never arbitrary jobs/shell.
+AUTO_UPDATE_ERROR=False
+AUTO_UPDATE_STATE=pathlib.Path('/var/lib/homecloud-connector-update')
+ROLLBACK_SOURCE=r'''import hashlib,json,os,pathlib,subprocess,sys,tempfile
+root=pathlib.Path('/var/lib/homecloud-connector-update')
+try:
+ state=json.loads((root/'pending.json').read_text())
+ if state.get('nonce')!=sys.argv[1] or state.get('verified'):sys.exit(0)
+ config=pathlib.Path('/etc/homecloud-node-agent.json')
+ if hashlib.sha256(config.read_bytes()).hexdigest()!=state['configHash']:sys.exit(1)
+ target=pathlib.Path('/usr/local/sbin/homecloud-node-agent.py');backup=root/'previous.py'
+ source=backup.read_bytes()
+ if hashlib.sha256(source).hexdigest()!=state['previousRevision'] or target.is_symlink():sys.exit(1)
+ fd,name=tempfile.mkstemp(dir=target.parent,prefix='.homecloud-rollback-')
+ with os.fdopen(fd,'wb') as file:file.write(source);file.flush();os.fsync(file.fileno())
+ os.chmod(name,0o600);os.replace(name,target)
+ descriptor=os.open(target.parent,os.O_RDONLY|os.O_DIRECTORY)
+ try:os.fsync(descriptor)
+ finally:os.close(descriptor)
+ state['rolledBack']=True;(root/'pending.json').write_text(json.dumps(state))
+ subprocess.run(['systemctl','restart','homecloud-node-agent.service'],timeout=30,check=True)
+except Exception:sys.exit(1)
+'''
+
+def atomic_connector_file(target,content):
+ import tempfile
+ fd,name=tempfile.mkstemp(dir=target.parent,prefix='.homecloud-update-')
+ try:
+  with os.fdopen(fd,'wb') as file:file.write(content);file.flush();os.fsync(file.fileno())
+  os.chmod(name,0o600);os.replace(name,target)
+  descriptor=os.open(target.parent,os.O_RDONLY|os.O_DIRECTORY)
+  try:os.fsync(descriptor)
+  finally:os.close(descriptor)
+ finally:
+  if os.path.exists(name):os.unlink(name)
+
+def validate_connector_update(config,payload,nonce):
+ import ast,hmac
+ if not config.get('url','').startswith('https://') or payload.get('id')!=config.get('id') or payload.get('nonce')!=nonce:raise RuntimeError('Update identity mismatch')
+ version=payload.get('version');expiry=payload.get('expiresAt')
+ if type(version)!=int or version<VERSION or type(expiry)!=int or not time.time()*1000<expiry<=time.time()*1000+60000:raise RuntimeError('Invalid update version or expiry')
+ if not re.fullmatch('[a-f0-9]{32}',nonce) or not re.fullmatch('[a-f0-9]{64}',payload.get('revision','')):raise RuntimeError('Invalid update manifest')
+ message=json.dumps([payload['id'],version,payload['revision'],expiry,nonce],separators=(',',':')).encode()
+ signature=hmac.new(hashlib.sha256(config['token'].encode()).digest(),message,hashlib.sha256).hexdigest()
+ if not hmac.compare_digest(signature,payload.get('signature','')):raise RuntimeError('Update authentication failed')
+ if len(payload.get('source',''))>1500000:raise RuntimeError('Update too large')
+ source=base64.b64decode(payload['source'],validate=True)
+ if hashlib.sha256(source).hexdigest()!=payload['revision']:raise RuntimeError('Update checksum mismatch')
+ tree=ast.parse(source);compile(tree,'connector-update','exec')
+ if not any(isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='VERSION' for t in n.targets) and isinstance(n.value,ast.Constant) and n.value.value==version for n in tree.body):raise RuntimeError('Update version mismatch')
+ return source
+
+def install_connector_update(config,payload,nonce,root=pathlib.Path('/'),exec_process=os.execv,run_process=subprocess.run):
+ import fcntl
+ source=validate_connector_update(config,payload,nonce)
+ target=root/'usr/local/sbin/homecloud-node-agent.py';config_path=root/'etc/homecloud-node-agent.json'
+ if os.geteuid()!=0 or pathlib.Path(__file__).resolve()!=target or target.is_symlink() or config_path.is_symlink():raise RuntimeError('Standard root connector installation required')
+ original_config=config_path.read_bytes()
+ if json.loads(original_config)!=config:raise RuntimeError('Pairing changed')
+ root=root/'var/lib/homecloud-connector-update'
+ if root.is_symlink():raise RuntimeError('Invalid update directory')
+ root.mkdir(mode=0o700,parents=True,exist_ok=True);root.chmod(0o700)
+ with open(root.parents[2]/'run/homecloud-connector-update.lock','a') as lock:
+  os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+  previous=target.read_bytes()
+  atomic_connector_file(root/'previous.py',previous)
+  with LOCK:resume_hosts=list(HOSTS)
+  state={'createdAt':time.time(),'hosts':resume_hosts,'nonce':nonce,'revision':payload['revision'],'configHash':hashlib.sha256(original_config).hexdigest(),'previousRevision':hashlib.sha256(previous).hexdigest(),'verified':False}
+  atomic_connector_file(root/'pending.json',json.dumps(state).encode());atomic_connector_file(root/'rollback.py',ROLLBACK_SOURCE.encode())
+  # Independent systemd timer survives a failed replacement process.
+  try:
+   run_process(['systemd-run','--quiet','--collect','--timer-property=AccuracySec=1s','--unit=homecloud-connector-rollback-'+nonce,'--on-active=60s','/usr/bin/python3',str(root/'rollback.py'),nonce],check=True,capture_output=True,timeout=10)
+   if config_path.read_bytes()!=original_config:raise RuntimeError('Pairing changed')
+   atomic_connector_file(target,source)
+   exec_process(sys.executable,[sys.executable,str(target),'--config',str(config_path)])
+  except Exception:
+   atomic_connector_file(target,previous);state['verified']=True;atomic_connector_file(root/'pending.json',json.dumps(state).encode());raise
+
+def verify_connector_update(config,nonce,config_path=pathlib.Path('/etc/homecloud-node-agent.json')):
+ if not nonce or not (AUTO_UPDATE_STATE/'pending.json').exists():return
+ state=json.loads((AUTO_UPDATE_STATE/'pending.json').read_text())
+ if state.get('nonce')==nonce and state.get('revision')==REVISION and state.get('configHash')==hashlib.sha256(config_path.read_bytes()).hexdigest():
+  state['verified']=True;atomic_connector_file(AUTO_UPDATE_STATE/'pending.json',json.dumps(state).encode())
+
+def connector_update_receipt():
+ try:
+  state=json.loads((AUTO_UPDATE_STATE/'pending.json').read_text())
+  if state.get('revision')==REVISION and not state.get('rolledBack'):
+   return (False,state['nonce']) if state.get('verified') else (True,'')
+ except Exception:pass
+ return False,''
+
 def poll_once(config,reads,writes,completed,ready):
+ global AUTO_UPDATE_ERROR
  started=time.monotonic();ready.clear();results=[]
  # Drain BEFORE sending. Completed results wake the next poll instead of waiting
  # through an extra heartbeat. Restore results on transport failure.
@@ -463,12 +556,21 @@ def poll_once(config,reads,writes,completed,ready):
   except queue.Empty:break
  with LOCK:hosts=list(HOSTS);network=NETWORK;operations=OPERATIONS
  with PULL_PROGRESS_LOCK:progress=list(PULL_PROGRESS.values())[:20];PULL_PROGRESS.clear()
- try:response=post(config,'poll',{'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,'operations':operations,**({'network':network} if network else {})})
+ pending_update,receipt=connector_update_receipt()
+ nonce=uuid.uuid4().hex
+ idle=reads.unfinished_tasks==0 and writes.unfinished_tasks==0
+ try:response=post(config,'poll',{'connectorUpdatePending':pending_update,'connectorUpdateReceipt':receipt,'updateReady':idle,'updateNonce':nonce,'connectorUpdateError':AUTO_UPDATE_ERROR,'progress':progress,'version':VERSION,'revision':REVISION,'hosts':hosts,'results':results,'operations':operations,**({'network':network} if network else {})})
  except Exception:
   for result in results:completed.put(result)
   with PULL_PROGRESS_LOCK:
    for item in progress:PULL_PROGRESS.setdefault(item['id'],item)
   ready.set();raise
+ if response.get('connectorUpdateVerified'):
+  try:verify_connector_update(config,response['connectorUpdateVerified'])
+  except Exception:AUTO_UPDATE_ERROR=True
+ if response.get('connectorUpdate') and idle and not response['jobs']:
+  try:install_connector_update(config,response['connectorUpdate'],nonce)
+  except Exception:AUTO_UPDATE_ERROR=True
  for job in response['jobs']:
   try:(reads if read_job(job) else writes).put_nowait(job)
   except queue.Full:completed.put({'id':job['id'],'error':'Connector is busy; retry after pending operations finish'});ready.set()
@@ -478,7 +580,7 @@ def poll_once(config,reads,writes,completed,ready):
  ready.wait(max(0,2-(time.monotonic()-started)))
 
 def main():
- global CONFIG
+ global CONFIG,HOSTS
  parser=argparse.ArgumentParser();parser.add_argument('--vpn-firewall',action='store_true');parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
  if args.vpn_firewall:
   policy=json.loads(VPN_POLICY.read_text()) if VPN_POLICY.exists() else {'rules':[]}
@@ -502,6 +604,10 @@ def main():
   os.chmod(args.config,0o600);return
  with open(args.config) as f:config=json.load(f)
  CONFIG=config
+ try:
+  pending=json.loads((AUTO_UPDATE_STATE/'pending.json').read_text())
+  if pending.get('revision')==REVISION and not pending.get('rolledBack') and 0<=time.time()-pending.get('createdAt',0)<120 and pending.get('configHash')==hashlib.sha256(pathlib.Path(args.config).read_bytes()).hexdigest():HOSTS=pending.get('hosts',[])[:500]
+ except Exception:pass
  threading.Thread(target=scan,daemon=True).start();threading.Thread(target=network_scan,daemon=True).start();threading.Thread(target=operations_scan,daemon=True).start()
  reads,writes,completed,ready=start_workers()
  while True:

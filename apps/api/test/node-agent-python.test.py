@@ -267,4 +267,18 @@ class TemperatureTests(unittest.TestCase):
    root=pathlib.Path(tmp);hw=root/'hwmon0';hw.mkdir();(hw/'name').write_text('fixture');(hw/'temp1_input').write_text('invalid');(hw/'temp1_fault').write_text('1');(hw/'temp2_input').write_text('500000')
    rows=agent.collect_temperatures(root,root/'missing');self.assertIsNone(rows[0]['celsius']);self.assertTrue(rows[0]['fault']);self.assertIsNone(rows[1]['celsius'])
 
+class DiskTests(unittest.TestCase):
+ def test_physical_whole_disks_only_and_sector_units_preserved(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);sysroot=root/'block';sysroot.mkdir()
+   for name in ['sda','sda1','dm-0','loop0','sdb']:(sysroot/name).mkdir()
+   for name in ['sda','sda1','dm-0','sdb']:(sysroot/name/'device').mkdir()
+   (sysroot/'sda1'/'partition').write_text('1')
+   (sysroot/'dm-0'/'slaves').mkdir();(sysroot/'dm-0'/'slaves'/'sda').touch()
+   stats=root/'diskstats';stats.write_text(''.join(f'8 {i} {name} 1 2 100 4 5 6 200 8 9 10 11\n' for i,name in enumerate(['sda','sda1','dm-0','loop0','sdb'])))
+   boot=root/'boot';boot.write_text('fixture-boot')
+   report=agent.collect_disk(stats,sysroot,boot)
+   self.assertEqual(len(report['devices']),2);self.assertEqual(report['devices'][0],{'id':'8:0','read':'100','write':'200'})
+   self.assertEqual(report['bootId'],'fixture-boot')
+
 if __name__=='__main__':unittest.main()

@@ -1,3 +1,4 @@
+import {recordDiskReport} from './disk-telemetry.js';
 import {publicOperations,validateOperationalAction} from './operations-health.js';
 import {connectorUpdateInfo} from './connector-release.js';
 import crypto from 'node:crypto';
@@ -19,13 +20,14 @@ export function pairingStatus(code){const pairing=pairings.get(hash(String(code)
 export function authenticateAgent(token){const digest=hash(String(token||''));return (get().nodeAgents||[]).find(n=>n.tokenHash===digest)||fail('Agent authentication rejected',401);}
 export function agentNodes(){return (get().nodeAgents||[]).map(({id,name,hostname=name,kind='proxmox'})=>{const report=nodes.get(id),node={id,name,hostname,kind,lastSeen:report?.lastSeen||null,hosts:report?.hosts||[],version:report?.version||1,revision:report?.revision||null,online:Date.now()-(report?.time||0)<90000};return {...node,update:connectorUpdateInfo(node)};});}
 export function operationalNodes(){return agentNodes().map(n=>({...n,operations:nodes.get(n.id)?.operations||null}));}
+export function agentDiskReports(){return agentNodes().map(n=>({...n,disk:nodes.get(n.id)?.disk||null}));}
 export function agentNetworkReports(){return agentNodes().map(n=>({id:n.id,hostname:n.hostname,kind:n.kind,online:n.online,version:n.version,network:nodes.get(n.id)?.network||null}));}
 export function agentHosts(){return agentNodes().flatMap(n=>n.hosts.map(h=>({...h,id:`${n.id}:${h.id}`,agent:n.id,node:n.name,kind:n.kind,online:n.online&&h.online})));}
 export function revokeAgent(id){mutate(s=>{s.nodeAgents=(s.nodeAgents||[]).filter(n=>n.id!==id)});nodes.delete(id);for(const [key,j]of jobs)if(j.agent===id){j.reject(new Error('Node agent revoked'));jobs.delete(key)}}
 export function pollAgent(agent,input){
  if(!Array.isArray(input.hosts)||input.hosts.length>500)fail('Invalid host report');
  const hosts=input.hosts.map(h=>{if((agent.kind==='docker'&&h.id!=='node')||!/^(node|qemu\/\d+|lxc\/\d+)$/.test(h.id))fail('Invalid guest identity');return {id:h.id,name:String(h.name||h.id).slice(0,100),online:h.online===true,error:String(h.error||'').slice(0,400),setup:h.setup===true,status:String(h.status||'unavailable').slice(0,40)}});
- nodes.set(agent.id,{version:Number.isInteger(input.version)&&input.version>0&&input.version<=1000?input.version:1,revision:/^[a-f0-9]{64}$/.test(input.revision||'')?input.revision:null,time:Date.now(),lastSeen:new Date().toISOString(),hosts,updatePending:input.connectorUpdatePending===true,operations:publicOperations(input.operations,Date.now(),nodes.get(agent.id)?.operations),network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
+ nodes.set(agent.id,{disk:recordDiskReport(agent.id,nodes.get(agent.id)?.disk,input.disk),version:Number.isInteger(input.version)&&input.version>0&&input.version<=1000?input.version:1,revision:/^[a-f0-9]{64}$/.test(input.revision||'')?input.revision:null,time:Date.now(),lastSeen:new Date().toISOString(),hosts,updatePending:input.connectorUpdatePending===true,operations:publicOperations(input.operations,Date.now(),nodes.get(agent.id)?.operations),network:input.network?acceptNetworkReport(nodes.get(agent.id)?.network,input.network):null});
  for(const p of (Array.isArray(input.progress)?input.progress:[]).slice(0,20)){const j=jobs.get(p?.id);if(!j||j.agent!==agent.id||!j.onProgress)continue;for(const e of (Array.isArray(p.events)?p.events:[]).slice(0,256))j.onProgress(e);}
  for(const r of (input.results||[]).slice(0,20)){const j=jobs.get(r.id);if(!j||j.agent!==agent.id)continue;jobs.delete(r.id);if(r.error)j.reject(new Error(String(r.error).slice(0,400)));else if(typeof r.body==='string'&&r.body.length<=2500000&&Number.isInteger(r.status))j.resolve(r);else j.reject(new Error('Invalid agent response'));}
  const pending=[];if(updating.has(agent.id)||input.connectorUpdatePending===true)return {jobs:pending};for(const [id,j]of jobs)if(j.agent===agent.id&&!j.sent){j.sent=true;pending.push({id,host:j.host,path:j.path,method:j.method,body:j.body,operation:j.operation||'docker',expiresAt:j.expiresAt,...(j.onProgress?{progress:true}:{})});if(pending.length===5)break}return {jobs:pending};

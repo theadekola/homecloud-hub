@@ -114,3 +114,13 @@ The table's **Container IPs** come from each container's reported network endpoi
 After opening Tools → Shell, its workspace stays mounted within the signed-in application. Navigating to another page hides the workspace while retaining each SSH connection, terminal output, and active session tab. Return to Tools → Shell to resume. Hidden terminals cannot receive clipboard input and do not lock page scrolling.
 
 Use **Disconnect** or a session tab's close button to end that session. Signing out, losing the required admin/owner role, or closing/reloading the application releases the workspace. Existing server inactivity limits, authentication expiry, remote host disconnects, and transport failures still apply. This does not provide detached sessions across browser reloads or server restarts; use a host-side tool such as `tmux` for that purpose. SFTP page lifecycle is unchanged.
+
+### Reporting when a Proxmox node is offline
+
+An offline member remains in the node inventory, but its previous CPU, memory, uptime, guest runtime state and storage readings are not treated as live measurements. Collection continues for online members. Individual node API failures are recorded by section without discarding successful sections.
+
+The Proxmox Overview and Nodes summaries show **Available CPU**, **Available Memory** and **Available Storage** when coverage is incomplete. The coverage line identifies online nodes and measured CPU, memory and storage entries. Charts use available measured storage entries; missing values remain unknown rather than becoming zero. These are per-node storage entries, so shared pools can appear more than once.
+
+Normal automatic polling retries collection. When a node reports online again, its sections are read afresh and successful measurements rejoin the summaries. Manual Refresh requests an immediate update. No node restart or other infrastructure change is needed for reporting recovery.
+
+The configured Proxmox API endpoint must still be reachable. If that endpoint itself is down, configure a reachable cluster member or a separately managed highly available API address in Connections. This change does not introduce automatic endpoint failover or restore cluster quorum.

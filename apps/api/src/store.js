@@ -1,3 +1,4 @@
+import {retireTemperature} from './retired-temperature.js';
 import {writeDurableJson,readDurableJson} from './durable-json.js';
 import {upgradeBrandSettings} from './product-brand.js';
 import {retireProviders} from './retired-providers.js';
@@ -13,7 +14,7 @@ if(fs.existsSync(file)){
   const saved=readDurableJson(file);
   if(saved.schema===3)state={...state,...saved};
 }
-const prior=JSON.stringify(state);upgradeBrandSettings(state.settings);retireProviders(state);if(JSON.stringify(state)!==prior)save();
+const prior=JSON.stringify(state);upgradeBrandSettings(state.settings);retireProviders(state);retireTemperature(state);if(JSON.stringify(state)!==prior)save();
 export function get(){return state;}
 export function save(){writeDurableJson(file,state);}
 export function mutate(fn){const previous=state;state=structuredClone(state);try{fn(state);save();return state;}catch(error){state=previous;throw error;}}

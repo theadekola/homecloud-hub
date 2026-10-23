@@ -1878,7 +1878,6 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 /* Shared pending state uses the Docker preparation ring and rotates action icons only while busy. */
 .report-loading-circle{width:26px;height:26px;border:0;animation:report-loading-rotate 1s linear infinite}
 .spin,.animate-spin,button[aria-busy="true"]>svg{animation:report-loading-rotate 1s linear infinite;transform-origin:center}
-.temperature-host{padding:12px 0;border-bottom:1px solid var(--border,#213445)}
 @media(prefers-reduced-motion:reduce){.spin,.animate-spin,button[aria-busy="true"]>svg{animation:none}}
 
 @media(prefers-reduced-motion:reduce){.report-loading-circle{animation:none}}

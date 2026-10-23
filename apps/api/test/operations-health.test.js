@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {publicOperations,operationsView,operationalConditions,validateOperationalAction,operationalRecovery} from '../src/operations-health.js';
 import {createReportPerformance} from '../src/report-performance.js';
-test('operational readings whitelist public fields and preserve unavailable values',()=>{const r=publicOperations({temperatures:[{name:'CPU',celsius:85}],disks:[{name:'/dev/sda',healthy:false}],ups:[{name:'ups',status:'OB LB',charge:'10',runtime:'30'}],vpn:{status:'configured',privateKey:'SECRET',publicKey:'A'.repeat(43)+'=',address:'10.77.0.1/24',peers:[{publicKey:'A'.repeat(43)+'=',presharedKey:'SECRET',address:'10.77.0.2/32',lastHandshake:12}]}});assert.equal(r.disks[0].celsius,null);assert.equal(r.ups[0].charge,10);assert.ok(!JSON.stringify(r).includes('SECRET'));const view=operationsView([{id:'a',name:'node',online:true,version:7,operations:r}]);assert.equal(view.nodes[0].status,'current');assert.equal(operationalConditions(view).length,3);assert.equal(operationalConditions(operationsView([{id:'a',online:false,version:7,operations:r}])).length,0)});
+test('operational readings whitelist public fields and preserve unavailable values',()=>{const r=publicOperations({temperatures:[{name:'CPU',celsius:85}],disks:[{name:'/dev/sda',healthy:false}],ups:[{name:'ups',status:'OB LB',charge:'10',runtime:'30'}],vpn:{status:'configured',privateKey:'SECRET',publicKey:'A'.repeat(43)+'=',address:'10.77.0.1/24',peers:[{publicKey:'A'.repeat(43)+'=',presharedKey:'SECRET',address:'10.77.0.2/32',lastHandshake:12}]}});assert.equal('celsius' in r.disks[0],false);assert.equal('temperatures' in r,false);assert.equal(r.ups[0].charge,10);assert.ok(!JSON.stringify(r).includes('SECRET'));const view=operationsView([{id:'a',name:'node',online:true,version:7,operations:r}]);assert.equal(view.nodes[0].status,'current');assert.equal(operationalConditions(view).length,2);assert.equal(operationalConditions(operationsView([{id:'a',online:false,version:7,operations:r}])).length,0)});
 test('missing and stale operational reports cannot look healthy',()=>{assert.equal(operationsView([{online:true,version:6}]).nodes[0].status,'update-required');assert.equal(operationsView([{online:true,version:7}]).nodes[0].status,'waiting');assert.equal(operationsView([{online:true,version:7,operations:{receivedAt:0}}],200000).nodes[0].status,'stale');});
 test('VPN requests accept only fixed actions, private gateways and public device keys',()=>{assert.deepEqual(validateOperationalAction({action:'network-check',url:'http://secret'}),{action:'network-check'});for(const body of [{action:'shell'},{action:'vpn-setup',address:'8.8.8.1/24',port:51820},{action:'vpn-setup',address:'10.1.0.1/24',port:22},{action:'vpn-add',publicKey:'secret',address:'10.1.0.2/32'}])assert.throws(()=>validateOperationalAction(body));assert.equal(validateOperationalAction({action:'vpn-setup',address:'10.77.0.1/24',port:51820}).port,51820)});
 test('response-time summaries are bounded, route-only, and expire old samples',()=>{let time=0;const p=createReportPerformance({now:()=>time,limit:3,windowMs:100});p.record('/api/auth/me',99,200);for(const n of [5,10,20,30])p.record('/api/docker',n,n===30?502:200);const r=p.snapshot().routes[0];assert.equal(r.samples,3);assert.equal(r.p50,20);assert.equal(r.p95,30);assert.equal(r.errors,1);time=101;assert.deepEqual(p.snapshot().routes,[])});
@@ -18,12 +18,9 @@ test('LAN grants require explicit authorization and private server service bound
  assert.deepEqual(validateOperationalAction({...body,rules:[]}).rules,[]);
 });
 
-test('temperature provenance retains reported 126 and fault readings cannot resolve heat alerts',()=>{
- const report=publicOperations({temperatures:[{name:'Dell / temp8_input',celsius:126,rawMilliCelsius:126000,source:'/sys/class/hwmon/hwmon1/temp8_input',fault:null},{name:'CPU',celsius:60,fault:true}]});
- assert.equal(report.temperatures[0].rawMilliCelsius,126000);assert.equal(report.temperatures[0].fault,null);
- const view={nodes:[{id:'node',name:'node',status:'current',report:{...report,disks:[],ups:[]}}]},conditions=operationalConditions(view);
- assert.equal(conditions.length,2);assert.match(conditions[0].details,/126/);assert.match(conditions[1].title,/sensor fault/);
- assert.equal(operationalRecovery({key:'operations:node:temperature:CPU',connectorId:'operations:node'},view),false);
- const faultAlert={key:'operations:node:sensor-fault:CPU',connectorId:'operations:node'};
- report.temperatures[1].fault=null;assert.equal(operationalRecovery(faultAlert,view),false);report.temperatures[1].fault=false;assert.equal(operationalRecovery(faultAlert,view),true);
+test('legacy temperature data is discarded while SMART and UPS remain operational',()=>{
+ const report=publicOperations({temperatures:[{name:'CPU',celsius:126}],disks:[{name:'/dev/sda',healthy:false,celsius:99}],ups:[{name:'ups',status:'OB'}]});
+ assert.equal('temperatures' in report,false);assert.equal('celsius' in report.disks[0],false);
+ const conditions=operationalConditions({nodes:[{id:'node',name:'node',status:'current',report}]});
+ assert.deepEqual(conditions.map(c=>c.title),['Disk health failure','UPS running on battery']);
 });

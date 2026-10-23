@@ -124,3 +124,13 @@ The Proxmox Overview and Nodes summaries show **Available CPU**, **Available Mem
 Normal automatic polling retries collection. When a node reports online again, its sections are read afresh and successful measurements rejoin the summaries. Manual Refresh requests an immediate update. No node restart or other infrastructure change is needed for reporting recovery.
 
 The configured Proxmox API endpoint must still be reachable. If that endpoint itself is down, configure a reachable cluster member or a separately managed highly available API address in Connections. This change does not introduce automatic endpoint failover or restore cluster quorum.
+
+### Partial reporting across pages
+
+Storage Overview and Datasets show measured capacity, used and available space from successfully read online pools even when full inventory coverage is incomplete. Full-cluster totals remain distinct from these measured subtotals. Offline node registrations remain visible without contributing stale capacity; shared pools are counted once through an available instance.
+
+Dashboard and Network Devices use resource-inventory coverage independently of optional node service failures. VM and CT summaries use paired memory/disk readings from reporting guests. Docker container CPU and memory summaries show how many running containers contributed readings. Network interface, bridge, VLAN, disk, share and snapshot counts describe reported resources when coverage is partial.
+
+Storage, network, DNS and task collection skip explicitly offline nodes, preserve successful reads and retry returned nodes on subsequent automatic polling. Backup archive collection already isolates offline nodes and retains accessible archives. Storage Performance refreshes automatically by default; this can be turned off in its controls. An explicitly selected offline target remains distinct from another host; selecting or reporting another node never redirects management actions to it.
+
+To verify without disrupting services, use an already unavailable node: compare the available node's cards and resource rows with its provider API, confirm the missing-node notice, then observe normal polling after that node is restored by its administrator. Manual Refresh can request an immediate reread. Do not shut down production nodes merely to exercise these checks.

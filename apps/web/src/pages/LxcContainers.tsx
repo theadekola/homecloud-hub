@@ -1,3 +1,4 @@
+import {guestAvailability} from '../proxmox-availability';
 import {reportValue} from '../components/ReportLoading';
 import ReportLoading from '../components/ReportLoading';
 import Pagination from '../components/Pagination';
@@ -34,7 +35,7 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh,l
  const destination=createNode||nodes[0]?.name||'';
  useEffect(()=>{setTemplates(null);setTemplateError('');if(modal!=='create'||!destination||!operator)return;const controller=new AbortController();setTemplateLoading(true);api<any>(`/proxmox/ct-templates/${encodeURIComponent(destination)}`,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted)setTemplates(result)}).catch(e=>{if(!controller.signal.aborted)setTemplateError(e.message)}).finally(()=>{if(!controller.signal.aborted)setTemplateLoading(false)});return()=>controller.abort();},[modal,destination,operator,templateRevision]);
  const eligibleStorage=storage.filter((s:any)=>s.node===(modal==='backup'?operationTarget?.node:destination)&&s.status==='online'&&String(s.content||'').split(',').includes(modal==='backup'?'backup':'rootdir'));
- const usedMemory=sum(containers,'memory'),totalMemory=sum(containers,'memoryTotal'),usedDisk=sum(containers,'disk'),totalDisk=sum(containers,'diskTotal');
+ const available=guestAvailability(containers),usedMemory=available.memory,totalMemory=available.memoryTotal,usedDisk=available.disk,totalDisk=available.diskTotal;
  const measuredCpu=containers.filter((ct:any)=>typeof ct.cpu==='number'),averageCpu=measuredCpu.length?Math.round(measuredCpu.reduce((total:number,ct:any)=>total+ct.cpu,0)/measuredCpu.length):null;
  const run=async(operation:string)=>{if(!current)return;setPending(operation);setFailure('');setMessage('');try{const result:any=await confirmedApi(`/actions/proxmox/lxc/${encodeURIComponent(current.id)}/${operation}`,{method:'POST',body:JSON.stringify({node:current.node})});setMessage(result.message||`${operation} submitted.`);await refresh();}catch(e:any){setFailure(e.message);}finally{setPending('');}};
  const submit=async(event:any)=>{event.preventDefault();if(modal!=='create'&&(!operationTarget||!containers.some((r:any)=>r.id===operationTarget.id&&r.node===operationTarget.node))){setFailure('The selected guest is no longer available on this node. Close the dialog and select it again.');return;}const form=event.currentTarget,values=Object.fromEntries(new FormData(form));setPending(modal||'');setFailure('');setMessage('');try{let result:any;if(modal==='create'){result=await confirmedApi('/proxmox/ct',{method:'POST',body:JSON.stringify(values)});setCreated(result.result);}else if(modal==='snapshot')result=await confirmedApi(`/actions/proxmox/lxc/${encodeURIComponent(operationTarget.id)}/snapshot`,{method:'POST',body:JSON.stringify({node:operationTarget.node,name:values.name})});else result=await api('/proxmox/backup',{method:'POST',body:JSON.stringify({node:operationTarget.node,vmid:operationTarget.id,storage:values.storage})});setMessage(result.message||'Task accepted.');setModal(null);await refresh();}catch(e:any){setFailure(e.message);}finally{for(const name of ['password','confirmPassword']){const input=form.querySelector(`input[name=${name}]`);if(input)input.value='';}setPending('');}};
@@ -44,11 +45,12 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh,l
   {(failure||message)&&<p className={failure?'login-error':'vm-message'} role={failure?'alert':'status'}>{failure||message}</p>}
   {created&&<Card><p>Creation queued for CT {created.vmid} on {created.node}. Check task history for completion. The container is created stopped.</p><CreationHa created={created} onUpdate={setCreated}/></Card>}
   <div className="vm-stats metric-grid">
-   <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={Box} label="Total Containers" value={inventoryComplete(data)?containers.length:loading||data?.refreshing?'Loading…':'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
+   <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={Box} label="Total Containers" value={(data?.resourceInventoryComplete===true||inventoryComplete(data))?containers.length:loading||data?.refreshing?'Loading…':'Unknown'} detail={`${containers.filter((ct:any)=>ct.status==='running').length} running · ${containers.filter((ct:any)=>ct.status==='stopped').length} stopped`}/>
    <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={Cpu} label="Average CPU" value={averageCpu==null?'Unavailable':`${averageCpu}%`} detail={`${measuredCpu.length}/${containers.length} containers reporting`}/>
    <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={HardDrive} label="Root Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>
   </div>
+ <p className="muted" role="status">{available.coverage}</p>
  {navigation}
   <div className="vm-workspace">
    <Card className="vm-list-card">

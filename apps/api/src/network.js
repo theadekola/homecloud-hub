@@ -7,14 +7,14 @@ export async function networkInventory(query=pve,reports=agentNetworkReports){
  const nodes=await query('/nodes'),interfaces=[],errors=[],telemetry=[];if(!Array.isArray(nodes))throw Object.assign(new Error('Invalid Proxmox node inventory'),{status:502});const reported=reports();
  for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async n=>{
   const reading=nodeNetworkTelemetry(n.node,reported);telemetry.push({node:n.node,status:reading.status,message:reading.message,sampledAt:reading.sampledAt||null});
-  try{for(const row of await query(`/nodes/${encode(n.node)}/network`)){
+  try{if(n.status==='offline')throw new Error('Node is offline');for(const row of await query(`/nodes/${encode(n.node)}/network`)){
    const runtime=reading.status==='ok'?reading.interfaces.find(r=>r.name===row.iface):null;
    const configuredAddresses=[row.cidr||row.address,row.cidr6||row.address6].filter(v=>typeof v==='string'&&v.length<=128),liveAddresses=runtime?.addresses||[],displayAddresses=[...new Set([...liveAddresses,...configuredAddresses])];
    const message=reading.message||(!runtime?'This interface is not reported by the connector.':null);
    interfaces.push({...row,id:`${n.node}/${row.iface}`,node:n.node,name:row.iface,address:configuredAddresses[0]||null,configuredAddresses,liveAddresses,displayAddresses,liveAddressesReported:!!runtime,speed:runtime?.speed??null,speedReason:message||runtime?.speedReason,rxMbps:runtime?.rxMbps??null,txMbps:runtime?.txMbps??null,rxReason:message||runtime?.rxReason,txReason:message||runtime?.txReason,telemetryStatus:reading.status,telemetryMessage:message,networkSampledAt:reading.sampledAt||null,status:[1,'1',true].includes(row.active)?'up':[0,'0',false].includes(row.active)?'down':'unknown'});
   }}catch(e){errors.push(`${n.node}: ${e.message}`);}
  }));
- return {nodes,interfaces,errors,telemetry,sampledAt:new Date().toISOString()};
+ return {nodes,interfaces,errors,coverage:{complete:!errors.length,expectedNodes:nodes.map(n=>n.node),readNodes:nodes.filter(n=>!errors.some(e=>e.startsWith(n.node+':'))).map(n=>n.node),missingNodes:nodes.filter(n=>errors.some(e=>e.startsWith(n.node+':'))).map(n=>n.node)},telemetry,sampledAt:new Date().toISOString()};
 }
 export async function networkDetails(node,period){
  const timeframe=['hour','day','week','month'].includes(period)?period:'day',result={node,errors:[]};

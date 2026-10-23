@@ -10,3 +10,9 @@ test('missing metrics do not erase another node or become zero; invalid values a
  assert.equal(view.cpuUsed,0);assert.equal(view.cores,4);assert.equal(view.usedMemory,0);assert.equal(view.totalMemory,16);assert.equal(view.usedStorage,10);assert.equal(view.totalStorage,100);assert.equal(view.partial,true);assert.match(view.coverage,/CPU 1\/2/);
  const missing=proxmoxAvailability({nodes:[{name:'a',status:'offline'}],storage:[]});assert.equal(missing.cpuUsed,null);assert.equal(missing.usedMemory,null);assert.equal(missing.usedStorage,null);
 });
+
+test('guest summaries retain paired healthy measurements through an offline guest',async()=>{
+ const {guestAvailability}=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text).toString('base64'));
+ const result=guestAvailability([{nodeAvailable:true,status:'running',memory:4,memoryTotal:16,disk:10,diskTotal:100},{nodeAvailable:false,status:'unknown',memory:99,memoryTotal:999,disk:99,diskTotal:999},{status:'running',memory:2,memoryTotal:null,disk:null,diskTotal:200}]);
+ assert.equal(result.memory,4);assert.equal(result.memoryTotal,16);assert.equal(result.disk,10);assert.equal(result.diskTotal,100);assert.match(result.coverage,/Memory 1\/3/);
+});

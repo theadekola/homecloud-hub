@@ -1,3 +1,4 @@
+import {useRefreshHandler} from '../hooks';
 import {InspectableRow} from '../components/TableActions';
 import ReportLoading from '../components/ReportLoading';
 import Pagination from '../components/Pagination';
@@ -14,6 +15,7 @@ export default function DockerEvents({navigation,hostSelector,host}:{navigation?
  const pending=useRef(false),requestId=useRef(0),detailHeading=useRef<HTMLDivElement>(null);
  useEffect(()=>{if(selected){detailHeading.current?.focus({preventScroll:true});detailHeading.current?.scrollIntoView?.({block:'nearest'})}},[selected]);
  const refresh=useCallback(async()=>{if(pending.current||!host)return;pending.current=true;const ticket=++requestId.current;setLoading(true);try{const result=await api(`/docker/events?hours=${hours}`);if(ticket===requestId.current){setData(result);setError('')}}catch(e:any){if(ticket===requestId.current)setError(e.message)}finally{if(ticket===requestId.current){pending.current=false;setLoading(false)}}},[hours,host?.hostname]);
+ useRefreshHandler('/docker/events',refresh);
  useEffect(()=>{pending.current=false;setData(null);setCutoff(0);setPage(0);setSelected(null);refresh();},[refresh]);
  useEffect(()=>{if(!live)return;const timer=window.setInterval(refresh,10000);return()=>window.clearInterval(timer)},[live,refresh]);
  const all=(Array.isArray(data?.events)?data.events:[]).filter((e:any)=>time(e)>cutoff).sort((a:any,b:any)=>time(b)-time(a));

@@ -18,7 +18,7 @@ import {useState,useEffect} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {Play,Pause,RefreshCw as ScrubIcon,Database,HardDrive,Folder,Camera,Activity,RefreshCw,Plus,Shield,Search,AlertTriangle,CheckCircle,Eye,Layers,ListChecks} from 'lucide-react';
 import {ResponsiveContainer,PieChart,Pie,Cell,AreaChart,Area,XAxis,YAxis,Tooltip} from 'recharts';
-import {useApi} from '../hooks';
+import {useApi,useResourceRefresh} from '../hooks';
 import {confirmedApi} from '../api';
 import {Card,Badge,Modal} from '../components/UI';
 const colors=['#8854ef','#3387ff','#16b7c8','#ffab38','#51c878','#e668a1'];
@@ -27,6 +27,7 @@ const enc=encodeURIComponent;
 const online=(r:any)=>['online','ONLINE'].includes(r.status);
 export default function Storage(){
  const [rowsPerPage,setRowsPerPage]=useState(8);
+ const reports=useResourceRefresh(['/storage','/proxmox/storage','/proxmox/tasks']);
  const live=useApi<any>('/storage?view=pools',null),session=useApi<any>('/auth/me',null),tasks=useApi<any>('/proxmox/tasks?hours=24',{tasks:[]});
  const d=live.data,pools=d?.pools||[],summary=d?.summary||{},admin=['owner','admin'].includes(session.data?.user?.role),operator=admin||session.data?.user?.role==='operator';
  const [provider,setProvider]=useState('all'),[availability,setAvailability]=useState('all');
@@ -39,7 +40,7 @@ export default function Storage(){
  const change=(value:string)=>{const next=new URLSearchParams(params);next.set('tab',tabs.includes(value)?value:'Storage Pools');setParams(next);setSearch('');setType('all');setNode('all');setProvider('all');setAvailability('all');setPage(0)};
  const execute=async(path:string,method='POST',body:any={})=>{setBusy(true);setError('');try{const r=await confirmedApi(path,{method,body:JSON.stringify(body)});setMessage(r.message||'Operation completed.');await live.refresh();return r;}catch(e:any){setError(e.message);return null;}finally{setBusy(false)}};
  const submit=async(e:any)=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));const path=modal==='Create Dataset'?'/truenas/dataset':'/truenas/snapshot';if(await execute(path,'POST',body))setModal('')};
- const storageTasks=(tasks.data.tasks||[]).filter((t:any)=>/vzdump|restore|snapshot|prune|imgcopy|move_volume/i.test(t.type||'')).slice(0,5);
+ const storageTasks=(tasks.error?[]:tasks.data.tasks||[]).filter((t:any)=>/vzdump|restore|snapshot|prune|imgcopy|move_volume/i.test(t.type||'')).slice(0,5);
  const truenas=d?.services?.find((s:any)=>s.provider==='truenas')&&['reachable','partial'].includes(d.services.find((s:any)=>s.provider==='truenas')?.status);
  if(tab==='Configuration')return <StorageConfiguration onTab={change} admin={admin} onChanged={()=>{void live.refresh()}}/>;
  if(tab==='Datasets / Volumes')return <StorageDatasets onTab={change}/>;
@@ -48,7 +49,7 @@ export default function Storage(){
 
  if(tab==='Snapshots')return <StorageSnapshots onTab={change}/>;
  if(tab==='Disks')return <StorageDisks onTab={change}/>;
- return <section className="storage-overview"><div className="page-header"><div><small className="muted">Storage</small><h1><PageIcon name="storage" className="page-title-icon"/>Storage Overview</h1><p className="muted">Monitor and manage storage across your connected hosts.</p></div><div className="header-actions"><Link className="btn secondary" to="/settings?tab=Connections">Manage Connections</Link><button className="btn secondary" aria-busy={live.loading} disabled={live.loading} onClick={live.refresh}><RefreshCw size={14}/>Refresh</button>{admin&&<button className="btn primary" onClick={()=>setModal('Add Storage')}><Plus size={14}/>Add Storage</button>}</div></div>
+ return <section className="storage-overview"><div className="page-header"><div><small className="muted">Storage</small><h1><PageIcon name="storage" className="page-title-icon"/>Storage Overview</h1><p className="muted">Monitor and manage storage across your connected hosts.</p></div><div className="header-actions"><Link className="btn secondary" to="/settings?tab=Connections">Manage Connections</Link><button className="btn secondary" aria-busy={live.loading||reports.refreshing} disabled={live.loading||reports.refreshing} onClick={reports.refresh}><RefreshCw size={14}/>Refresh</button>{admin&&<button className="btn primary" onClick={()=>setModal('Add Storage')}><Plus size={14}/>Add Storage</button>}</div></div>
  {(error||live.error)&&<p className="error" role="alert">{error||live.error}</p>}{message&&<p className="storage-feedback" role="status">{message}<button className="btn ghost small" onClick={()=>setMessage('')}>Dismiss</button></p>}
 
  <div className="storage-overview-stats metric-grid">{[[Database,'Storage Pools',d?summary.pools:'--',`${summary.online||0} online pools`],[Activity,'Measured Capacity',bytes(summary.capacity??(summary.measured>0?summary.measuredCapacity:null)),summary.complete===false?'Partial measured online pools; shared capacity counted once':'Online pools; shared capacity counted once'],[HardDrive,'Used Capacity',bytes(summary.used??summary.measuredUsed),summary.capacity?`${Math.round(summary.used/summary.capacity*100)}% of measured capacity`:summary.measured>0?'Available measured pools; coverage incomplete':'Measurements unavailable'],[Folder,'Available Capacity',bytes(summary.available??summary.measuredAvailable),'Provider-reported free space'],[Camera,'Snapshots',d?(d.snapshots||[]).length:'--','Reported by TrueNAS'],[Shield,'Active Alerts',d?(d.alerts||[]).length:'--','Connected storage providers']].map(([Icon,label,value,sub]:any)=><Card key={label}><div><small className="muted">{label}</small><strong>{value}</strong><small className="muted">{sub}</small></div><span><Icon size={24}/></span></Card>)}</div>

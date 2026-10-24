@@ -49,3 +49,19 @@ export async function completeCreationHa(id,user,call){
   await call('/cluster/ha/resources',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({sid:`${r.kind==='vm'?'vm':'ct'}:${r.vmid}`,state:'stopped'}).toString()});r.state='configured';return {state:'configured',message:'HA configured with desired state stopped. Start the guest through Proxmox HA when ready.'};
  }finally{r.busy=false;}
 }
+
+// Structured wizard options only. Never pass arbitrary QEMU property strings through.
+export function vmHardware(payload,{storage,diskBus,memory,cores}){
+ const choice=(key,allowed,fallback)=>{const value=payload[key]||fallback;if(!allowed.includes(value))fail('Invalid '+key);return value;};
+ const integer=(key,fallback,min,max)=>{const value=Number(payload[key]??fallback);if(!Number.isInteger(value)||value<min||value>max)fail('Invalid '+key);return value;};
+ const sockets=integer('sockets',1,1,16);if(sockets*cores>128)fail('Total vCPUs cannot exceed 128');
+ const balloon=payload.balloon===undefined?undefined:integer('balloon',0,0,memory);
+ const bios=choice('bios',['seabios','ovmf'],'seabios'),machine=choice('machine',['pc','q35'],'pc'),vga=choice('vga',['std','virtio','qxl','serial0'],'std');
+ const cpu=payload.cpuType===undefined?undefined:choice('cpuType',['x86-64-v2-AES','host','kvm64'],'x86-64-v2-AES');
+ const ostype=choice('ostype',['l26','win11','win10','other'],'l26'),scsihw=choice('scsihw',['virtio-scsi-pci','virtio-scsi-single'],'virtio-scsi-pci');
+ const cache=payload.diskCache===undefined?undefined:choice('diskCache',['none','writethrough','writeback','directsync'],'none');
+ const ioThread=flag(payload.ioThread),discard=payload.discard===undefined?undefined:flag(payload.discard),tpm=flag(payload.tpm);
+ if(ioThread&&(diskBus!=='scsi'||scsihw!=='virtio-scsi-single'))fail('IO thread requires VirtIO SCSI Single');
+ if(tpm&&bios!=='ovmf')fail('TPM requires UEFI firmware');
+ return {properties:{sockets,cpu,balloon,bios,machine,vga,serial0:vga==='serial0'?'socket':undefined,scsihw:diskBus==='scsi'?scsihw:undefined,ostype,agent:flag(payload.qemuAgent,true)?1:0,efidisk0:bios==='ovmf'?`${storage}:1,efitype=4m,pre-enrolled-keys=1`:undefined,tpmstate0:tpm?`${storage}:1,version=v2.0`:undefined},diskOptions:[cache?`cache=${cache}`:null,discard===undefined?null:`discard=${discard?'on':'ignore'}`,ioThread?'iothread=1':null].filter(Boolean)};
+}

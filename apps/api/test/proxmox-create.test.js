@@ -62,3 +62,11 @@ test('ISO discovery is node-specific, excludes inactive stores and retains parti
  const result=await proxmoxInstallationMedia('pve1',f.call);assert.deepEqual(result,{node:'pve1',isos:[{volid:vm.iso,storage:'local',name:'debian.iso',size:42}],errors:[]});assert.equal(f.calls.length,2);assert.ok(f.calls.every(c=>!c.init));
  const denied=await proxmoxInstallationMedia('pve1',fixture({failContent:true}).call);assert.deepEqual(denied.isos,[]);assert.match(denied.errors[0],/Permission denied/);
 });
+
+test('wizard hardware options become explicit QEMU properties and stopped creation',async()=>{
+ const f=fixture();await proxmoxCreateVm({...vm,sockets:'2',cores:'4',cpuType:'host',memory:'8192',balloon:'4096',ostype:'win11',bios:'ovmf',machine:'q35',vga:'serial0',scsihw:'virtio-scsi-single',qemuAgent:'0',tpm:'1',diskCache:'writethrough',discard:'1',ioThread:'1'},f.call);
+ const b=new URLSearchParams(f.calls.at(-1).init.body);for(const [key,value] of Object.entries({sockets:'2',cores:'4',cpu:'host',memory:'8192',balloon:'4096',ostype:'win11',bios:'ovmf',machine:'q35',vga:'serial0',serial0:'socket',scsihw:'virtio-scsi-single',agent:'0',efidisk0:'local-lvm:1,efitype=4m,pre-enrolled-keys=1',tpmstate0:'local-lvm:1,version=v2.0',scsi0:'local-lvm:40,cache=writethrough,discard=on,iothread=1',start:'0',onboot:'0'}))assert.equal(b.get(key),value,key);
+});
+test('invalid wizard combinations and injected QEMU options never mutate providers',async()=>{
+ for(const changes of [{sockets:0},{sockets:2,cores:128},{memory:1024,balloon:2048},{balloon:-1},{cpuType:'host,flags=+vmx'},{bios:'bad'},{machine:'q35,accel=kvm'},{vga:'bad'},{ostype:'invalid'},{scsihw:'bad'},{diskCache:'unsafe'},{qemuAgent:'bad'},{tpm:true,bios:'seabios'},{ioThread:true},{ioThread:true,scsihw:'virtio-scsi-single',diskBus:'sata'}]){const f=fixture();await assert.rejects(proxmoxCreateVm({...vm,...changes},f.call));assert.equal(f.calls.some(c=>c.init),false);assert.equal(f.calls.some(c=>c.path==='/cluster/nextid'),false);}
+});

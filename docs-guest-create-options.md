@@ -27,3 +27,11 @@ The receipt is bound to its creator, guest identity, node and creation task, exp
 ## Validation
 
 API tests cover serialization, malformed network settings, IDs in use, pool verification, password/DNS/key validation, privilege and confirmation gates, creation-bound HA, pending/failed tasks, stopped state and duplicate follow-up. Rendered UI tests verify the displayed fields are submitted, credentials clear and operators retain safe defaults. Creation stays stopped with onboot disabled. No existing live VM, container, node or network was changed during development.
+
+## VM creation tabs
+
+Create VM uses General, OS, System, Disks, CPU, Memory, Network and Confirm tabs. Back/Next and arrow-key tab navigation retain edits. Next checks the current tab; Finish validates every tab and opens the first invalid field before any API request. Enter from another tab opens Confirm rather than creating the guest. Changing the node invalidates its storage/pool and ISO selection while preserving general sizing edits. Confirm lists the submitted values. Creation remains subject to the existing approval flow and creates a stopped guest.
+
+System options include i440fx/q35, SeaBIOS/UEFI, standard/VirtIO/SPICE/serial display, VirtIO SCSI controller, guest-agent access and optional TPM 2.0. UEFI allocates an EFI disk on the chosen disk storage; TPM requires UEFI and uses that storage too. Serial display also provisions a serial socket. Disk options include SCSI/SATA, size, cache, discard and IO thread, with IO thread restricted to VirtIO SCSI Single. CPU supports sockets, cores and selected models, with a total limit of 128 vCPUs. Balloon minimum must not exceed allocated memory; zero disables it. All new enum, boolean and numeric options are checked by the API before creation or ID allocation. Defaults preserve agent access and stopped creation.
+
+This flow creates one primary disk with optional existing ISO media. Physical CD passthrough, additional-disk/import tools and immediate start are not offered. Manage additional devices and start separately in Proxmox after task completion. Rendered UI and API fixtures verify all tabs and option serialization; they do not substitute for acceptance against each supported Proxmox version.

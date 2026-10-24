@@ -3,7 +3,7 @@ import {dockerPullProgress} from './docker-pull-progress.js';
 import {publicComposeLabels} from './docker-public.js';
 import {createGuestFilesystemReader} from './guest-filesystem-cache.js';
 import {createHash} from 'node:crypto';
-import {guestNetwork,ctExtra,guestGeneral,allocateGuestId} from './guest-create-options.js';
+import {guestNetwork,ctExtra,guestGeneral,allocateGuestId,vmHardware} from './guest-create-options.js';
 import {assertGuestPlacement} from './ssh-target.js';
 import {validateBackupSelection} from './backup-validation.js';
 import {selectedAgentHost,selectedAgentVersion,agentRequest,agentContainerStats} from './node-agents.js';
@@ -149,6 +149,7 @@ export async function proxmoxCreateVm(payload,call=pve){
   if(!['cdrom-first','disk-first'].includes(bootOrder)||(!iso&&bootOrder==='cdrom-first'))throw vmInputError('CD-ROM boot requires an installation ISO');
   const diskBus=payload.diskBus||'scsi';
   if(!['scsi','sata'].includes(diskBus))throw vmInputError('Invalid disk controller');
+  const hardware=vmHardware(payload,{storage,diskBus,memory,cores});
   if(iso&&(typeof iso!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]*:iso\/[^,;\s\x00-\x1f]+\.iso$/i.test(iso)||iso.split('/').includes('..')))throw vmInputError('Invalid ISO volume');
   const stores=await call(`/nodes/${encodeURIComponent(node)}/storage`);
   if(!Array.isArray(stores))throw new Error('Unexpected storage inventory');
@@ -165,10 +166,10 @@ export async function proxmoxCreateVm(payload,call=pve){
   // Validate explicit guestId availability; creation never uses force or replaces guests.
   const vmid=await allocateGuestId(payload,call),diskDevice=`${diskBus}0`;
   const body=form({vmid,name:payload.name,cores,memory,
-    scsihw:diskBus==='scsi'?'virtio-scsi-pci':undefined,[diskDevice]:`${storage}:${diskGB}`,
+    ...hardware.properties,[diskDevice]:[`${storage}:${diskGB}`,...hardware.diskOptions].join(','),
     ide2:iso?`${iso},media=cdrom`:undefined,
     boot:`order=${iso?(bootOrder==='cdrom-first'?`ide2;${diskDevice}`:`${diskDevice};ide2`):diskDevice}`,
-    net0,...general,ostype:payload.ostype||'l26',agent:1,onboot:0,start:0
+    net0,...general,onboot:0,start:0
   });
   const task=await call(`/nodes/${encodeURIComponent(node)}/qemu`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
   return {vmid:String(vmid),node,task,installationReady:Boolean(iso)};

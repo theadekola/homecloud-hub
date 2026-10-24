@@ -19,3 +19,11 @@ test('background checks return promptly, share in-flight scans and discard resul
  const read=createGuestConnectionReader({config:()=>({url:endpoint}),query:async(path,init,config)=>{calls++;assert.ok(['one','two'].includes(config.url));if(config.url==='one')await new Promise(r=>release=r);return []}});
  assert.equal(read().refreshing,true);assert.equal(read(true).refreshing,true);assert.equal(calls,1);endpoint='two';assert.equal(read().refreshing,true);await new Promise(r=>setTimeout(r,0));assert.equal(read().refreshing,false);release();await new Promise(r=>setTimeout(r,0));assert.equal(read().refreshing,false);assert.deepEqual(read().guests,[]);assert.equal(calls,2);
 });
+
+test('unknown, missing and paused power states never become stopped or trigger agent probes',async()=>{
+ const calls=[];const states=['unknown',undefined,'paused','stopped','running'];
+ const result=await guestConnections(async(path)=>{calls.push(path);if(path.startsWith('/cluster/resources'))return states.map((status,i)=>({vmid:i+1,node:'node02',type:'qemu',status}));if(path.endsWith('/config'))return {agent:'1'};return {result:{name:'Ubuntu'}}});
+ assert.deepEqual(result.guests.map(g=>g.status),['power_unknown','power_unknown','power_unknown','stopped','connected']);
+ assert.ok(!calls.some(path=>/qemu\/[123]\//.test(path)));
+ assert.ok(result.guests.slice(0,3).every(g=>!g.detail.includes('Start this VM')));
+});

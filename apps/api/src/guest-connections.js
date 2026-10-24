@@ -9,9 +9,12 @@ export async function guestConnections(query=pve){
   const base=`/nodes/${encodeURIComponent(guest.node)}/qemu/${encodeURIComponent(guest.id)}`;
   let status='unverified',detail='';
   try{
+   if(guest.power!=='running'&&guest.power!=='stopped'){
+    rows.push({...guest,status:'power_unknown',detail:'VM power state is not confirmed as running or stopped. Verify the VM and its node in Proxmox before changing guest-agent setup.'});return;
+   }
    const config=await query(base+'/config',{timeoutMs:4000});
    const enabled=/(?:^|,)(?:1|enabled=1)(?:,|$)/.test(String(config.agent||''));
-   if(guest.power!=='running'){status='stopped';detail='Start this VM in Proxmox before checking or installing its guest agent.';}
+   if(guest.power==='stopped'){status='stopped';detail='Start this VM in Proxmox before checking or installing its guest agent.';}
    else if(!enabled){status='disabled';detail='Guest-agent access is disabled in this VM’s Proxmox options.';}
    else{const info=await query(base+'/agent/get-osinfo',{timeoutMs:4000}),os=info?.result||info;if(!os||typeof os!=='object'||Array.isArray(os)||!Object.keys(os).length)throw Error('Guest OS information was not returned');status='connected';detail=os.name||os.id||'QEMU Guest Agent responded.';}
   }catch(error){const code=error.providerStatus||Number(error.message?.match(/HTTP (\d+)/)?.[1]);status=code===401||code===403?'permission':'unavailable';detail=status==='permission'?'The configured Proxmox account or token cannot check this VM’s guest access.':'The guest agent could not be verified. It may be missing, stopped or awaiting a full shutdown and start.';}

@@ -59,3 +59,12 @@ test('paused retries wait for channel and severity eligibility; explicit tests r
 test('notification preference validation rejects invalid or unsupported values',async()=>{
  const {validateNotificationPreferences,defaultNotificationPreferences}=await import('../src/notifications.js'),valid=defaultNotificationPreferences();assert.deepEqual(validateNotificationPreferences(valid),valid);for(const bad of [null,{}, {...valid,enabled:'false'},{...valid,minimumSeverity:'all'},{...valid,quietHours:true},{...valid,channels:{...valid.channels,unsupported:true}},{...valid,channels:{discord:true}},{...valid,notifyResolved:1}])assert.throws(()=>validateNotificationPreferences(bad),{status:400});
 });
+
+test('last delivery uses completion time rather than queue order and ignores invalid dates',()=>{
+ const newest='2026-10-24T06:40:39.000Z',older='2026-10-24T06:08:33.000Z';
+ const state={notificationQueue:[{id:'retried',sentAt:newest},{id:'later-queued',sentAt:older},{id:'invalid',sentAt:'not a date'},{id:'pending'}]};
+ const n=createNotifier({env:{},persistence:{get:()=>state,mutate:fn=>fn(state)}});
+ assert.equal(n.status().lastSent,newest);
+ state.notificationQueue.reverse();assert.equal(n.status().lastSent,newest);
+ state.notificationQueue=[{id:'pending'},{id:'invalid',sentAt:'bad'}];assert.equal(n.status().lastSent,null);
+});

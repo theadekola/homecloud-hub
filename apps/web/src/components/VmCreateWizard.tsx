@@ -1,6 +1,5 @@
 import {useId,useRef,useState} from 'react';
 import {useApi} from '../hooks';
-import './VmCreateWizard.css';
 const tabs=['General','OS','System','Disks','CPU','Memory','Network','Confirm'];
 export default function VmCreateWizard({nodes,node,onNode,storage,iso,onIso,media,mediaLoading,mediaError,onRefreshMedia,role,busy,error,onCancel,onSubmit}:any){
  const id=useId(),form=useRef<HTMLFormElement>(null),[step,setStep]=useState(0),[review,setReview]=useState<Record<string,string>>({}),[noNetwork,setNoNetwork]=useState(false),[bios,setBios]=useState('seabios'),[bus,setBus]=useState('scsi'),[controller,setController]=useState('virtio-scsi-pci');

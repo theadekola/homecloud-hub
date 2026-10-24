@@ -1,3 +1,4 @@
+import {cardValue} from '../components/ReportLoading';
 import DistributionSummary from '../components/DistributionSummary';
 import {proxmoxAvailability} from '../proxmox-availability';
 import ReportLoading from '../components/ReportLoading';
@@ -36,7 +37,7 @@ export default function ProxmoxOverview(){
  const view=action==='Create VM'?'Virtual Machines':action==='Create CT'?'LXC Containers':tabs.includes(requested)?requested:'Overview';
  const setView=(tab:string)=>{if(!tabs.includes(tab))return;const next=new URLSearchParams(params);next.set('tab',tab);next.delete('action');if(tab!=='Nodes'){next.delete('node');next.delete('nodeTab');}setParams(next);};
  const openNodeServices=(name:string)=>{const next=new URLSearchParams(params);next.set('tab','Nodes');next.set('node',name);next.set('nodeTab','Services');next.delete('action');setParams(next);};
- const data=live.data,nodes=data?.nodes||[],vms=data?.vms||[],lxc=data?.lxc||[],storage=data?.storage||[],errors=data?.errors||[],services=data?.nodeServices||[];
+ const data=live.error?null:live.data,nodes=data?.nodes||[],vms=data?.vms||[],lxc=data?.lxc||[],storage=data?.storage||[],errors=data?.errors||[],services=data?.nodeServices||[];
  const cluster=data?.clusterStatus?.find((r:any)=>r.type==='cluster'),online=nodes.filter((n:any)=>n.status==='online').length;
  const available=proxmoxAvailability(data),totalCores=available.cores,usedMemory=available.usedMemory,totalMemory=available.totalMemory,totalStorage=available.totalStorage,usedStorage=available.usedStorage,cpuUsed=available.cpuUsed;
  const counted=!live.error&&(data?.resourceInventoryComplete===true||inventoryComplete(data,live.error));
@@ -57,7 +58,7 @@ export default function ProxmoxOverview(){
  {!!errors.length&&<details className="pve-errors"><summary>{errors.length} unavailable API readings{permissionErrors?' — Proxmox permissions need attention':''}</summary>{permissionErrors&&<p>In Proxmox → Datacenter → Permissions, grant PVEAuditor at / with Propagate enabled to both the user and its privilege-separated API token. This provides read access. Management actions require their own additional privileges.</p>}<ul>{errors.map((e:string)=><li key={e}>{e}</li>)}</ul></details>}
  {view==='Overview'?<><div className="pve-stats metric-grid">{[
  ['Total Nodes',counted?nodes.length:'Unknown',`${online} Online`,Server,'Nodes'],['Total VMs',counted?vms.length:'Unknown',`${vms.filter((v:any)=>v.status==='running').length} Running`,Monitor,'Virtual Machines'],['Total LXC',counted?lxc.length:'Unknown',`${lxc.filter((v:any)=>v.status==='running').length} Running`,Box,'LXC Containers'],[available.partial?'Available CPU':'Total CPU',cpuUsed==null?'Unknown':cpuUsed.toFixed(1),totalCores==null?'Core capacity unknown':`of ${totalCores} cores in use`,Cpu,'Nodes'],[available.partial?'Available Memory':'Total Memory',bytes(usedMemory),`of ${bytes(totalMemory)}`,MemoryStick,'Nodes'],[available.partial?'Available Storage':'Total Storage',bytes(usedStorage),'Per-node entries; shared pools may repeat',HardDrive,'Storage']
- ].map(([label,value,sub,Icon,target]:any)=><button className="pve-stat" key={label} onClick={()=>setView(target)}><div><small>{label}</small><strong>{reportValue(value,live)}</strong><span>{sub}</span></div><i><Icon size={25}/></i></button>)}</div>
+ ].map(([label,value,sub,Icon,target]:any)=><button className="pve-stat" key={label} onClick={()=>setView(target)}><div><small>{label}</small><strong>{cardValue(value,live)}</strong><span>{sub}</span></div><i><Icon size={25}/></i></button>)}</div>
  {navigation}
  <p className="muted" role="status">{available.coverage}. {available.partial?'Available totals exclude missing or offline readings. Nodes are checked again automatically.':'Current readings from all nodes.'}</p>
  <div className="pve-grid"><Card className="pve-wide"><WidgetHeader title="Cluster Nodes" action="View All Nodes" onClick={()=>setView('Nodes')}/>{nodes.length?nodeTable(nodes.slice(0,5)):<p className="muted">{live.loading?<ReportLoading/>:'Connect a cluster through Cluster Settings to load its nodes.'}</p>}</Card>

@@ -1,4 +1,4 @@
-import {reportValue} from './ReportLoading';
+import {cardValue} from './ReportLoading';
 import PageIcon, {pageIconForTitle} from './PageIcon';
 import React, { useEffect, useState, useRef, useId } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
@@ -11,8 +11,8 @@ export function Card({children, className=''}:{children:React.ReactNode; classNa
   return <div className={`card ${className}`}>{children}</div>
 }
 
-export function Stat({label,value,sub,icon,reading={}}:{label:string;value:string|number;sub?:string;icon?:React.ReactNode;reading?:{loading?:boolean;error?:string;data?:any}}) {
-  return <Card className="stat"><div><div className="muted small">{label}</div><div className="stat-value">{reportValue(value,reading)}</div>{sub && <div className="small positive">{sub}</div>}</div>{icon && <div className="stat-icon">{icon}</div>}</Card>
+export function Stat({label,value,sub,icon,reading}:{label:string;value:string|number;sub?:string;icon?:React.ReactNode;reading?:{loading?:boolean;error?:string;data?:any}}) {
+  return <Card className="stat"><div><div className="muted small">{label}</div><div className="stat-value">{reading?cardValue(value,reading):value}</div>{sub && <div className="small positive">{sub}</div>}</div>{icon && <div className="stat-icon">{icon}</div>}</Card>
 }
 
 export function Badge({children,tone='green'}:{children:React.ReactNode;tone?:'green'|'red'|'yellow'|'blue'|'purple'|'gray'}) {

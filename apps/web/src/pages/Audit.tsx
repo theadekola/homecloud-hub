@@ -1,3 +1,4 @@
+import {cardValue} from '../components/ReportLoading';
 import ReportLoading from '../components/ReportLoading';
 import Pagination from '../components/Pagination';
 import PageIcon from '../components/PageIcon';

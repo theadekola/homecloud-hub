@@ -49,7 +49,7 @@ test('overview does not report zero backups from an unconfigured or incomplete a
 
 test('overview retains discovered backups when another storage or node is unavailable',async()=>{
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[{node:'n1'}],jobs:[],errors:['n2: node is offline; archives were not checked.'],archiveInventory:{configured:true,complete:false}}:sample());
- try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/incomplete/);assert.ok([...page.container.querySelectorAll('[role=alert]')].some(e=>e.textContent.includes('n2: node is offline')))}finally{await page.close()}
+ try{assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1 reported');assert.match(stat(page,'Backups').textContent,/incomplete/);assert.ok([...page.container.querySelectorAll('[role=alert]')].some(e=>e.textContent.includes('n2: node is offline')))}finally{await page.close()}
 });
 
 
@@ -91,13 +91,13 @@ test('partial backups remain visible and node problems group into scoped destina
  try{const card=page.container.querySelector('.backup-status-widget');assert.equal(card.querySelector('.backup-number strong').textContent,'1');assert.match(card.textContent,/Verified backup archives/);assert.equal(card.querySelectorAll('.backup-node-actions a').length,2);assert.equal(card.querySelector('.backup-other-issues'),null);const select=page.container.querySelector('[aria-label="Select node"]');await act(async()=>{select.value='n1';select.dispatchEvent(new page.dom.window.Event('change',{bubbles:true}));});assert.equal(card.querySelectorAll('.backup-node-actions a').length,1);assert.equal(card.querySelector('.backup-node-actions a').getAttribute('href'),'/backups?tab=Destinations&node=n1');assert.ok(!card.textContent.includes('n2 nas denied'));}finally{await page.close()}
 });
 
-test('a failed backup refresh preserves known archive and job counts with stale status',async()=>{
+test('a failed backup refresh marks the headline unknown and retains labelled previous details',async()=>{
  let failed=false;const page=await mounted('pages/Overview.tsx',{},async p=>{
   if(p==='/auth/me')return {user:{role:'viewer'}};
   if(p==='/backups'){if(failed)throw Error('Backup inventory timed out');return {points:[{node:'n1',storage:'usb',volid:'usb:backup/one'}],jobs:[{enabled:1}],archiveInventory:{configured:true,complete:true},providerInventory:{jobs:{configured:true,complete:true}}}}
   return sample();
  });
- try{failed=true;await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(stat(page,'Backups').querySelector('strong').textContent,'1');assert.match(stat(page,'Backups').textContent,/Last known.*refresh failed/);const card=page.container.querySelector('.backup-status-widget');assert.match(card.textContent,/1 configured jobs/);assert.match(card.textContent,/Backup inventory timed out/);assert.ok(stat(page,'Backups').classList.contains('needs-attention'))}finally{await page.close()}
+ try{failed=true;await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(stat(page,'Backups').querySelector('strong').textContent,'Unknown');assert.match(stat(page,'Backups').textContent,/Last known.*refresh failed/);const card=page.container.querySelector('.backup-status-widget');assert.match(card.textContent,/1 configured jobs/);assert.match(card.textContent,/Backup inventory timed out/);assert.ok(stat(page,'Backups').classList.contains('needs-attention'))}finally{await page.close()}
 });
 
 test('pending overview measurements show circles without loading text',async()=>{

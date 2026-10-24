@@ -1,3 +1,4 @@
+import {cardValue} from '../components/ReportLoading';
 import DistributionSummary from '../components/DistributionSummary';
 import {InspectableRow} from '../components/TableActions';
 import ReportLoading from '../components/ReportLoading';
@@ -5,7 +6,7 @@ import Pagination from '../components/Pagination';
 import {storageTabs} from '../storage-navigation';
 import PageIcon from '../components/PageIcon';
 import {Link} from 'react-router-dom';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {useStorageDialog} from '../storage-dialog';
 import {Database,HardDrive,Folder,Camera,Plus,RefreshCw,Search,Copy,Shield,Download,Eye} from 'lucide-react';
 import {ResponsiveContainer,PieChart,Pie,Cell,Tooltip} from 'recharts';
@@ -16,6 +17,7 @@ const bytes=(n:any)=>typeof n==='number'&&Number.isFinite(n)?n>=1024**4?`${(n/10
 const colors=['#3387ff','#11c98e','#ffac32','#9254ed','#16b9c8','#e25d91'];
 const tabs=storageTabs;
 export default function StorageDatasets({onTab}:{onTab:(t:string)=>void}){
+ const [refreshFailure,setRefreshFailure]=useState('');
  const [rowsPerPage,setRowsPerPage]=useState(8);
  const live=useApi<any>('/storage/datasets',null),session=useApi<any>('/auth/me',null);
  const [search,setSearch]=useState(''),[pool,setPool]=useState('all'),[type,setType]=useState('all'),[selected,setSelected]=useState(''),[page,setPage]=useState(0),[working,setBusy]=useState(false),[message,setMessage]=useState('');
@@ -26,11 +28,12 @@ export default function StorageDatasets({onTab}:{onTab:(t:string)=>void}){
  const choose=(r:any)=>{setSelected(r.id);setError('')};
  const open=(name:string)=>dialog.open(name,!['Create Dataset','Create ZFS Volume'].includes(name));
  const read=(kind:string)=>dialog.read(kind,(selected,signal)=>api(`/storage/datasets/${kind==='Browse'?'browse':'permissions'}?dataset=${encodeURIComponent(selected.resourceId)}`,{signal}));
- const refresh=async()=>{try{setBusy(true);live.setData(await api('/storage/datasets?refresh=1'));setError('')}catch(e:any){setError(e.message)}finally{setBusy(false)}};
+ useEffect(()=>setRefreshFailure(''),[live.data]);
+ const refresh=async()=>{try{setBusy(true);live.setData(await api('/storage/datasets?refresh=1'));setError('');setRefreshFailure('')}catch(e:any){setError(e.message);setRefreshFailure(e.message)}finally{setBusy(false)}};
  const submit=async(e:any)=>{e.preventDefault();const f:any=Object.fromEntries(new FormData(e.currentTarget));if(busy||(!admin&&modal!=='Take Snapshot')||(!operator&&modal==='Take Snapshot'))return;if(['Set Permissions','Take Snapshot','Clone Dataset'].includes(modal)&&!dialog.valid()){dialog.close();setMessage('The selected dataset is no longer available. Select it again.');return;}let path='/truenas/dataset',method='POST',body:any={name:f.name};if(modal==='Set Permissions'){path='/truenas/dataset/permissions';method='PUT';body={dataset:target.resourceId,mode:f.mode,uid:f.uid,gid:f.gid}}else if(modal==='Create ZFS Volume')body={...body,type:'VOLUME',volsize:Number(f.size)*1024**3,compression:f.compression};else if(modal==='Create Dataset')body={...body,type:'FILESYSTEM',compression:f.compression,...(f.quota?{quota:Number(f.quota)*1024**3}:{})};else if(modal==='Take Snapshot'){path='/truenas/snapshot';body={name:f.name,dataset:target.resourceId}}else if(modal==='Clone Dataset'){path='/truenas/dataset/clone';body={name:f.name,snapshot:f.snapshot}}setBusy(true);setError('');try{const result=await confirmedApi(path,{method,body:JSON.stringify(body)});setMessage(result.result?.jobId!=null?`Job ${result.result.jobId} queued. View Provider Jobs for completion.`:result.message||'Operation accepted.');if(result.result?.jobId!=null)dialog.close();else dialog.succeed('Storage configuration saved successfully.');await refresh()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  const exportResource=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(resource,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='homecloud-storage-resource.json';a.click();URL.revokeObjectURL(url)};
  return <section className="storage-overview storage-datasets"><div className="page-header"><div><small className="muted">Storage / Datasets &amp; Volumes</small><h1><PageIcon name="storage" className="page-title-icon"/>Datasets / Volumes</h1><p className="muted">TrueNAS datasets and ZFS volumes, plus Proxmox VM and container storage volumes.</p></div><div className="header-actions"><button className="btn secondary" aria-busy={busy||live.loading} disabled={busy||live.loading} onClick={refresh}><RefreshCw size={14}/>Refresh</button>{admin&&<button className="btn primary" disabled={!d?.truenasEnabled||busy} onClick={()=>open('Create Dataset')}><Plus size={14}/>Create Dataset</button>}</div></div>
- <div className="dataset-stat-grid metric-grid">{[[Database,'Datasets / Volumes',d?rows.length:'--','Reported resources'],[HardDrive,'Pool Capacity',bytes(summary.capacity??(summary.measured>0?summary.measuredCapacity:null)),'Shared Proxmox pools counted once'],[Database,'Pool Used Space',bytes(summary.used??summary.measuredUsed),'Measured online pools'],[HardDrive,'Pool Available',bytes(summary.available??summary.measuredAvailable),'Provider-reported free space'],[Folder,'Mount Points',rows.filter((r:any)=>r.mountpoint&&r.mountpoint!=='none').length,'Reported dataset paths']].map(([Icon,label,value,sub]:any)=><Card key={label}><div><small className="muted">{label}</small><strong>{value}</strong><small className="muted">{sub}</small></div><span><Icon size={23}/></span></Card>)}</div>
+ <div className="dataset-stat-grid metric-grid">{[[Database,'Datasets / Volumes',d?rows.length:'--','Reported resources'],[HardDrive,'Pool Capacity',bytes(summary.capacity??(summary.measured>0?summary.measuredCapacity:null)),'Shared Proxmox pools counted once'],[Database,'Pool Used Space',bytes(summary.used??summary.measuredUsed),'Measured online pools'],[HardDrive,'Pool Available',bytes(summary.available??summary.measuredAvailable),'Provider-reported free space'],[Folder,'Mount Points',rows.filter((r:any)=>r.mountpoint&&r.mountpoint!=='none').length,'Reported dataset paths']].map(([Icon,label,value,sub]:any)=><Card key={label}><div><small className="muted">{label}</small><strong>{cardValue(value,{...live,error:live.error||refreshFailure})}</strong><small className="muted">{sub}</small></div><span><Icon size={23}/></span></Card>)}</div>
  {summary.coverage?.complete===false&&<p role="status" className="muted">Showing measured storage from available hosts. Full inventory coverage is incomplete.{summary.coverage.missingNodes?.length?` Missing nodes: ${summary.coverage.missingNodes.join(', ')}.`:null}</p>}
  <div className="tabs" role="tablist">{tabs.map(t=><button role="tab" aria-selected={t==='Datasets / Volumes'} className={t==='Datasets / Volumes'?'active':''} onClick={()=>onTab(t)} key={t}>{t}</button>)}</div>
  {(live.error||error)&&<p role="alert" className="error">{live.error||error}</p>}{message&&<p role="status" className="storage-feedback">{message}<button className="btn ghost small" onClick={()=>setMessage('')}>Dismiss</button></p>}

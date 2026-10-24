@@ -11,7 +11,7 @@ const rate=(v:any)=>numeric(v)?`${(v/1024**2).toFixed(2)} MiB/s`:'Not reported';
 const bytes=(v:any)=>numeric(v)?`${(v/1024**3).toFixed(1)} GiB`:'Not reported';
 export default function StoragePerformance({onTab}:{onTab:(t:string)=>void}){
  const [source,setSource]=useState(''),[period,setPeriod]=useState('day'),[automatic,setAutomatic]=useState(true);
- const live=useApi<any>(`/storage/performance?timeframe=${period}${source?'&source='+encodeURIComponent(source):''}`,null,automatic?30000:0),d=live.data,series=d?.series||[],last=series.filter((r:any)=>Object.entries(r).some(([k,v])=>k!=='time'&&numeric(v))).at(-1),current=d?.current;
+ const live=useApi<any>(`/storage/performance?timeframe=${period}${source?'&source='+encodeURIComponent(source):''}`,null,automatic?30000:0),d=live.data,series=d?.series||[],last=[...series].sort((a:any,b:any)=>a.time-b.time).at(-1),current=d?.current;
  const diskSeries=d?.diskIO?.series||series,diskLatest=d?.diskIO?.source==='connector'?d.diskIO.current:last;
  const combined=(a:any,b:any)=>numeric(a)&&numeric(b)?a+b:null;
  const exportReport=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`homecloud-storage-performance-${period}.json`;a.click();URL.revokeObjectURL(url)};

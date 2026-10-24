@@ -14,3 +14,5 @@ test('backup source coverage distinguishes unconfigured, incomplete and measured
  for(const data of [{truncated:['node01']},{coverage:{complete:false}},{archiveInventory:partial}])assert.equal(inventoryComplete(data),false);
  assert.equal(archiveInventoryComplete({points:[],archiveInventory:ok}),true);
 });
+
+test('a stopped task without an exit result remains unknown rather than a fabricated failure',()=>{assert.equal(taskState({status:'stopped',endtime:12}),'Unknown');assert.equal(taskState({status:'unknown',endtime:12}),'Unknown');});

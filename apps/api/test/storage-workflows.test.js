@@ -48,3 +48,16 @@ test('cluster storage configuration stays enabled independently of node activity
 test('invalid cluster storage configuration is not shown as an empty or enabled inventory',async()=>{
  for(const value of [{},[null],[{type:'dir'}]])await assert.rejects(()=>storageConfiguration(async()=>value),{status:502});assert.deepEqual((await storageConfiguration(async()=>[])).resources,[]);
 });
+
+test('unavailable TrueNAS inventory cannot look like a successful empty disk or snapshot report',async()=>{
+ const priorUrl=process.env.TRUENAS_URL,priorKey=process.env.TRUENAS_API_KEY;
+ process.env.TRUENAS_URL='https://truenas.fixture';process.env.TRUENAS_API_KEY='fixture';
+ let sample={services:[{provider:'truenas',status:'error',error:'Fixture authentication rejected'}],alerts:[],hosts:[],metrics:[],sampledAt:new Date().toISOString()};
+ const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:'viewer'};next()},authorize:requireRole,audit:async()=>{},monitor:{sample:async()=>sample,invalidate:()=>{}},db:{query:async()=>({rows:[]})}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{
+  const root=`http://127.0.0.1:${server.address().port}/api`;
+  const disks=await (await fetch(root+'/storage/disks')).json();assert.deepEqual(disks.resources,[]);assert.ok(disks.errors.some(e=>/TrueNAS disk inventory unavailable/.test(e)));
+  sample={...sample,services:[{provider:'truenas',status:'partial'}],truenas:{pools:[],snapshots:[],errors:['pool.snapshot.query: Fixture permission denied']}};
+  const storage=await (await fetch(root+'/storage?view=pools')).json();assert.ok(storage.errors.some(e=>e.includes('pool.snapshot.query')));
+ }finally{server.closeAllConnections();await new Promise(r=>server.close(r));for(const [key,value] of [['TRUENAS_URL',priorUrl],['TRUENAS_API_KEY',priorKey]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+});

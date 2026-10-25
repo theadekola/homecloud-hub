@@ -31,7 +31,7 @@ export function alertConditions(snapshot,rules){
   for(const rule of rules.filter(r=>r.enabled!==false))for(const resource of resources){
     if(rule.provider!=='all'&&rule.provider!==resource.provider)continue;
     const value=resource[rule.metric];
-    if(typeof value==='number'&&value>=rule.threshold)conditions.push({key:`rule:${rule.id}:${resource.provider}:${resource.id}`,ruleId:rule.id,title:rule.name,source:resource.host?`${resource.host} / ${resource.name}`:resource.name,connectorId:resource.connectorId,node:resource.node||(snapshot.proxmox?.nodes||[]).find(n=>n.id===resource.id)?.name,metric:rule.metric,resourceId:resource.id,provider:resource.provider,severity:rule.severity,details:`${rule.metric}: ${value}% (threshold ${rule.threshold}%)`});
+    if(Number.isFinite(value)&&(resource.status==null||['online','running','healthy','available'].includes(String(resource.status).toLowerCase()))&&value>=rule.threshold)conditions.push({key:`rule:${rule.id}:${resource.provider}:${resource.id}`,ruleId:rule.id,title:rule.name,source:resource.host?`${resource.host} / ${resource.name}`:resource.name,connectorId:resource.connectorId,node:resource.node||(snapshot.proxmox?.nodes||[]).find(n=>n.id===resource.id)?.name,metric:rule.metric,resourceId:resource.id,provider:resource.provider,severity:rule.severity,details:`${rule.metric}: ${value}% (threshold ${rule.threshold}%)`});
   }
   for(const a of snapshot.truenas?.alerts||[])if(!a.dismissed)conditions.push({key:`truenas:${a.id||a.uuid}`,title:a.klass||'TrueNAS alert',source:'TrueNAS',provider:'truenas',severity:['CRITICAL','ALERT','EMERGENCY'].includes(a.level)?'critical':'warning',details:a.formatted||a.text||JSON.stringify(a.args)});
   return conditions;
@@ -82,6 +82,8 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
           if(existing.key?.startsWith('operations:')){if(operationalRecovery(existing,snapshot.operations)){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}continue;}
           if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}else if(typeof row?.content==='string'&&!row.content.split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;existing.resolution='no-longer-backup-destination';existing.details='This storage is no longer configured for backup content. This does not mean its filesystem mount was repaired.';}continue;}
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
+          const removedConnection=existing.key?.startsWith('connection:')&&(service?.status==='not-configured'||!service&&existing.connectorId?.startsWith('docker:')&&snapshot.dockerFleet?.connectorsComplete===true&&!snapshot.dockerFleet.connectors.some(n=>existing.connectorId.startsWith(`docker:${n.id}:`)));
+          if(removedConnection){Object.assign(existing,{status:'resolved',resolvedAt:snapshot.sampledAt,resolution:'configuration-removed',details:'Monitoring configuration was removed. Connection recovery has not been verified.'});continue;}
           // A no-heartbeat placeholder disappears when real Docker hosts are discovered.
           // Resolve its exact connector alert only from a fresh online node report.
           const connectorRecovered=!existing.metric&&(snapshot.dockerFleet?.connectors||[]).some(n=>n.online===true&&existing.connectorId===`docker:${n.id}:node-agent`);
@@ -96,7 +98,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
             }existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
         }
         for(const condition of conditions){const closed=state.alerts.find(a=>a.key===condition.key&&a.status==='resolved'&&a.resolution==='manual');if(closed&&Date.parse(snapshot.sampledAt)<=Date.parse(closed.resolvedAt))continue;const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
-          if(current){current.ruleId=condition.ruleId||current.ruleId;current.node=condition.node;current.details=condition.details;current.lastSeen=snapshot.sampledAt;}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
+          if(current){Object.assign(current,condition,{lastSeen:snapshot.sampledAt});}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
         }
         state.alerts=state.alerts.slice(0,1000);
         observeHeaderActivity(state,snapshot);

@@ -1,8 +1,10 @@
+import {reconcileNodeInventory} from './proxmox-inventory.js';
 import {pve} from './connectors.js';
 // Read checks only. A failed agent probe does not distinguish a missing package from a stopped service.
 export async function guestConnections(query=pve){
- const resources=await query('/cluster/resources?type=vm',{timeoutMs:10000});
+ let resources=await query('/cluster/resources?type=vm',{timeoutMs:10000});
  if(!Array.isArray(resources))throw Object.assign(new Error('Proxmox guest inventory is unavailable'),{status:502});
+ const errors=[];if(resources.some(r=>r.type==='qemu'))try{resources=reconcileNodeInventory(resources,await query('/nodes',{timeoutMs:4000})).resources;}catch{errors.push('Current Proxmox node membership could not be verified. Guest inventory may be incomplete or outdated.');}
  const guests=resources.filter(r=>r.type==='qemu').map(r=>({id:String(r.vmid),node:r.node,name:r.name||String(r.vmid),power:r.status}));
  const rows=[];
  for(let i=0;i<guests.length;i+=4)await Promise.all(guests.slice(i,i+4).map(async guest=>{
@@ -20,7 +22,7 @@ export async function guestConnections(query=pve){
   }catch(error){const code=error.providerStatus||Number(error.message?.match(/HTTP (\d+)/)?.[1]);status=code===401||code===403?'permission':'unavailable';detail=status==='permission'?'The configured Proxmox account or token cannot check this VM’s guest access.':'The guest agent could not be verified. It may be missing, stopped or awaiting a full shutdown and start.';}
   rows.push({...guest,status,detail});
  }));
- return {guests:rows.sort((a,b)=>a.node.localeCompare(b.node)||Number(a.id)-Number(b.id)),checkedAt:new Date().toISOString()};
+ return {errors,guests:rows.sort((a,b)=>a.node.localeCompare(b.node)||Number(a.id)-Number(b.id)),checkedAt:new Date().toISOString()};
 }
 
 // Keep multi-VM network probes off the page's response path. The client polls while refreshing.

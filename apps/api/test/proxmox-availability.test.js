@@ -37,3 +37,14 @@ test('one denied node reading preserves successful sections and exposes its diag
  });
  assert.equal(snapshot.nodes[0].cpu,20);assert.equal(snapshot.nodes[0].memoryPercent,25);assert.equal(snapshot.nodeCoverage[0].status,'partial');assert.match(snapshot.errors[0],/services.*403/);assert.ok(snapshot.nodeCoverage[0].readings.includes('status'));
 });
+
+test('successful node inventory removes departed nodes and their stale guests/storage without probing them',async()=>{
+ const calls=[];let includeRemoved=true;
+ const query=async path=>{calls.push(path);if(path==='/cluster/resources')return [{type:'node',node:'node01',status:'online'},{type:'node',node:'node02',status:'online'},{type:'qemu',vmid:200,node:'node02',status:'running'},{type:'lxc',vmid:201,node:'node02',status:'running'},{type:'storage',node:'node02',storage:'media',status:'online'}];if(path==='/nodes')return [{node:'node01',status:'online'},...(includeRemoved?[{node:'node02',status:'offline'}]:[])];if(path==='/cluster/status')return [];if(path.endsWith('/status'))return {cpu:0.2,memory:{used:20,total:100}};return []};
+ const before=await proxmoxSnapshot(query);assert.equal(before.nodes.length,2);assert.equal(before.vms.length,1);assert.equal(before.vms[0].status,'unknown');
+ includeRemoved=false;calls.length=0;const after=await proxmoxSnapshot(query);assert.deepEqual(after.nodeInventory,{complete:true,members:['node01']});assert.deepEqual(after.nodes.map(n=>n.name),['node01']);assert.deepEqual(after.vms,[]);assert.deepEqual(after.lxc,[]);assert.ok(!after.storage.some(s=>s.node==='node02'));assert.ok(!after.nodeCoverage.some(n=>n.node==='node02'));assert.ok(!calls.some(p=>p.startsWith('/nodes/node02/')));
+});
+test('failed node discovery retains reported nodes instead of declaring them removed',async()=>{
+ const result=await proxmoxSnapshot(async path=>{if(path==='/cluster/resources')return [{type:'node',node:'node02',status:'offline'},{type:'qemu',vmid:200,node:'node02',status:'running'}];if(path==='/nodes')throw Error('permission denied');if(path==='/cluster/status')return [];throw Error('Unexpected '+path)});
+ assert.equal(result.nodeInventory.complete,false);assert.equal(result.nodes[0].name,'node02');assert.equal(result.vms[0].status,'unknown');assert.ok(result.errors.some(e=>e.includes('Node inventory')));
+});

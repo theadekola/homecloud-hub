@@ -27,3 +27,8 @@ test('unknown, missing and paused power states never become stopped or trigger a
  assert.ok(!calls.some(path=>/qemu\/[123]\//.test(path)));
  assert.ok(result.guests.slice(0,3).every(g=>!g.detail.includes('Start this VM')));
 });
+
+test('guest setup excludes obsolete cluster guest references after a node is removed',async()=>{
+ const calls=[];const result=await guestConnections(async path=>{calls.push(path);if(path.startsWith('/cluster/resources'))return [{type:'qemu',node:'node01',vmid:100,status:'running'},{type:'qemu',node:'node02',vmid:200,status:'running'}];if(path==='/nodes')return [{node:'node01',status:'online'}];if(path.endsWith('/config'))return {agent:1};return {result:{name:'Ubuntu'}}});
+ assert.deepEqual(result.guests.map(g=>g.id),['100']);assert.deepEqual(result.errors,[]);assert.ok(!calls.some(p=>p.startsWith('/nodes/node02/')));
+});

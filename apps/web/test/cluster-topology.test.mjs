@@ -13,3 +13,9 @@ test('search retains the parent branch and unknown parents never assert running 
 test('a node listed online without a successful direct status read remains unconfirmed',()=>{
  const view=clusterTopology({nodes:[{name:'one',status:'online'}],nodeCoverage:[{node:'one',status:'partial',readings:['qemu']}],vms:[{id:1,node:'one',status:'running'}]});assert.equal(view.nodes[0].status,'unknown');assert.equal(view.nodes[0].reportedStatus,'online');assert.equal(topologyState(view.nodes[0].guests[0],view.nodes[0].status),'unknown');
 });
+
+test('verified membership never recreates a departed node from stale guest rows or search matches',()=>{
+ const input={nodeInventory:{complete:true,members:['node01','offline']},nodes:[{name:'node01',status:'online'},{name:'offline',status:'offline'},{name:'node02',status:'unknown'}],vms:[{id:'100',node:'node01'},{id:'200',node:'node02'},{id:'201',node:'offline'}],lxc:[{id:'300',node:'node02'}]};
+ assert.deepEqual(clusterTopology(input).nodes.map(n=>n.name),['node01','offline']);assert.equal(clusterTopology(input).nodes[1].guests.length,1);assert.deepEqual(clusterTopology(input,'node02').nodes,[]);assert.deepEqual(clusterTopology({...input,nodeInventory:{complete:true,members:[]}}).nodes,[]);
+});
+test('unverified membership retains a guest-referenced unknown node without claiming its removal',()=>{assert.equal(clusterTopology({nodeInventory:{complete:false,members:[]},vms:[{node:'node02',id:200}]}).nodes[0].name,'node02')});

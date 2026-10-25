@@ -1,3 +1,4 @@
+import {alertVerification} from './alert-verification.js';
 import {notificationIds,channelNames,channelAccepts} from './notification-channels.js';
 import {notificationMessage,messageText,emailCard} from './notification-message.js';
 import {sendAdapter} from './notification-adapters.js';
@@ -77,24 +78,24 @@ export function createNotifier({persistence={get,mutate},env=runtimeEnvironment,
    const policySince=persistence.get().connectionRecoveryNotificationsSince||new Date(startedAt).toISOString();
    const automaticRecovery=(alert,event)=>connectionRecovery(alert,event)&&Date.parse(alert.resolvedAt)>=Date.parse(policySince);
    const imageUpdate=alert=>alert?.key?.startsWith('docker-image:');
-   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>alert.resolution==='manual'?false:imageUpdate(alert)?event==='active'&&['active','acknowledged'].includes(alert.status)&&preferences.notifyDockerUpdates!==false:event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
+   const eligible=(alert,event=alert.status==='resolved'?'resolved':'active')=>alert.resolution||imageUpdate(alert)&&alertVerification(alert,persistence.get(),now())!=='confirmed'||event==='active'&&alert.lastSeen&&(!Number.isFinite(Date.parse(alert.lastSeen))||now()-Date.parse(alert.lastSeen)>(imageUpdate(alert)?86400000:180000))?false:imageUpdate(alert)?event==='active'&&['active','acknowledged'].includes(alert.status)&&preferences.notifyDockerUpdates!==false:event==='resolved'?(automaticRecovery(alert,event)||preferences.notifyResolved):({info:0,warning:1,critical:2}[alert.severity]??0)>=({info:0,warning:1,critical:2}[preferences.minimumSeverity]);
    const accepts=(channel,alert,event)=>imageUpdate(alert)||automaticRecovery(alert,event)||channelAccepts(channel,alert,event,environment());
-   const queuedAlert=row=>({...alerts.find(a=>a.id===row.alertId),...row.alert});
+   const queuedAlert=row=>({...row.alert,...alerts.find(a=>a.id===row.alertId)});
    persistence.mutate(s=>{s.connectionRecoveryNotificationsSince??=policySince;s.notificationQueue??=[];
     for(const alert of alerts){if(!['active','acknowledged','resolved'].includes(alert.status)||!eligible(alert))continue;
      const event=alert.status==='resolved'?'resolved':'active',date=event==='resolved'?alert.resolvedAt:alert.triggered;
-     if(!date||now()-Date.parse(date)>7*86400000)continue;
+     if(!Number.isFinite(Date.parse(date))||Date.parse(date)>now()+60000||now()-Date.parse(date)>7*86400000)continue;
      for(const channel of channels){if(!accepts(channel,alert,event))continue;const key=`${alert.id}:${event}:${channel}`;
       if(!s.notificationQueue.some(r=>r.key===key)&&s.notificationQueue.filter(r=>!r.sentAt).length<1000)
        s.notificationQueue.push({id:crypto.randomUUID(),key,channel,alertId:alert.id,event,createdAt:new Date(now()).toISOString(),alert:{key:alert.key,title:alert.title,severity:alert.severity,source:alert.source,details:alert.details,triggered:alert.triggered,resolvedAt:alert.resolvedAt},text:textFor(alert,event),attempts:0,nextAttempt:now()});
      }
     }
     // Keep successful delivery keys for deduplication while the corresponding alert is retained.
-    const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId)&&(!alerts.some(a=>a.id===r.alertId&&a.resolution==='manual')||r.sentAt));
+    const ids=new Set(alerts.map(a=>a.id)),tests=new Set(s.notificationQueue.filter(r=>r.event==='test').slice(-100).map(r=>r.id));s.notificationQueue=s.notificationQueue.filter(r=>r.event==='test'?tests.has(r.id):ids.has(r.alertId)&&(r.sentAt||alerts.some(a=>a.id===r.alertId&&!a.resolution&&(r.event==='resolved'?a.status==='resolved':['active','acknowledged'].includes(a.status)))));
    });
    const pending=(persistence.get().notificationQueue||[]).filter(r=>r.event!=='test'&&channels.includes(r.channel)&&eligible(queuedAlert(r),r.event)&&accepts(r.channel,queuedAlert(r),r.event)&&!r.sentAt&&r.nextAttempt<=now()).slice(0,20);
-   for(const item of pending){let error=null;try{const n=notificationMessage({...queuedAlert(item),occurredAt:item.event==='resolved'?item.alert?.resolvedAt:item.alert?.triggered},item.event);if(!n.time){const date=item.text?.split('\n').at(-1);if(Number.isFinite(Date.parse(date)))n.time=new Date(date).toISOString();}await send(item.channel,messageText(n),{env:environment(),notification:n});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}
-    persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.attempts++;
+   for(const item of pending){let error=null;const deliveredAlert=queuedAlert(item);try{const n=notificationMessage({...deliveredAlert,occurredAt:item.event==='resolved'?item.alert?.resolvedAt:item.alert?.triggered},item.event);if(!n.time){const date=item.text?.split('\n').at(-1);if(Number.isFinite(Date.parse(date)))n.time=new Date(date).toISOString();}await send(item.channel,messageText(n),{env:environment(),notification:n});}catch{error=`${item.channel} delivery failed. Check its saved configuration and service availability.`;}
+    persistence.mutate(s=>{const row=s.notificationQueue.find(r=>r.id===item.id);if(!row)return;row.alert=Object.fromEntries(['key','title','severity','source','details','triggered','resolvedAt'].map(key=>[key,deliveredAlert[key]]));row.attempts++;
      if(error){row.error=error;row.nextAttempt=now()+Math.min(3600000,30000*2**Math.min(row.attempts-1,7));}
      else{row.sentAt=new Date(now()).toISOString();delete row.error;delete row.text;}
     });

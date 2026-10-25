@@ -13,3 +13,7 @@ test('membership reconciliation distinguishes removed, offline and successfully 
  const current=reconcileNodeInventory(input,[{node:'one',status:'online'},{node:'two',status:'offline'}]);assert.equal(current.resources.find(r=>r.node==='two'&&r.type==='node').status,'offline');assert.ok(current.resources.some(r=>r.vmid===200));assert.ok(!current.resources.some(r=>r.node==='three'));assert.equal(input[1].status,'online');assert.deepEqual(reconcileNodeInventory(input,[]).resources,[]);
  for(const value of [{},[null],[{status:'online'}]])assert.throws(()=>reconcileNodeInventory(input,value));
 });
+
+test('fresh storage reports with missing measurements cannot reuse previous capacity, usage or online state',()=>{
+ const resources=[{type:'storage',node:'one',storage:'local',status:'online',maxdisk:100,disk:50,available:50}];mergeNodeStorage(resources,'one',[{storage:'local',type:'dir'}]);assert.equal(resources[0].maxdisk,null);assert.equal(resources[0].disk,null);assert.equal(resources[0].available,null);assert.equal(resources[0].status,'unknown');
+});

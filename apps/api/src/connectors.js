@@ -71,20 +71,22 @@ export async function proxmoxSnapshot(query=pve){
           if(data.memory){node.mem=data.memory.used;node.maxmem=data.memory.total;}
           node.uptime=data.uptime??node.uptime;node.maxcpu=data.cpuinfo?.cpus??node.maxcpu;
         }else if(type==='storage'){
-          if(!Array.isArray(data))throw new Error('Unexpected storage inventory response');
+          if(!Array.isArray(data)||data.some(row=>!row||typeof row.storage!=='string'||!row.storage))throw new Error('Unexpected storage inventory response');
+          const present=new Set(data.map(row=>row.storage));resources=resources.filter(row=>row.type!=='storage'||row.node!==node.node||present.has(row.storage));
           mergeNodeStorage(resources,node.node,data);
         }else if(type==='services'){
           if(!Array.isArray(data))throw new Error('Unexpected service inventory response');
           for(const service of data)if(service.name&&service['unit-state']!=='not-found')nodeServices.push({id:`${node.node}:${service.service||service.name}`,node:node.node,name:service.name,service:service.service||service.name,status:service.state||service['active-state']||'unknown'});
         }else{
-          if(!Array.isArray(data))throw new Error('Unexpected guest inventory response');
-          for(const guest of data)if(guest.vmid!=null){const existing=resources.find(r=>r.type===type&&String(r.vmid)===String(guest.vmid));if(existing)Object.assign(existing,guest);else resources.push({...guest,type,node:node.node});}
+          if(!Array.isArray(data)||data.some(guest=>!guest||guest.vmid==null||!Number.isInteger(Number(guest.vmid))))throw new Error('Unexpected guest inventory response');
+          const present=new Set(data.map(guest=>String(guest.vmid)));resources=resources.filter(row=>row.type!==type||row.node!==node.node||present.has(String(row.vmid)));
+          for(const guest of data)if(guest.vmid!=null){const existing=resources.find(r=>r.type===type&&String(r.vmid)===String(guest.vmid));if(existing)Object.assign(existing,guest,{node:node.node});else resources.push({...guest,type,node:node.node});}
         }
         coverage.readings.push(type);
       }catch(e){coverage.status='partial';coverage.errors.push(`${type}: ${e.message}`);errors.push(`${node.node} ${type}: ${e.message}`);}
     }));
   }));
-  const unavailable=new Set(nodes.filter(node=>node.status!=='online').map(node=>node.node));
+  const knownNodes=new Set(nodes.map(node=>node.node)),unavailable=new Set([...nodes.filter(node=>node.status!=='online').map(node=>node.node),...resources.filter(row=>row.node&&!knownNodes.has(row.node)).map(row=>row.node)]);
   for(const row of resources)if(unavailable.has(row.node)){
     for(const key of ['cpu','mem','maxmem','maxcpu','uptime','disk','maxdisk','available'])row[key]=null;
     if(row.type!=='node'){row.reportedStatus=row.status;row.status=row.type==='storage'?'offline':'unknown';row.nodeAvailable=false;}

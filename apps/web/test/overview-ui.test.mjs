@@ -104,3 +104,11 @@ test('pending overview measurements show circles without loading text',async()=>
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[],jobs:[]}:{...sample(),nodes:[],guests:[],resources:[],refreshing:true,services:[{provider:'proxmox',status:'pending'},{provider:'docker',status:'pending'}]});
  try{for(const label of ['Total Servers','Virtual Machines','Containers']){assert.ok(stat(page,label).querySelector('strong [role=status] .report-loading-circle'));assert.ok(!/Loading/.test(stat(page,label).textContent));}}finally{await page.close()}
 });
+
+test('Overview resource and health widgets suppress cached values after forced refresh fails and recover on success',async()=>{
+ let fail=true;const page=await mounted('pages/Overview.tsx',{},async p=>{if(p==='/auth/me')return {user:{role:'viewer'}};if(p==='/backups')return {points:[],jobs:[]};if(p==='/dashboard?refresh=1'&&fail)throw Error('Fixture refresh unavailable');return {...sample(),storage:[{id:'disk',node:'n1',status:'online',usage:40}]}});
+ try{assert.equal(page.container.querySelector('.resource-tile strong').textContent,'10%');await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.ok([...page.container.querySelectorAll('.resource-tile strong,.health-line b,.actual-health strong')].every(el=>el.textContent==='Unknown'));assert.ok([...page.container.querySelectorAll('.health-line .mini-meter span')].every(el=>el.style.width==='0%'));fail=false;await page.click(page.container.querySelector('[aria-label="Refresh live measurements"]'));assert.equal(page.container.querySelector('.resource-tile strong').textContent,'10%');assert.equal(page.container.querySelector('.actual-health strong').textContent,'100');}finally{await page.close()}
+});
+test('Overview expired resource readings are labelled Stale rather than current percentages',async()=>{
+ const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'viewer'}}:p==='/backups'?{points:[],jobs:[]}:{...sample(),sampledAt:new Date(Date.now()-240000).toISOString()});try{assert.ok([...page.container.querySelectorAll('.resource-tile strong,.health-line b,.actual-health strong')].every(el=>el.textContent==='Stale'));}finally{await page.close()}
+});

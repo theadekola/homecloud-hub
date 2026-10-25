@@ -37,3 +37,9 @@ test('extended creation sends IDs, pools, VM NIC and LXC network/security settin
 test('HA follow-up refuses a newly started guest without issuing power or HA writes',async()=>{
  const created=registerCreation({node:'n1',vmid:'109',task:'UPID:new'},'vm','owner'),calls=[];await assert.rejects(()=>completeCreationHa(created.ha.receipt,'owner',async(p,init)=>{calls.push({p,init});if(p.includes('/tasks/'))return {status:'stopped',exitstatus:'OK'};if(p==='/cluster/resources')return [{node:'n1',vmid:109,type:'qemu'}];return {status:'running'};}),/remain stopped/);assert.ok(calls.every(c=>!c.init));
 });
+
+test('CT swap is optional, bounded and serialized with explicit zero preserved',async()=>{
+ assert.equal(ctExtra({}).swap,undefined);assert.equal(ctExtra({swap:'0'}).swap,0);assert.equal(ctExtra({swap:'512'}).swap,512);
+ for(const swap of [-1,1048577,1.5,'bad','512,other=1'])assert.throws(()=>ctExtra({swap}),/Swap/);
+ for(const swap of ['0','512']){let write;await proxmoxCreateCt({node:'n1',storage:'local',ostemplate:'local:vztmpl/debian.tar.zst',name:'fixture',password:'fixture-password',swap},async(path,init)=>{if(init){write=init;return 'UPID:ct'}if(path.endsWith('/storage'))return [{storage:'local',content:'rootdir,vztmpl',active:1,enabled:1}];if(path.includes('/content'))return [{content:'vztmpl',volid:'local:vztmpl/debian.tar.zst'}];return 108});const body=new URLSearchParams(write.body);assert.equal(body.get('swap'),swap);assert.equal(body.get('start'),'0');assert.equal(body.get('onboot'),'0');}
+});

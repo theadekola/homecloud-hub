@@ -23,7 +23,8 @@ export function ctExtra(payload){
  let nameserver;if(payload.nameserver){const servers=String(payload.nameserver).trim().split(/[\s,]+/);if(servers.length>3||servers.some(ip=>!isIP(ip)))fail('Enter up to three DNS server IP addresses');nameserver=servers.join(' ');}
  const searchdomain=optional(payload.searchdomain,'DNS search domain',/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/,253);
  if(payload.sshKey&&(typeof payload.sshKey!=='string'||payload.sshKey.length>65536||payload.sshKey.includes('PRIVATE KEY')))fail('Enter public SSH keys only');
- return {unprivileged:unprivileged?1:0,features:nesting===undefined?undefined:`nesting=${nesting?1:0}`,nameserver,searchdomain};
+ const swap=payload.swap===undefined?undefined:Number(payload.swap);if(swap!==undefined&&(!Number.isInteger(swap)||swap<0||swap>1048576))fail('Swap must be an integer from 0 to 1048576 MiB');
+ return {swap,unprivileged:unprivileged?1:0,features:nesting===undefined?undefined:`nesting=${nesting?1:0}`,nameserver,searchdomain};
 }
 export async function guestGeneral(payload,call){
  const pool=optional(payload.pool,'resource pool',/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/,100);

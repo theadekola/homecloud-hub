@@ -8,7 +8,7 @@ import {assertGuestPlacement} from './ssh-target.js';
 import {validateBackupSelection} from './backup-validation.js';
 import {selectedAgentHost,selectedAgentVersion,agentRequest,agentContainerStats} from './node-agents.js';
 import {dockerConfig,dockerTlsConfig} from './docker-config.js';
-import {mergeNodeStorage} from './proxmox-inventory.js';
+import {mergeNodeStorage,reconcileNodeInventory} from './proxmox-inventory.js';
 import {backgroundGuestInventory} from './guest-discovery.js';
 import fs from 'node:fs';
 import https from 'node:https';
@@ -55,9 +55,9 @@ const readGuestFilesystems=createGuestFilesystemReader(guestFilesystemUsage);
 export async function proxmoxSnapshot(query=pve){
   const inventory=await query('/cluster/resources');
   if(!Array.isArray(inventory))throw new Error('Unexpected cluster resource inventory');
-  const resources=inventory.map(row=>({...row}));
+  let resources=inventory.map(row=>({...row})),nodeInventory={complete:false,members:[]};
   const errors=[],nodeServices=[],nodeCoverage=[];
-  try{const listed=await query('/nodes');if(!Array.isArray(listed))throw new Error('Unexpected node inventory');for(const n of listed){if(!n.node)continue;const existing=resources.find(r=>r.type==='node'&&r.node===n.node);if(existing)Object.assign(existing,n);else resources.push({...n,type:'node'});}}catch(e){errors.push(`Node inventory: ${e.message}`);}
+  try{({resources,nodeInventory}=reconcileNodeInventory(resources,await query('/nodes')));}catch(e){errors.push(`Node inventory: ${e.message}`);}
   const nodes=resources.filter(r=>r.type==='node');
   for(let i=0;i<nodes.length;i+=5)await Promise.all(nodes.slice(i,i+5).map(async node=>{
     const coverage={node:node.node,status:node.status==='online'?'available':'offline',readings:[],errors:[]};nodeCoverage.push(coverage);
@@ -99,7 +99,7 @@ export async function proxmoxSnapshot(query=pve){
   try{clusterStatus=await query('/cluster/status');}catch(e){errors.push(`Cluster status: ${e.message}`);}
   const config=clusterConfig();
   const guestInventory=backgroundGuestInventory(guests('qemu'),query,`${config.url}:${config.tokenId}`);
-  return {resourceInventoryComplete:true,nodeCoverage,clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
+  return {resourceInventoryComplete:true,nodeInventory,nodeCoverage,clusterStatus,guestInventory,errors,nodeServices,nodes:resources.filter(r=>r.type==='node').map(r=>({id:r.node,name:r.node,ip:clusterStatus.find(n=>n.type==='node'&&n.name===r.node)?.ip??null,status:r.status,cpu:r.cpu==null?null:Math.round(r.cpu*100),memory:percent(r.mem,r.maxmem),memoryPercent:percent(r.mem,r.maxmem),cores:r.maxcpu??null,memoryBytes:r.mem??null,memoryTotal:r.maxmem??null,uptime:r.uptime??null})),
     vms:guests('qemu'),lxc:guests('lxc'),
     storage:resources.filter(r=>r.type==='storage').map(r=>({id:r.id,node:r.node,storage:r.storage,name:r.storage,type:r.plugintype??'Proxmox',status:r.status,nodeAvailable:!unavailable.has(r.node),capacity:r.maxdisk??null,used:r.disk??null,available:r.available??(r.maxdisk==null||r.disk==null?null:r.maxdisk-r.disk),content:r.content??null,usage:percent(r.disk,r.maxdisk)}))};
 }

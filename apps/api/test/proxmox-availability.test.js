@@ -48,3 +48,15 @@ test('failed node discovery retains reported nodes instead of declaring them rem
  const result=await proxmoxSnapshot(async path=>{if(path==='/cluster/resources')return [{type:'node',node:'node02',status:'offline'},{type:'qemu',vmid:200,node:'node02',status:'running'}];if(path==='/nodes')throw Error('permission denied');if(path==='/cluster/status')return [];throw Error('Unexpected '+path)});
  assert.equal(result.nodeInventory.complete,false);assert.equal(result.nodes[0].name,'node02');assert.equal(result.vms[0].status,'unknown');assert.ok(result.errors.some(e=>e.includes('Node inventory')));
 });
+
+test('successful per-node inventories remove deleted guests and storage while failed sections retain uncertainty',async()=>{
+ let denied=false;const query=async path=>{if(path==='/cluster/resources')return [{type:'node',node:'one',status:'online'},{type:'qemu',node:'one',vmid:100,status:'stopped'},{type:'lxc',node:'one',vmid:130,status:'stopped'},{type:'storage',node:'one',storage:'gone',status:'online',maxdisk:100,disk:50}];if(path==='/nodes')return [{node:'one',status:'online'}];if(path==='/cluster/status')return [];if(path.endsWith('/status'))return {cpu:0.1};if(denied&&path==='/nodes/one/qemu')throw Error('denied');return []};
+ const current=await proxmoxSnapshot(query);assert.deepEqual(current.vms,[]);assert.deepEqual(current.lxc,[]);assert.deepEqual(current.storage,[]);denied=true;const partial=await proxmoxSnapshot(query);assert.equal(partial.vms.length,1);assert.ok(partial.errors.some(e=>e.includes('qemu')));
+});
+test('unconfirmed orphan guests never report running metrics or trigger guest probes when membership fails',async()=>{
+ const calls=[];const result=await proxmoxSnapshot(async path=>{calls.push(path);if(path==='/cluster/resources')return [{type:'qemu',node:'orphan',vmid:200,status:'running',cpu:0.9,mem:90,maxmem:100}];if(path==='/nodes')throw Error('denied');if(path==='/cluster/status')return [];throw Error('Unexpected '+path)});assert.equal(result.vms[0].status,'unknown');assert.equal(result.vms[0].cpu,null);assert.equal(result.vms[0].memory,null);assert.equal(result.vms[0].nodeAvailable,false);assert.ok(!calls.some(p=>p.startsWith('/nodes/orphan/')));
+});
+
+test('malformed per-node inventories cannot masquerade as successful empty sections',async()=>{
+ const result=await proxmoxSnapshot(async path=>{if(path==='/cluster/resources')return [{type:'node',node:'one',status:'online'},{type:'qemu',node:'one',vmid:100,status:'stopped'},{type:'storage',node:'one',storage:'local',status:'online'}];if(path==='/nodes')return [{node:'one',status:'online'}];if(path==='/cluster/status')return [];if(path.endsWith('/status'))return {cpu:0.1};if(path.endsWith('/qemu')||path.endsWith('/storage'))return [{}];return []});assert.equal(result.vms.length,1);assert.equal(result.storage.length,1);assert.ok(result.errors.some(e=>e.includes('guest inventory')));assert.ok(result.errors.some(e=>e.includes('storage inventory')));
+});

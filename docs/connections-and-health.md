@@ -51,11 +51,24 @@ page. **Recheck VMs** explicitly refreshes those checks.
 
 **Set Up Guest Agent** or **Install / Start Guest Agent** opens the selected VM’s
 SSH installer. On Debian/Ubuntu it installs QEMU Guest Agent if missing, enables
-its Proxmox option, preserves other agent options and starts its service when the
+its Proxmox option only when disabled, preserves other agent options and starts its service when the
 VirtIO channel exists. This operation does not install Docker. The verified SSH
 host must match the selected VM’s UUID or configured adapter. Use that VM’s Linux
 SSH password with root or sudo access, rather than an application or Proxmox login.
 Other operating systems require their supported agent installation procedure.
+
+An already-enabled agent option does not require a configuration write. If enabling
+the option is denied, setup stops before package installation and explains the
+`VM.Config.Options` grant at `/vms/ID` for the user and any privilege-separated
+token. A Proxmox administrator can alternatively enable the option in VM Options.
+The guest-discovery permission repair grants guest command access; it does not
+grant VM configuration access.
+
+Manual provider test results expire after three minutes and yield to newer health
+observations. An unsuccessful test is shown as unverified, since permissions or
+TLS failures do not establish that a server is offline. Provider health uses the
+actual observation timestamp; old, invalid or excessively future-dated readings
+cannot establish a current connection.
 
 **Fix Permissions** opens the existing scoped administrator repair and selects the
 affected VM when it is still pending. It needs a separate Proxmox administrator

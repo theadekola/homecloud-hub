@@ -44,3 +44,14 @@ test('guest-agent-only setup never installs Docker and verifies the selected VM'
  const pending=await bootstrapGuest({...input,purpose:'guest-agent'},fixture(preflight,'needs-power-cycle'));assert.equal(pending.agentVerified,false);assert.equal(pending.requiresPowerCycle,true);assert.match(pending.message,/shutdown and start/);
  await assert.rejects(()=>bootstrapGuest({...input,purpose:'arbitrary-script'},fixture()),/Invalid guest setup purpose/);
 });
+
+test('already-enabled agent channels install without requesting configuration write privileges',async()=>{
+ for(const agent of ['1','enabled=1','1,type=virtio,freeze-fs-on-backup=0']){
+  const f=fixture(),query=f.query;f.query=async(p,i)=>{if(i?.method==='PUT')throw Object.assign(Error('denied'),{providerStatus:403});return p.endsWith('/config')&&!i?{...config,agent}:query(p,i)};
+  const result=await bootstrapGuest({...input,purpose:'guest-agent'},f);assert.equal(result.agentVerified,true);assert.equal(f.runs.length,2);assert.equal(f.calls.filter(c=>c.init).length,0);
+ }
+});
+test('configuration denial explains the scoped grant and stops before package installation',async()=>{
+ const f=fixture(),query=f.query;f.query=async(p,i)=>{if(i?.method==='PUT')throw Object.assign(Error('denied'),{providerStatus:403});return query(p,i)};
+ await assert.rejects(()=>bootstrapGuest(input,f),e=>e.status===422&&/VM.Config.Options at \/vms\/101/.test(e.message)&&/Package installation has not started/.test(e.message));assert.equal(f.runs.length,1);assert.equal(f.ended(),true);
+});

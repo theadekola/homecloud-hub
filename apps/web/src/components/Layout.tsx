@@ -1,3 +1,4 @@
+import {lockPageScroll} from '../scroll-lock';
 import PersistentShell from './PersistentShell';
 import PageIcon, {pageIconForPath} from './PageIcon';
 import BrandIcon from './BrandIcon';
@@ -33,7 +34,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef=useRef<HTMLElement>(null);
   const toggleRef=useRef<HTMLButtonElement>(null);
-  const closeMenu=()=>{setMenuOpen(false);toggleRef.current?.focus();};
+  const closeMenu=()=>{setMenuOpen(false);toggleRef.current?.focus({preventScroll:true});};
   useEffect(()=>{
     const query=window.matchMedia('(max-width: 800px)');
     const change=()=>{setMobile(query.matches);setMenuOpen(false);};
@@ -47,13 +48,12 @@ export default function Layout() {
   const {data:configuration}=useApi<any>('/settings',null);
   useEffect(()=>{if(configuration?.settings)configureRefresh(configuration.settings.refresh);},[configuration?.settings?.refresh]);
   useEffect(()=>{const close=(event:MouseEvent)=>{if(!profileRef.current?.contains(event.target as Node))setProfileOpen(false)};const key=(event:KeyboardEvent)=>{if(event.key==='Escape')setProfileOpen(false)};document.addEventListener('mousedown',close);document.addEventListener('keydown',key);return()=>{document.removeEventListener('mousedown',close);document.removeEventListener('keydown',key)}},[]);
-  useEffect(()=>{if(menuOpen)toggleRef.current?.focus();setMenuOpen(false);setProfileOpen(false);},[location.pathname]);
+  useEffect(()=>{if(menuOpen)toggleRef.current?.focus({preventScroll:true});setMenuOpen(false);setProfileOpen(false);},[location.pathname]);
   useEffect(()=>{
     if(!mobile||!menuOpen)return;
-    const previous=document.body.style.overflow;
-    document.body.style.overflow='hidden';
+    const unlock=lockPageScroll();
     const controls=()=>Array.from(menuRef.current?.querySelectorAll<HTMLElement>('a,button')||[]);
-    controls()[0]?.focus();
+    controls()[0]?.focus({preventScroll:true});
     const key=(event:KeyboardEvent)=>{
       if(event.key==='Escape'){event.preventDefault();closeMenu();}
       if(event.key==='Tab'){
@@ -63,7 +63,7 @@ export default function Layout() {
       }
     };
     document.addEventListener('keydown',key);
-    return ()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',key);};
+    return ()=>{unlock();document.removeEventListener('keydown',key);};
   },[mobile,menuOpen]);
   const showLabels=mobile||!collapsed;
   const signOut=async()=>{try{await api('/account/logout',{method:'POST',body:'{}'});clearTokens();window.location.assign('/')}catch(e:any){window.alert(e.message||'Sign-out could not be confirmed. Retry when connected.')}};

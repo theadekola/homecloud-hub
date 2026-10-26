@@ -1,3 +1,4 @@
+import {lockPageScroll} from '../scroll-lock';
 import {cardValue} from './ReportLoading';
 import PageIcon, {pageIconForTitle} from './PageIcon';
 import React, { useEffect, useState, useRef, useId } from 'react';
@@ -27,15 +28,15 @@ export function Modal({open,onClose,title,children,success}:{open:boolean;onClos
   const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=onClose;
   useEffect(()=>{
     if(!open)return;
-    const previous=document.activeElement as HTMLElement|null;
-    const focusable=()=>Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')||[]).filter(el=>!el.hidden&&el.getAttribute('type')!=='hidden');
+    const previous=document.activeElement as HTMLElement|null,unlock=lockPageScroll();
+    const focusable=()=>Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')||[]).filter(el=>!el.closest('[hidden],[inert]')&&el.getAttribute('type')!=='hidden');
     const key=(event:KeyboardEvent)=>{
       const modals=document.querySelectorAll('.modal-backdrop');if(dialog.current?.parentElement!==modals[modals.length-1])return;
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close.current();}
       if(event.key==='Tab'){const controls=focusable(),first=controls[0],last=controls.at(-1);if(!first){event.preventDefault();dialog.current?.focus();return;}if(event.shiftKey&&(document.activeElement===first||!dialog.current?.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey&&(document.activeElement===last||!dialog.current?.contains(document.activeElement))){event.preventDefault();first.focus();}}
     };
     (focusable()[0]||dialog.current)?.focus({preventScroll:true});document.addEventListener('keydown',key);
-    return()=>{document.removeEventListener('keydown',key);if(previous?.isConnected)previous.focus({preventScroll:true});};
+    return()=>{document.removeEventListener('keydown',key);unlock();if(previous?.isConnected)previous.focus({preventScroll:true});};
   },[open]);
   if(!open) return null;
   return <div className="modal-backdrop" onMouseDown={onClose}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>

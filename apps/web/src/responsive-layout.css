@@ -1,0 +1,60 @@
+/* Shared constraints apply to page content and dialogs, including lazy pages. */
+html{scrollbar-gutter:stable}
+body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
+.content.content{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}
+.content.content>:where(*),.content.content :where(.card,form,fieldset,[role=tabpanel]){min-inline-size:0;max-inline-size:100%}
+:where(.content,.modal,[role=dialog]) :where(h1,h2,h3,h4,h5,h6,p,li,dt,dd,label,summary){overflow-wrap:anywhere}
+:where(.content,.modal,[role=dialog]) :where(input,select,textarea){min-inline-size:0;max-inline-size:100%;box-sizing:border-box}
+:where(.content,.modal,[role=dialog]) :where(fieldset){min-inline-size:0;margin-inline:0}
+.content.content :is(.page-header,.volume-header,.vm-heading,.overview-toolbar,.header-actions,.volume-toolbar,.nodes-toolbar,.shell-toolbar){min-inline-size:0;max-inline-size:100%;flex-wrap:wrap}
+.content.content :is(.page-header,.volume-header,.vm-heading,.overview-toolbar,.header-actions,.volume-toolbar,.nodes-toolbar,.shell-toolbar)>*{min-inline-size:0;max-inline-size:100%}
+:where(.content,.modal) .btn{max-inline-size:100%;white-space:normal;overflow-wrap:anywhere}
+:where(.content,.modal) .btn>svg{flex-shrink:0}
+.content.content :is(.table-wrap,.live-output,.shell-tabs,.vm-create-tabs,.truenas-guide-table){min-inline-size:0;max-inline-size:100%;overscroll-behavior-inline:contain}
+.content.content .table-wrap{overflow:auto}
+:where(.content,.modal) pre:not(.xterm-screen){min-inline-size:0;max-inline-size:100%;overflow:auto}
+:where(.content,.modal) :is(.ssh-fingerprint code,.ssh-fingerprint b,.permission-help code,.connection-endpoint code){white-space:normal;overflow-wrap:anywhere;word-break:normal}
+/* An intrinsic-width child must not stretch the backdrop's centering track. */
+.modal-backdrop.modal-backdrop{display:flex;align-items:center;justify-content:center;min-inline-size:0;max-inline-size:100%;padding:12px;padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));overscroll-behavior:contain}
+.modal.modal{box-sizing:border-box;min-inline-size:0;max-inline-size:100%;max-block-size:calc(100vh - 24px);max-block-size:calc(100dvh - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-wrap:anywhere}
+.modal.modal>*{min-inline-size:0;max-inline-size:100%}
+.modal.modal .modal-head{min-inline-size:0;gap:12px;align-items:flex-start;margin-block-end:16px}
+.modal.modal .modal-head>h3{flex:1;min-inline-size:0;max-inline-size:100%;margin:0;white-space:normal;overflow-wrap:anywhere;line-height:1.35;font-size:clamp(16px,2.2vw,20px)}
+.modal.modal .modal-head>.icon-btn{flex:0 0 44px;inline-size:44px;block-size:44px;min-inline-size:44px;padding:10px}
+.modal.modal :is(.form-grid,.cluster-form,.vm-create-fields,.vm-create-network){min-inline-size:0;max-inline-size:100%;grid-template-columns:repeat(2,minmax(0,1fr))}
+.modal.modal :is(.form-grid,.cluster-form)>*{min-inline-size:0;max-inline-size:100%}
+.modal.modal :is(.modal-actions,.header-actions,.vm-create-footer){max-inline-size:100%;flex-wrap:wrap}
+.modal.modal :is(.cluster-wide,.form-wide){grid-column:1/-1}
+.modal.modal :is(label,.ssh-fingerprint,.connection-next-step){overflow-wrap:anywhere;white-space:normal}
+.modal.modal :is(.ssh-password,.ssh-connection-fields,.ssh-auth-fields){min-inline-size:0;max-inline-size:100%}
+.modal.modal .ssh-password input{min-inline-size:0;inline-size:100%}
+.header-notification-panel.header-notification-panel{box-sizing:border-box;min-inline-size:0;max-inline-size:calc(100vw - 24px);overflow-wrap:anywhere}
+.header-notification-title.header-notification-title>h2{min-inline-size:0;overflow-wrap:anywhere}
+.header-notification-title.header-notification-title>.icon-btn{flex:none}
+.header-notification-item.header-notification-item>span>b{min-inline-size:0;overflow-wrap:anywhere}
+@media(max-width:900px){
+ .content.content :is(.vm-workspace,.volume-workspace,.image-workspace,.dataset-layout,.device-workspace,.network-layout,.backup-workspace,.users-workspace,.audit-workspace,.restore-workspace,.retention-workspace,.destination-workspace,.report-workspace,.storage-overview-grid,.docker-workspace){grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:767px){
+ .modal.modal{padding:14px}
+ .modal.modal :is(.form-grid,.cluster-form,.vm-create-fields,.vm-create-network,.ssh-connection-fields,.ssh-auth-fields){grid-template-columns:minmax(0,1fr)}
+ .modal.modal :is(.btn,input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select){min-block-size:44px}
+ .content.content :is(.page-header,.volume-header,.vm-heading,.overview-toolbar) :is(h1,h2){white-space:normal;overflow-wrap:anywhere}
+ .content.content .header-actions>.btn{flex:0 1 auto}
+ .modal.modal .modal-actions>.btn{flex:1 1 120px}
+ .modal.modal .vm-create-review>div{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+}
+.content.content .network-container-addresses div{min-inline-size:0;flex-wrap:wrap;white-space:normal}
+.modal.modal .modal-head{position:sticky;top:0;z-index:2;background:inherit;padding-block:4px}
+.header-notification-panel.header-notification-panel{overflow-y:auto;overscroll-behavior:contain}
+@media(max-height:480px){.header-notification-panel .header-notification-scroll{flex-shrink:0;overflow:visible}}
+.login-page.login-page,.login-page .login-card{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}
+.topbar.topbar,.topbar .top-actions,.topbar .profile-menu,.topbar .profile-trigger{min-inline-size:0;max-inline-size:100%}
+.topbar .profile{min-inline-size:0;max-inline-size:16rem;overflow-wrap:anywhere;white-space:normal}
+.topbar .profile-trigger>svg{flex:none}
+.content.content :is(.sftp-heading,.sftp-toolbar,.sftp-footer,.composer){min-inline-size:0;max-inline-size:100%;flex-wrap:wrap}
+.content.content :is(.sftp-heading,.sftp-toolbar,.sftp-footer,.composer)>*{min-inline-size:0;max-inline-size:100%}
+.content.content .composer input{flex:1 1 180px}
+.connection-notice.connection-notice{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}
+.connection-notice.connection-notice>p{min-inline-size:0;flex:1}
+.toast.toast{right:max(12px,env(safe-area-inset-right));min-inline-size:0;max-inline-size:calc(100vw - 24px);max-block-size:calc(100dvh - 24px);overflow:auto;white-space:normal;overflow-wrap:anywhere}

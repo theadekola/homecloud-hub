@@ -81,7 +81,11 @@ export async function bootstrapGuest(input,{query=pve,clientFactory=()=>new Clie
   bootstrapIdentity(config,await run(client,username,password,preflight,30000));
   // Revalidate placement immediately before enabling configuration, with optimistic concurrency.
   await assertGuestPlacement(node,vmid,'qemu',query);
-  await query(base+'/config',{method:'PUT',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({agent:enableAgentOption(config.agent),...(config.digest?{digest:config.digest}:{})})});
+  // An already-enabled channel needs no configuration write or extra write ACL.
+  if(!/(?:^|,)(?:1|enabled=1)(?:,|$)/.test(String(config.agent||''))){
+   try{await query(base+'/config',{method:'PUT',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({agent:enableAgentOption(config.agent),digest:config.digest})});}
+   catch(error){if(error.providerStatus===403)throw failure(`Proxmox denied enabling QEMU Guest Agent for VM ${vmid}. Ask a Proxmox administrator to grant VM.Config.Options at /vms/${vmid} to the connected user and, for a privilege-separated API token, the token too. Alternatively, enable QEMU Guest Agent in this VM’s Proxmox Options, then retry. Package installation has not started.`,422);throw error;}
+  }
   const output=await run(client,username,password,purpose==='guest-agent'?agentInstaller:installer);
   const requiresPowerCycle=!/^HC_AGENT=ready$/m.test(output);
   let agentVerified=false;

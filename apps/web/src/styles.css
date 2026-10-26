@@ -1875,9 +1875,9 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 
 .report-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:64px;width:100%;text-align:center;vertical-align:middle}.report-loading-circle{display:inline-block;flex:none;width:26px;height:26px;box-sizing:border-box;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;color:var(--accent,#438eff);animation:report-loading-rotate .9s linear infinite}.report-loading.inline{display:inline-flex;width:auto;min-height:32px;min-width:32px}.report-loading-message{display:block;width:100%;text-align:center;font-size:14px;font-weight:400;line-height:1.5}@keyframes report-loading-rotate{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.report-loading-circle{animation:none;border-style:dotted}}
 
-/* Shared pending state uses the Docker preparation ring and rotates action icons only while busy. */
+/* Only explicit circular loading indicators rotate; action icons stay still. */
 .report-loading-circle{width:26px;height:26px;border:0;animation:report-loading-rotate 1s linear infinite}
-.spin,.animate-spin,button[aria-busy="true"]>svg{animation:report-loading-rotate 1s linear infinite;transform-origin:center}
-@media(prefers-reduced-motion:reduce){.spin,.animate-spin,button[aria-busy="true"]>svg{animation:none}}
+.spin,.animate-spin{animation:report-loading-rotate 1s linear infinite;transform-origin:center}
+@media(prefers-reduced-motion:reduce){.spin,.animate-spin{animation:none}}
 
 @media(prefers-reduced-motion:reduce){.report-loading-circle{animation:none}}

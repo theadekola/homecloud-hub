@@ -48,3 +48,10 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .modal.modal .modal-head{position:sticky;top:0;z-index:2;background:inherit;padding-block:4px}
 .header-notification-panel.header-notification-panel{overflow-y:auto;overscroll-behavior:contain}
 @media(max-height:480px){.header-notification-panel .header-notification-scroll{flex-shrink:0;overflow:visible}}
+.login-page.login-page,.login-page .login-card{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}
+.topbar.topbar,.topbar .top-actions,.topbar .profile-menu,.topbar .profile-trigger{min-inline-size:0;max-inline-size:100%}
+.topbar .profile{min-inline-size:0;max-inline-size:16rem;overflow-wrap:anywhere;white-space:normal}
+.topbar .profile-trigger>svg{flex:none}
+.content.content :is(.sftp-heading,.sftp-toolbar,.sftp-footer,.composer){min-inline-size:0;max-inline-size:100%;flex-wrap:wrap}
+.content.content :is(.sftp-heading,.sftp-toolbar,.sftp-footer,.composer)>*{min-inline-size:0;max-inline-size:100%}
+.content.content .composer input{flex:1 1 180px}

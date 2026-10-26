@@ -7,6 +7,16 @@ class MonitoringInstallError(RuntimeError):
         super().__init__('Monitoring package installation could not be verified. Check package-manager status before retrying.' if code=='PACKAGE_VERIFY_FAILED' else 'Monitoring package operation failed')
         self.code=code;self.stage=stage
 
+# Compatibility reads keep existing paired connectors usable through the rename.
+def connector_path(root,relative):
+    canonical=root/relative
+    legacy=root/relative.replace('iclusters','homecloud')
+    return canonical if canonical.exists() or not legacy.exists() else legacy
+
+def connector_unit(root):
+    return 'iclusters-node-agent.service' if (root/'etc/iclusters-node-agent.json').exists() or not (root/'etc/homecloud-node-agent.json').exists() else 'homecloud-node-agent.service'
+
+
 def package_failure(text):
     text=text.lower()
     for code,patterns in (
@@ -74,12 +84,12 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
     if action not in ACTIONS or not isinstance(target,str) or not re.fullmatch(r'node|(?:qemu|lxc)/[0-9]+',target): raise RuntimeError('Unsupported connection action or target')
     if (action.startswith('connector-') or action=='monitoring-tools') and target!='node': raise RuntimeError('Connector actions must target the paired host')
     if os.geteuid()!=0: raise RuntimeError('Root or sudo access is required')
-    config=root/'etc/homecloud-node-agent.json'
+    config=connector_path(root,'etc/iclusters-node-agent.json')
     if config.is_symlink() or not config.is_file(): raise RuntimeError('Existing standard connector installation required')
     original=config.read_bytes();paired=json.loads(original)
     if paired.get('id')!=payload.get('id') or not hmac.compare_digest(hashlib.sha256(str(paired.get('token','')).encode()).hexdigest(),payload.get('tokenHash','')): raise RuntimeError('This SSH host is not the selected paired connector')
     if paired.get('kind','proxmox')=='docker' and target!='node': raise RuntimeError('Standalone connector cannot access Proxmox guests')
-    starting=action.endswith('-start');docker=action.startswith('docker-');unit='docker.service' if docker else 'homecloud-node-agent.service'
+    starting=action.endswith('-start');docker=action.startswith('docker-');unit='docker.service' if docker else connector_unit(root)
     if config.read_bytes()!=original: raise RuntimeError('Pairing changed; no action was performed')
     if action=='monitoring-tools':
         packages=('smartmontools','nut-client','nftables')
@@ -102,7 +112,7 @@ def diagnose(payload,root=pathlib.Path('/'),run=execute):
         result['docker']={'ready':bool(re.fullmatch(r'[0-9][A-Za-z0-9_.+-]{0,79}',version)),'version':version if re.fullmatch(r'[0-9][A-Za-z0-9_.+-]{0,79}',version) else None,'containers':{state:states.count(state) for state in sorted(set(states))},'total':len(states) if rest and '__CONTAINERS_OK__' in rest[0].splitlines() else None,'statistics':[line for line in (rest[1].splitlines() if len(rest)>1 else []) if re.fullmatch(r'[0-9.]+%\|[0-9. A-Za-z/]+',line)][:20]}
         if starting and not result['docker']['ready']: raise RuntimeError('Docker service is active but its Engine is not ready. Recheck Docker status before retrying.')
     else:
-        agent=root/'usr/local/sbin/homecloud-node-agent.py'
+        agent=connector_path(root,'usr/local/sbin/iclusters-node-agent.py')
         if agent.is_file() and not agent.is_symlink():
             source=agent.read_bytes()
             if len(source)<2000000:

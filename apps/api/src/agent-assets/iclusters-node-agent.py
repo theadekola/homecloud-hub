@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
+
+# Compatibility reads keep existing paired connectors usable through the rename.
+def connector_path(root,relative):
+    canonical=root/relative
+    legacy=root/relative.replace('iclusters','homecloud')
+    return canonical if canonical.exists() or not legacy.exists() else legacy
+
+def connector_unit(root):
+    return 'iclusters-node-agent.service' if (root/'etc/iclusters-node-agent.json').exists() or not (root/'etc/homecloud-node-agent.json').exists() else 'homecloud-node-agent.service'
+
 VERSION=9
 REVISION=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest()
 HOSTS=[]
@@ -30,13 +40,13 @@ def docker_request(host,path,method='GET',body='',timeout=300):
  decoded=base64.b64decode(body,validate=True) if body else b''
  if len(decoded)>1024*1024:raise RuntimeError('Request too large')
  content='application/x-tar' if path.startswith('/build?') else 'application/json'
- command='curl --silent --show-error --max-time '+str(int(timeout))+' --unix-socket /var/run/docker.sock -X '+shlex.quote(method)+' -H '+shlex.quote('Content-Type: '+content)+' --write-out '+shlex.quote('\n__HOMECLOUD_STATUS__%{http_code}')+' '+shlex.quote('http://localhost'+path)
+ command='curl --silent --show-error --max-time '+str(int(timeout))+' --unix-socket /var/run/docker.sock -X '+shlex.quote(method)+' -H '+shlex.quote('Content-Type: '+content)+' --write-out '+shlex.quote('\n__ICLUSTERS_STATUS__%{http_code}')+' '+shlex.quote('http://localhost'+path)
  if body:command="printf %s "+shlex.quote(body)+" | base64 -d | "+command+' --data-binary @-'
  # Encode binary Docker log frames before they pass through the guest-agent JSON channel.
  script='command -v curl >/dev/null || { echo "Guest curl is missing" >&2; exit 1; }; test -S /var/run/docker.sock || { echo "Docker socket unavailable; install or start Docker" >&2; exit 1; }; ('+command+') | base64'
  output=guest_run(host,script,timeout=max(11,timeout+10)).strip()
  try:
-  data=base64.b64decode(output);payload,status=data.rsplit(b'\n__HOMECLOUD_STATUS__',1)
+  data=base64.b64decode(output);payload,status=data.rsplit(b'\n__ICLUSTERS_STATUS__',1)
  except Exception:raise RuntimeError('Guest returned an invalid Docker response; check curl and Docker service')
  if status==b'000':raise RuntimeError('Docker socket is not responding; start Docker service')
  if len(payload)>1300000:raise RuntimeError('Response too large for node bridge')
@@ -45,7 +55,7 @@ def docker_request(host,path,method='GET',body='',timeout=300):
 def docker_pull(host,path,timeout,report):
  # Keep the potentially huge NDJSON stream inside the guest, not in QGA stdout.
  # Only a bounded tail crosses the bridge; layer snapshots go out on heartbeats.
- directory='/tmp/homecloud-pull-'+uuid.uuid4().hex
+ directory='/tmp/iclusters-pull-'+uuid.uuid4().hex
  q=shlex.quote(directory)
  command='curl --silent --show-error --no-buffer --max-time '+str(int(timeout))+' --unix-socket /var/run/docker.sock -X POST --output '+q+'/stream --write-out "%{http_code}" '+shlex.quote('http://localhost'+path)+' >'+q+'/http 2>'+q+'/error; code=$?; printf "%s" "$code" >'+q+'/exit'
  launch='set -e; command -v curl >/dev/null; test -S /var/run/docker.sock; mkdir -m 700 '+q+'; nohup /bin/sh -c '+shlex.quote(command)+' </dev/null >/dev/null 2>&1 &'
@@ -450,31 +460,41 @@ def start_workers():
 
 # Automatic updates are fixed local file replacement, never arbitrary jobs/shell.
 AUTO_UPDATE_ERROR=False
-AUTO_UPDATE_STATE=pathlib.Path('/var/lib/homecloud-connector-update')
+AUTO_UPDATE_STATE=connector_path(pathlib.Path('/'),'var/lib/iclusters-connector-update')
 ROLLBACK_SOURCE=r'''import hashlib,json,os,pathlib,subprocess,sys,tempfile
-root=pathlib.Path('/var/lib/homecloud-connector-update')
+
+# Compatibility reads keep existing paired connectors usable through the rename.
+def connector_path(root,relative):
+    canonical=root/relative
+    legacy=root/relative.replace('iclusters','homecloud')
+    return canonical if canonical.exists() or not legacy.exists() else legacy
+
+def connector_unit(root):
+    return 'iclusters-node-agent.service' if (root/'etc/iclusters-node-agent.json').exists() or not (root/'etc/homecloud-node-agent.json').exists() else 'homecloud-node-agent.service'
+
+root=connector_path(pathlib.Path('/'),'var/lib/iclusters-connector-update')
 try:
  state=json.loads((root/'pending.json').read_text())
  if state.get('nonce')!=sys.argv[1] or state.get('verified'):sys.exit(0)
- config=pathlib.Path('/etc/homecloud-node-agent.json')
+ config=connector_path(pathlib.Path('/'),'etc/iclusters-node-agent.json')
  if hashlib.sha256(config.read_bytes()).hexdigest()!=state['configHash']:sys.exit(1)
- target=pathlib.Path('/usr/local/sbin/homecloud-node-agent.py');backup=root/'previous.py'
+ target=connector_path(pathlib.Path('/'),'usr/local/sbin/iclusters-node-agent.py');backup=root/'previous.py'
  source=backup.read_bytes()
  if hashlib.sha256(source).hexdigest()!=state['previousRevision'] or target.is_symlink():sys.exit(1)
- fd,name=tempfile.mkstemp(dir=target.parent,prefix='.homecloud-rollback-')
+ fd,name=tempfile.mkstemp(dir=target.parent,prefix='.iclusters-rollback-')
  with os.fdopen(fd,'wb') as file:file.write(source);file.flush();os.fsync(file.fileno())
  os.chmod(name,0o600);os.replace(name,target)
  descriptor=os.open(target.parent,os.O_RDONLY|os.O_DIRECTORY)
  try:os.fsync(descriptor)
  finally:os.close(descriptor)
  state['rolledBack']=True;(root/'pending.json').write_text(json.dumps(state))
- subprocess.run(['systemctl','restart','homecloud-node-agent.service'],timeout=30,check=True)
+ subprocess.run(['systemctl','restart',connector_unit(pathlib.Path('/'))],timeout=30,check=True)
 except Exception:sys.exit(1)
 '''
 
 def atomic_connector_file(target,content):
  import tempfile
- fd,name=tempfile.mkstemp(dir=target.parent,prefix='.homecloud-update-')
+ fd,name=tempfile.mkstemp(dir=target.parent,prefix='.iclusters-update-')
  try:
   with os.fdopen(fd,'wb') as file:file.write(content);file.flush();os.fsync(file.fileno())
   os.chmod(name,0o600);os.replace(name,target)
@@ -503,14 +523,14 @@ def validate_connector_update(config,payload,nonce):
 def install_connector_update(config,payload,nonce,root=pathlib.Path('/'),exec_process=os.execv,run_process=subprocess.run):
  import fcntl
  source=validate_connector_update(config,payload,nonce)
- target=root/'usr/local/sbin/homecloud-node-agent.py';config_path=root/'etc/homecloud-node-agent.json'
+ target=connector_path(root,'usr/local/sbin/iclusters-node-agent.py');config_path=connector_path(root,'etc/iclusters-node-agent.json')
  if os.geteuid()!=0 or pathlib.Path(__file__).resolve()!=target or target.is_symlink() or config_path.is_symlink():raise RuntimeError('Standard root connector installation required')
  original_config=config_path.read_bytes()
  if json.loads(original_config)!=config:raise RuntimeError('Pairing changed')
- root=root/'var/lib/homecloud-connector-update'
+ root=connector_path(root,'var/lib/iclusters-connector-update')
  if root.is_symlink():raise RuntimeError('Invalid update directory')
  root.mkdir(mode=0o700,parents=True,exist_ok=True);root.chmod(0o700)
- with open(root.parents[2]/'run/homecloud-connector-update.lock','a') as lock:
+ with open(root.parents[2]/'run/iclusters-connector-update.lock','a') as lock:
   os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
   previous=target.read_bytes()
   atomic_connector_file(root/'previous.py',previous)
@@ -519,14 +539,14 @@ def install_connector_update(config,payload,nonce,root=pathlib.Path('/'),exec_pr
   atomic_connector_file(root/'pending.json',json.dumps(state).encode());atomic_connector_file(root/'rollback.py',ROLLBACK_SOURCE.encode())
   # Independent systemd timer survives a failed replacement process.
   try:
-   run_process(['systemd-run','--quiet','--collect','--timer-property=AccuracySec=1s','--unit=homecloud-connector-rollback-'+nonce,'--on-active=60s','/usr/bin/python3',str(root/'rollback.py'),nonce],check=True,capture_output=True,timeout=10)
+   run_process(['systemd-run','--quiet','--collect','--timer-property=AccuracySec=1s','--unit=iclusters-connector-rollback-'+nonce,'--on-active=60s','/usr/bin/python3',str(root/'rollback.py'),nonce],check=True,capture_output=True,timeout=10)
    if config_path.read_bytes()!=original_config:raise RuntimeError('Pairing changed')
    atomic_connector_file(target,source)
    exec_process(sys.executable,[sys.executable,str(target),'--config',str(config_path)])
   except Exception:
    atomic_connector_file(target,previous);state['verified']=True;atomic_connector_file(root/'pending.json',json.dumps(state).encode());raise
 
-def verify_connector_update(config,nonce,config_path=pathlib.Path('/etc/homecloud-node-agent.json')):
+def verify_connector_update(config,nonce,config_path=connector_path(pathlib.Path('/'),'etc/iclusters-node-agent.json')):
  if not nonce or not (AUTO_UPDATE_STATE/'pending.json').exists():return
  state=json.loads((AUTO_UPDATE_STATE/'pending.json').read_text())
  if state.get('nonce')==nonce and state.get('revision')==REVISION and state.get('configHash')==hashlib.sha256(config_path.read_bytes()).hexdigest():
@@ -575,7 +595,7 @@ def poll_once(config,reads,writes,completed,ready):
 
 def main():
  global CONFIG,HOSTS
- parser=argparse.ArgumentParser();parser.add_argument('--vpn-firewall',action='store_true');parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default='/etc/homecloud-node-agent.json');args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--vpn-firewall',action='store_true');parser.add_argument('--pair');parser.add_argument('--pair-stdin',action='store_true');parser.add_argument('--kind',choices=['proxmox','docker'],default='proxmox');parser.add_argument('--url');parser.add_argument('--config',default=str(connector_path(pathlib.Path('/'),'etc/iclusters-node-agent.json')));args=parser.parse_args()
  if args.vpn_firewall:
   policy=json.loads(VPN_POLICY.read_text()) if VPN_POLICY.exists() else {'rules':[]}
   # Before interface startup, derive peers from persistent configuration.

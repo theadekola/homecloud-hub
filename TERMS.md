@@ -26,7 +26,7 @@ You choose and provide access to connected providers, notification channels and 
 
 ## Support and reporting
 
-Use the [repository issue tracker](https://github.com/theadekola/homecloud-hub/issues) for non-sensitive reproducible problems or feature requests. Do not include credentials or private infrastructure data. For security vulnerabilities, follow [SECURITY.md](SECURITY.md). No specific response time is promised.
+Use the [repository issue tracker](https://github.com/theadekola/i-clusters/issues) for non-sensitive reproducible problems or feature requests. Do not include credentials or private infrastructure data. For security vulnerabilities, follow [SECURITY.md](SECURITY.md). No specific response time is promised.
 
 ## Release candidates
 

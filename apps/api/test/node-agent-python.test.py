@@ -1,6 +1,6 @@
 import base64,importlib.util,json,pathlib,unittest,tempfile
 from unittest.mock import patch
-module_path=pathlib.Path(__file__).parents[1]/'src'/'agent-assets'/'homecloud-node-agent.py'
+module_path=pathlib.Path(__file__).parents[1]/'src'/'agent-assets'/'iclusters-node-agent.py'
 spec=importlib.util.spec_from_file_location('agent',module_path);agent=importlib.util.module_from_spec(spec);spec.loader.exec_module(agent)
 class AgentTests(unittest.TestCase):
  def test_ct_uses_fixed_tool_with_explicit_script(self):
@@ -14,7 +14,7 @@ class AgentTests(unittest.TestCase):
   with patch.object(agent,'run',return_value=json.dumps({'exited':True,'exitcode':0,'out-truncated':True})):
    with self.assertRaises(RuntimeError):agent.guest_run('qemu/100','echo fixture')
  def test_binary_response_survives_bridge(self):
-  binary=b'\x01\x00\xfflog';encoded=base64.b64encode(binary+b'\n__HOMECLOUD_STATUS__200').decode()
+  binary=b'\x01\x00\xfflog';encoded=base64.b64encode(binary+b'\n__ICLUSTERS_STATUS__200').decode()
   with patch.object(agent,'guest_run',return_value=encoded):
    result=agent.docker_request('lxc/130','/containers/abc/logs?stdout=1');self.assertEqual(base64.b64decode(result['body']),binary);self.assertEqual(result['status'],200)
  def test_rejects_non_docker_paths(self):
@@ -150,7 +150,7 @@ class AgentTests(unittest.TestCase):
   with patch.object(agent,'guest_run',side_effect=guest) as run,patch.object(agent.time,'sleep'):
    result=agent.docker_pull('qemu/100','/images/create?fromImage=nginx',30,reports.append)
   self.assertEqual(result['status'],200);self.assertLess(len(result['body']),1000);self.assertEqual(reports[0][0]['progressDetail']['current'],1048576)
-  scripts=[call.args[1] for call in run.call_args_list];self.assertIn('--no-buffer',scripts[0]);self.assertTrue(any('tail -c 16384' in script for script in scripts));self.assertTrue(scripts[-1].startswith('rm -rf -- /tmp/homecloud-pull-'))
+  scripts=[call.args[1] for call in run.call_args_list];self.assertIn('--no-buffer',scripts[0]);self.assertTrue(any('tail -c 16384' in script for script in scripts));self.assertTrue(scripts[-1].startswith('rm -rf -- /tmp/iclusters-pull-'))
  def test_pull_timeouts_and_registry_errors_are_not_reported_as_success(self):
   for snapshot in ['28\n200\n','0\n200\n'+json.dumps({'error':'registry rejected'})+'\n']:
    def guest(host,script,timeout):return snapshot if 'tail -c' in script else ''

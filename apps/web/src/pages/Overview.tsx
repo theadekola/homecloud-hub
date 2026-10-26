@@ -28,8 +28,8 @@ export default function Overview(){
 
  const [success,setSuccess]=usePopupSuccess(customize);
  const [visible,setVisible]=useState<string[]>(loadDashboardWidgets);
- useEffect(()=>{localStorage.setItem('homecloud-widgets',JSON.stringify(visible));},[visible]);
- useEffect(()=>{const update=()=>setVisible(loadDashboardWidgets());window.addEventListener('homecloud-widgets',update);return()=>window.removeEventListener('homecloud-widgets',update);},[]);
+ useEffect(()=>{localStorage.setItem('iclusters-widgets',JSON.stringify(visible));},[visible]);
+ useEffect(()=>{const update=()=>setVisible(loadDashboardWidgets());window.addEventListener('iclusters-widgets',update);return()=>window.removeEventListener('iclusters-widgets',update);},[]);
  useEffect(()=>setRefreshFailure(''),[data]);
  const forceRefresh=async()=>{setRefreshFailure('');setFailure('');setRefreshing(true);try{await Promise.all([(async()=>{try{await api('/dashboard?refresh=1');await refresh()}catch(e:any){setRefreshFailure(e.message);throw e}})(),refreshBackups(),attention.refresh()]);}catch(e:any){setFailure(e.message);}finally{setRefreshing(false);}};
  const assess=async()=>{setChecking(true);setFailure('');try{setAnswer((await api('/ai/chat',{method:'POST',body:JSON.stringify({message:'Summarize current infrastructure health and the most urgent measured issues.'})})).result.answer);}catch(e:any){setFailure(e.message);}finally{setChecking(false);}};

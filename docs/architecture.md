@@ -1,6 +1,6 @@
 # Architecture and repository structure
 
-HomeCloud runs as a dedicated controller. Provider credentials and privileged operations stay behind its authenticated API. The browser is not given a Docker socket or direct database access.
+i-Clusters runs as a dedicated controller. Provider credentials and privileged operations stay behind its authenticated API. The browser is not given a Docker socket or direct database access.
 
 ## Controller deployment
 
@@ -21,7 +21,7 @@ Compose publishes Caddy's configured ports. PostgreSQL and the API are internal 
 
 ```mermaid
 flowchart TB
-    API["HomeCloud API"] --> PVE["Proxmox API: cluster inventory and actions"]
+    API["i-Clusters API"] --> PVE["Proxmox API: cluster inventory and actions"]
     API --> Direct["Optional Docker HTTPS API"]
     API --> NAS["TrueNAS JSON-RPC / configured legacy protocol"]
     Agent["Paired connector: outbound HTTPS polling"] --> API

@@ -6,7 +6,7 @@ Each signed-in user can open Settings → Security → Account security and sele
 
 The session list allows users to revoke their own devices. Revocation also closes associated SSH sessions and grants. Browser refresh credentials use an HttpOnly, Secure, SameSite cookie. Use the HTTPS controller endpoint, not plain HTTP. Remember this device retains the original fixed ten-day deadline; refreshing credentials does not extend it. Authenticator secrets and Docker operation checkpoints require the original JWT_SECRET. Preserve that key in encrypted backups.
 
-A root administrator with host-console access can run `homecloud recover-account USERNAME` to reset a password without putting it into shell arguments. Add `--reset-mfa` only for an approved account recovery. This invalidates all sessions and records the recovery in the audit log.
+A root administrator with host-console access can run `iclusters recover-account USERNAME` to reset a password without putting it into shell arguments. Add `--reset-mfa` only for an approved account recovery. This invalidates all sessions and records the recovery in the audit log.
 
 ## Installation and screen behavior
 
@@ -19,7 +19,7 @@ Docker installations run on the controller with encrypted, durable progress. Clo
 Install `age` from the operating system package repository and keep its private identity separately from the controller. Back up using a public recipient:
 
 ```sh
-homecloud backup /absolute/off-controller-backup-directory age1YOUR_PUBLIC_RECIPIENT
+iclusters backup /absolute/off-controller-backup-directory age1YOUR_PUBLIC_RECIPIENT
 ```
 
 This briefly pauses API and HTTPS services for a consistent database/runtime snapshot. It includes the database, runtime configuration, encryption keys, deployed source revision, offline Git history and local HTTPS authority. Transfer the encrypted archive off the controller. This is separate from VM/container backups and does not back up provider application volumes.
@@ -34,6 +34,6 @@ The command verifies archive checksums, creates isolated Compose volumes, restor
 
 ## Software upgrades
 
-The standard `homecloud update` flow takes a private local database/runtime recovery point, retains the current API/web/Caddy/PostgreSQL images, and restores those images and database if the replacement fails health checks. Local recovery points are under `/var/backups/iclusters`; manage their retention and free space explicitly. They are not an off-host backup. Maintenance blocks provider writes during the upgrade. Finish outstanding Docker operations before the first upgrade from an older release that lacks durable operation checks.
+The standard `iclusters update` flow takes a private local database/runtime recovery point, retains the current API/web/Caddy/PostgreSQL images, and restores those images and database if the replacement fails health checks. Local recovery points are under `/var/backups/iclusters`; manage their retention and free space explicitly. They are not an off-host backup. Maintenance blocks provider writes during the upgrade. Finish outstanding Docker operations before the first upgrade from an older release that lacks durable operation checks.
 
 Health checks demonstrate service availability, not complete provider behavior. A release still needs staging acceptance with each supported provider, a verified fresh VM/container restore, a controller restore drill, and representative mobile/desktop testing. CI runs an isolated encrypted controller restore and MFA sign-in; it does not validate physical disks, LAN permissions, all provider versions or a commercial security assessment. Multi-tenant SaaS isolation is not provided by the single-controller deployment.

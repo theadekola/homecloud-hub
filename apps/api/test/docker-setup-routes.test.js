@@ -4,7 +4,7 @@ const {createApp}=await import('../src/app.js');const {requireRole}=await import
 test('Direct Engine verification is owner-only, read-only and separate from paired-host selection',async()=>{
  let engineFails=false;const requests=[],engine=http.createServer((req,res)=>{requests.push({method:req.method,path:req.url});if(engineFails)res.statusCode=503;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({Name:'fixture-engine',ServerVersion:'test'}));});await new Promise(r=>engine.listen(0,'127.0.0.1',r));
  const audits=[];const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:req.headers['x-role']||'owner'};next()},authorize:requireRole,audit:async(...args)=>audits.push(args),monitor:{invalidate:async()=>{},sample:async()=>({services:[]})},db:{query:async()=>({rows:[]})}});const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}/api`;
- const call=async(p,role='owner',init={})=>{const r=await fetch(url+p,{...init,headers:{'x-role':role,'content-type':'application/json','x-homecloud-docker-host':'unrelated-agent',...init.headers}});return {status:r.status,body:await r.json()}};
+ const call=async(p,role='owner',init={})=>{const r=await fetch(url+p,{...init,headers:{'x-role':role,'content-type':'application/json','x-iclusters-docker-host':'unrelated-agent',...init.headers}});return {status:r.status,body:await r.json()}};
  try{
   assert.equal((await call('/connections/docker/verify','viewer')).status,403);
   assert.equal((await call('/connections/proxmox/verify','viewer')).status,403);

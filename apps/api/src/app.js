@@ -85,7 +85,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const agentPollLimiter=rateLimit({windowMs:60000,limit:120,standardHeaders:true,legacyHeaders:false,keyGenerator:req=>req.nodeAgent.id});
 
  const loginLimiter=rateLimit({windowMs:apiPolicy.loginWindowMs,limit:apiPolicy.loginRequests,standardHeaders:true,legacyHeaders:false});
- app.get('/api/node-agent/download',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/homecloud-node-agent.py',import.meta.url))));
+ app.get('/api/node-agent/download',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/iclusters-node-agent.py',import.meta.url))));
+
  app.get('/api/node-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-node-agent.sh',import.meta.url))));
  app.get('/api/docker-agent/install',(req,res)=>res.sendFile(fileURLToPath(new URL('./agent-assets/install-docker-agent.sh',import.meta.url))));
  app.post('/api/node-agent/pair',loginLimiter,(req,res)=>res.json(pairNode(req.body.code,req.body.name,req.body.kind)));
@@ -114,7 +115,9 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.use('/api',authenticate);
  app.use('/api',(req,res,next)=>{if(!['GET','HEAD'].includes(req.method)&&process.env.DATA_DIR&&existsSync(process.env.DATA_DIR+'/maintenance.json'))return res.status(503).json({error:'Controller maintenance is in progress. Retry after it completes.'});next();});
  app.use('/api/account',accountSecurityRouter({db,audit,limiter:loginLimiter,onSessionRevoked:closeSessionAccess}));
- app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-homecloud-docker-host']||'')},next));
+ app.use('/api',(req,res,next)=>{for(const [key,value] of Object.entries(req.headers))if(key.startsWith('x-homecloud-')&&!Object.hasOwn(req.headers,key.replace('x-homecloud-','x-iclusters-')))req.headers[key.replace('x-homecloud-','x-iclusters-')]=value;next()});
+ app.use('/api',(req,res,next)=>agentContext.run({host:String(req.headers['x-iclusters-docker-host']||'')},next));
+
  app.get('/api/docker/hosts',authorize('viewer'),(req,res)=>res.json({hosts:agentHosts().filter(h=>h.online||h.status==='connected'),directEnabled:providers.docker.configured()}));
  app.get('/api/node-agents',authorize('owner'),(req,res)=>res.json({nodes:agentNodes()}));
  app.get('/api/node-agents/:id/ssh-target',authorize('owner'),async(req,res)=>{const node=agentNodes().find(n=>n.id===req.params.id);if(!node)throw httpError('Paired connector not found',404);res.set('Cache-Control','no-store');res.json(await connectorAddress(node));});
@@ -129,9 +132,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
 
  app.get('/api/updates',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(updates.status());});
  app.post('/api/updates/check',authorize('owner'),(req,res)=>res.status(202).json(updates.check()));
- app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','homecloud',{},'queued');res.status(202).json(updates.request());});
+ app.post('/api/updates',authorize('owner'),async(req,res)=>{await audit(req,'software.update','iclusters',{},'queued');res.status(202).json(updates.request());});
+
  app.get('/api/connections/health',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');if(req.query.refresh==='1')void monitor.sample(true).catch(()=>{});const snapshot=await monitor.sample();res.json(connectionHealth({snapshot,cluster:publicCluster(clusterConfig()),direct:publicDocker(),nodes:agentNodes(),refreshing:!!monitor.isRefreshing?.(),configurations:Object.fromEntries(['truenas'].map(id=>{const c=configuration.resolve(id);return [id,{source:configuration.publicConfig(id).source,endpoint:c.TRUENAS_URL||null}]}))}));});
- app.get('/api/connections/proxmox/guests',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestConnectionReader(req.query.refresh==='1'||req.headers['x-homecloud-refresh']==='1'));});
+ app.get('/api/connections/proxmox/guests',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestConnectionReader(req.query.refresh==='1'||req.headers['x-iclusters-refresh']==='1'));});
  app.get('/api/connections/proxmox/guest-permissions',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await guestPermissions.inspect());});
  app.post('/api/connections/proxmox/guest-permissions',authorize('owner'),loginLimiter,async(req,res)=>{
   res.set('Cache-Control','no-store');let result;
@@ -169,7 +173,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  });
  const connectionScope=()=>crypto.createHash('sha256').update(JSON.stringify([clusterConfig(),dockerConfig(),['truenas'].map(id=>configuration.resolve(id))])).digest('hex');
  const cachedReads=new Set(['/backups/jobs','/restore','/dashboard','/monitoring','/proxmox','/proxmox/tasks','/docker','/storage','/network','/backups','/schedules','/retention','/proxmox/storage','/storage/disks','/storage/datasets','/storage/snapshots']);
- const forceRead=req=>req?.query?.refresh==='1'||req?.get?.('X-HomeCloud-Refresh')==='1';
+ const forceRead=req=>req?.query?.refresh==='1'||req?.get?.('X-IClusters-Refresh')==='1';
  const sampleView=async req=>{if(!monitor.isRefreshing)return monitor.sample(forceRead(req));if(forceRead(req))void monitor.sample(true).catch(()=>{});const s=await monitor.sample();return {...s,refreshing:!!s.refreshing||monitor.isRefreshing()};};
  const read=(path,handler,role='viewer')=>app.get(`/api${path}`,authorize(role),async(req,res)=>{res.set('Cache-Control','no-store');if(!cachedReads.has(path))return res.json(await handler(req));const url=new URL(req.originalUrl,'http://local');url.searchParams.delete('refresh');url.searchParams.sort();const key=JSON.stringify([req.user?.sub,req.user?.role,connectionScope(),selectedAgentHost(),url.pathname+url.search]);res.json(await readCache.run(key,()=>handler(req),{force:forceRead(req),background:true}));});
 
@@ -190,8 +194,8 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    const phrase=confirmation(`CONFIRM ${label.toUpperCase()} ${resource}`,req.body);
    const needsConfirmation=typeof sensitive==='function'?sensitive(req):sensitive;
    req.sshLabel=label;const legacyTarget=actionTarget(req),approval=needsConfirmation||legacyTarget?await resolveActionApproval(req.path.replace(/^\/api/,''),req.body,req.method,{dockerHost:selectedAgentHost(),query:pve}):null,sshTarget=approval?.target||legacyTarget;
-   if(needsConfirmation&&req.headers['x-homecloud-confirm']!==phrase){req.activityChallenge=true;return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase,sshTarget,approvalDescription:approval?.description});}
-   if(sshTarget&&!consumeGrant(req.headers['x-homecloud-ssh-grant'],req.user.sub,req.method,req.path.replace(/^\/api/,''),req.body,approval?.scope||sshTarget))return res.status(428).json({error:'Target SSH authentication required',sshTarget,approvalDescription:approval?.description});
+   if(needsConfirmation&&req.headers['x-iclusters-confirm']!==phrase){req.activityChallenge=true;return res.status(409).json({error:'confirmation_required',confirmationPhrase:phrase,sshTarget,approvalDescription:approval?.description});}
+   if(sshTarget&&!consumeGrant(req.headers['x-iclusters-ssh-grant'],req.user.sub,req.method,req.path.replace(/^\/api/,''),req.body,approval?.scope||sshTarget))return res.status(428).json({error:'Target SSH authentication required',sshTarget,approvalDescription:approval?.description});
    let result;
    try{result=await handler(req);}catch(error){await audit(req,label,resource,{error:error.message},'failed');throw error;}
    monitor.invalidate();
@@ -430,7 +434,8 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/truenas/pool/:id/scrub','admin','truenas.pool.scrub',async req=>({jobId:await truenas('pool.scrub.scrub',[integer(req.params.id,'Pool ID'),'START'])}));
  action('post','/truenas/schedule','admin','truenas.snapshot.schedule.create',req=>{
    const {dataset,hour='2',minute='0',lifetime=7}=req.body;integer(hour,'Hour',0,23);integer(minute,'Minute',0,59);
-   return truenas('pool.snapshottask.create',[{dataset:required(dataset,'Dataset'),recursive:false,lifetime_value:integer(lifetime,'Retention days',1,3650),lifetime_unit:'DAY',naming_schema:'homecloud-%Y-%m-%d_%H-%M',schedule:{minute:String(minute),hour:String(hour),dom:'*',month:'*',dow:'*'},enabled:true}]);
+   return truenas('pool.snapshottask.create',[{dataset:required(dataset,'Dataset'),recursive:false,lifetime_value:integer(lifetime,'Retention days',1,3650),lifetime_unit:'DAY',naming_schema:'iclusters-%Y-%m-%d_%H-%M',schedule:{minute:String(minute),hour:String(hour),dom:'*',month:'*',dow:'*'},enabled:true}]);
+
  });
  action('post','/truenas/schedule/:id/toggle','admin','truenas.snapshot.schedule.toggle',async req=>{const id=integer(req.params.id,'Task ID');const tasks=await truenas('pool.snapshottask.query',[[['id','=',id]]]);if(!tasks.length)throw httpError('Task not found',404);return truenas('pool.snapshottask.update',[id,{enabled:!tasks[0].enabled}]);});
 

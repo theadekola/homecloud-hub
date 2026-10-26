@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 [[ $EUID == 0 ]] || { echo 'Run as root on the Docker host, using sudo bash if needed.'; exit 1; }
-[[ ! -e /etc/homecloud-node-agent.json ]] || { echo 'Connector already configured. Revoke and remove the old connector before pairing again.'; exit 1; }
+[[ ! -e /etc/iclusters-node-agent.json && ! -e /etc/homecloud-node-agent.json ]] || { echo 'Connector already configured. Revoke and remove the old connector before pairing again.'; exit 1; }
 command -v python3 >/dev/null
 command -v systemctl >/dev/null
 command -v curl >/dev/null
@@ -24,16 +24,16 @@ curl --fail --silent --show-error --max-time 15 --unix-socket /var/run/docker.so
 read -rsp 'One-time pairing code from i-Clusters: ' pairing
 printf '\n'
 umask 077
-curl --fail --silent --show-error --proto '=https' "${hub%/}/api/node-agent/download" -o /usr/local/sbin/homecloud-node-agent.py
-printf '%s\n' "$pairing" | python3 /usr/local/sbin/homecloud-node-agent.py --url "$hub" --pair-stdin --kind docker
+curl --fail --silent --show-error --proto '=https' "${hub%/}/api/node-agent/download" -o /usr/local/sbin/iclusters-node-agent.py
+printf '%s\n' "$pairing" | python3 /usr/local/sbin/iclusters-node-agent.py --url "$hub" --pair-stdin --kind docker
 unset pairing
-cat > /etc/systemd/system/homecloud-node-agent.service <<'UNIT'
+cat > /etc/systemd/system/iclusters-node-agent.service <<'UNIT'
 [Unit]
 Description=i-Clusters outbound Docker host connector
 After=network-online.target docker.service
 Wants=network-online.target
 [Service]
-ExecStart=/usr/bin/python3 /usr/local/sbin/homecloud-node-agent.py
+ExecStart=/usr/bin/python3 /usr/local/sbin/iclusters-node-agent.py
 Restart=always
 RestartSec=10
 UMask=0077
@@ -41,5 +41,5 @@ UMask=0077
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now homecloud-node-agent.service
+systemctl enable --now iclusters-node-agent.service
 echo 'Paired. Return to i-Clusters and click Verify & Connect. No Docker TCP port was opened.'

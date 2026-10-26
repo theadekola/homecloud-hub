@@ -16,12 +16,12 @@ function fixture({docker=true,consent='INSTALL',existing=false}={}){
  if(docker)fs.writeFileSync(path.join(dir,'docker.sock'),'');if(existing)fs.writeFileSync(path.join(dir,'config.json'),'existing');fs.writeFileSync(path.join(dir,'agent.py'),'# fixture');
  let script=fs.readFileSync(new URL('../src/agent-assets/install-docker-agent.sh',import.meta.url),'utf8');
  // Redirect every installation target and socket check to fixtures. No system paths are written.
- script=script.replace('if command -v dockerd >/dev/null || command -v podman >/dev/null; then','if false; then').replace('[[ $EUID == 0 ]]','[[ 0 == 0 ]]').replaceAll('/etc/homecloud-node-agent.json',dir+'/config.json').replaceAll('/usr/local/sbin/homecloud-node-agent.py',dir+'/installed.py').replaceAll('/etc/systemd/system/homecloud-node-agent.service',dir+'/service').replaceAll('test -S /var/run/docker.sock','test -f "'+dir+'/docker.sock"');
- const file=path.join(dir,'install.sh');fs.writeFileSync(file,script);const result=spawnSync('bash',[file],{input:`https://homecloud.test\n${docker?'':consent+'\n'}fixture-secret\n`,encoding:'utf8',env:{...process.env,PATH:bin+':/usr/bin:/bin',FIXTURE:dir}});
+ script=script.replace('if command -v dockerd >/dev/null || command -v podman >/dev/null; then','if false; then').replace('[[ $EUID == 0 ]]','[[ 0 == 0 ]]').replaceAll('/etc/iclusters-node-agent.json',dir+'/config.json').replaceAll('/usr/local/sbin/iclusters-node-agent.py',dir+'/installed.py').replaceAll('/etc/systemd/system/iclusters-node-agent.service',dir+'/service').replaceAll('test -S /var/run/docker.sock','test -f "'+dir+'/docker.sock"');
+ const file=path.join(dir,'install.sh');fs.writeFileSync(file,script);const result=spawnSync('bash',[file],{input:`https://iclusters.test\n${docker?'':consent+'\n'}fixture-secret\n`,encoding:'utf8',env:{...process.env,PATH:bin+':/usr/bin:/bin',FIXTURE:dir}});
  const calls=fs.existsSync(log)?fs.readFileSync(log,'utf8'):'';fs.rmSync(dir,{recursive:true,force:true});return {...result,calls};
 }
 test('Standalone installer verifies existing Docker, pairs via stdin and opens no TCP listener',()=>{
- const result=fixture();assert.equal(result.status,0,result.stderr);assert.ok(result.calls.includes('--pair-stdin --kind docker'));assert.ok(!result.calls.includes('fixture-secret'));assert.ok(!result.calls.includes('apt-get'));assert.ok(result.calls.includes('enable --now homecloud-node-agent'));assert.ok(result.stdout.includes('No Docker TCP port was opened'));
+ const result=fixture();assert.equal(result.status,0,result.stderr);assert.ok(result.calls.includes('--pair-stdin --kind docker'));assert.ok(!result.calls.includes('fixture-secret'));assert.ok(!result.calls.includes('apt-get'));assert.ok(result.calls.includes('enable --now iclusters-node-agent'));assert.ok(result.stdout.includes('No Docker TCP port was opened'));
 });
 test('Missing Docker needs explicit installation consent',()=>{
  const cancelled=fixture({docker:false,consent:'NO'});assert.equal(cancelled.status,1);assert.equal(cancelled.calls,'');

@@ -19,7 +19,7 @@ const original={fetch:globalThis.fetch,window:globalThis.window,localStorage:glo
 try{
  await test('container review carries its name and host, and host changes cancel before the mutation retry',async()=>{
   const c=await client();c.setDockerHost('original');let calls=0,detail;
-  window.dispatchEvent=e=>{if(e.type==='homecloud-ssh-approval'){detail=e.detail;c.setDockerHost('other');e.detail.resolve('grant')}};
+  window.dispatchEvent=e=>{if(e.type==='iclusters-ssh-approval'){detail=e.detail;c.setDockerHost('other');e.detail.resolve('grant')}};
   globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM restart',sshTarget:'vm:node:100'})};
   await assert.rejects(c.confirmedApi('/actions/docker/container/c/restart',{method:'POST',body:'{}'},{title:'Restart container app',description:'Restart app on engine-a'}),/host changed/);
   assert.equal(calls,1);assert.equal(detail.title,'Restart container app');assert.equal(detail.description,'Restart app on engine-a');assert.equal(detail.dockerHost,'original');
@@ -27,19 +27,19 @@ try{
 
  await test('monitoring tools confirmation uses the application dialog and rejects an incorrect approval',async()=>{
   const c=await client();let calls=0,detail;window.prompt=()=>{throw Error('Native prompt must not open')};
-  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){detail=e.detail;detail.resolve('wrong phrase')}};
+  window.dispatchEvent=e=>{if(e.type==='iclusters-action-confirmation'){detail=e.detail;detail.resolve('wrong phrase')}};
   globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM HOST.MONITORING-TOOLS.INSTALL host nonce',approvalDescription:'Install tools'})};
   await assert.rejects(c.confirmedApi('/operations/host/tools',{method:'POST',body:'{"action":"install-tools"}'}),/cancelled/);
   assert.equal(calls,1);assert.equal(detail.path,'/operations/host/tools');assert.equal(detail.description,'Install tools');assert.match(detail.phrase,/HOST.MONITORING-TOOLS.INSTALL/);
  });
 
  await test('Proxmox confirmation combines warning approval and SSH authentication without native prompt',async()=>{
-  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-api-write')return;assert.equal(e.type,'homecloud-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-HomeCloud-Confirm'],'CONFIRM reboot');
+  const c=await client();c.setTokens('token','refresh');let calls=0,requests=[];window.prompt=()=>{throw Error('Native prompt must not open')};window.dispatchEvent=e=>{if(e.type==='iclusters-api-write')return;assert.equal(e.type,'iclusters-ssh-approval');assert.equal(e.detail.target,'vm:pve:100');e.detail.resolve('grant')};globalThis.fetch=async(url,options)=>{requests.push(options);return ++calls===1?response(409,{confirmationPhrase:'CONFIRM reboot',sshTarget:'vm:pve:100'}):response(200,{ok:true})};assert.deepEqual(await c.confirmedApi('/actions/proxmox/vm/100/reboot',{method:'POST',body:JSON.stringify({node:'pve'})}),{ok:true});assert.equal(new Headers(requests[1].headers).get('X-IClusters-SSH-Grant'),'grant');assert.equal(requests[1].headers['X-IClusters-Confirm'],'CONFIRM reboot');
  });
  await test('PUT and DELETE target approvals use SSH modal metadata and pin selected Docker host without native passkeys',async()=>{
-  for(const method of ['PUT','DELETE']){const c=await client();c.setTokens('token','refresh');c.setDockerHost('original-host');let detail,requests=[];window.prompt=()=>{throw Error('Native confirmation must not open')};window.dispatchEvent=e=>{if(e.type==='homecloud-ssh-approval'){detail=e.detail;c.setDockerHost('changed-host');detail.resolve('verified grant')}};
+  for(const method of ['PUT','DELETE']){const c=await client();c.setTokens('token','refresh');c.setDockerHost('original-host');let detail,requests=[];window.prompt=()=>{throw Error('Native confirmation must not open')};window.dispatchEvent=e=>{if(e.type==='iclusters-ssh-approval'){detail=e.detail;c.setDockerHost('changed-host');detail.resolve('verified grant')}};
    globalThis.fetch=async(url,options)=>{requests.push(options);return requests.length===1?response(409,{confirmationPhrase:'server binding',sshTarget:'node:pve'}):response(200,{ok:true})};
-   await c.confirmedApi('/network/dns/pve',{method,body:'{"dns1":"192.0.2.1"}'});assert.equal(detail.method,method);assert.equal(detail.target,'node:pve');assert.equal(detail.dockerHost,'original-host');assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-SSH-Grant'),'verified grant');assert.equal(new Headers(requests[1].headers).get('X-HomeCloud-Docker-Host'),'original-host');
+   await c.confirmedApi('/network/dns/pve',{method,body:'{"dns1":"192.0.2.1"}'});assert.equal(detail.method,method);assert.equal(detail.target,'node:pve');assert.equal(detail.dockerHost,'original-host');assert.equal(new Headers(requests[1].headers).get('X-IClusters-SSH-Grant'),'verified grant');assert.equal(new Headers(requests[1].headers).get('X-IClusters-Docker-Host'),'original-host');
   }
  });
  await test('terminal streaming shares token refresh and returns an unread authenticated response',async()=>{
@@ -52,11 +52,11 @@ try{
   const c=await client();c.setTokens('old','refresh');
   globalThis.fetch=async url=>response(url.endsWith('/auth/refresh')?503:401);
   await assert.rejects(c.api('/auth/me'),{status:503});
-  assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('homecloud_refresh_token'),'refresh');
+  assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('iclusters_refresh_token'),'refresh');
  });
  await test('rejected refresh tokens clear the session',async()=>{
   const c=await client();c.setTokens('old','refresh');globalThis.fetch=async()=>response(401);
-  await assert.rejects(c.api('/auth/me'),{status:401});assert.equal(c.getAccessToken(),'');assert.equal(localStorage.getItem('homecloud_refresh_token'),null);assert.equal(localStorage.getItem('lastEvent'),'homecloud-session-expired');
+  await assert.rejects(c.api('/auth/me'),{status:401});assert.equal(c.getAccessToken(),'');assert.equal(localStorage.getItem('iclusters_refresh_token'),null);assert.equal(localStorage.getItem('lastEvent'),'iclusters-session-expired');
  });
  await test('simultaneous expired requests share one token refresh and retry successfully',async()=>{
   const c=await client();c.setTokens('old','refresh');let refreshes=0;
@@ -69,16 +69,16 @@ try{
  await test('confirmation retries stay on the original Docker host even when selection changes',async()=>{
   const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];
   globalThis.fetch=async(url,options)=>{calls.push(new Headers(options.headers));return calls.length===1?response(409,{confirmationPhrase:'CONFIRM host-a'}):response(200,{ok:true});};
-  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM host-a')}};
+  window.dispatchEvent=e=>{if(e.type==='iclusters-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM host-a')}};
   await c.confirmedApi('/docker/volume/data',{method:'DELETE'});
-  assert.equal(calls[0].get('X-HomeCloud-Docker-Host'),'node-a:lxc/101');assert.equal(calls[1].get('X-HomeCloud-Docker-Host'),'node-a:lxc/101');
-  assert.equal(calls[1].get('X-HomeCloud-Confirm'),'CONFIRM host-a');
+  assert.equal(calls[0].get('X-IClusters-Docker-Host'),'node-a:lxc/101');assert.equal(calls[1].get('X-IClusters-Docker-Host'),'node-a:lxc/101');
+  assert.equal(calls[1].get('X-IClusters-Confirm'),'CONFIRM host-a');
  });
  await test('direct Engine confirmation does not switch to a subsequently selected agent',async()=>{
   const c=await client();const calls=[];
   globalThis.fetch=async(url,options)=>{calls.push(new Headers(options.headers));return calls.length===1?response(409,{confirmationPhrase:'CONFIRM direct'}):response(200);};
-  window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM direct')}};
-  await c.confirmedApi('/docker/prune/volumes',{method:'POST'});assert.equal(calls[1].get('X-HomeCloud-Docker-Host'),'');
+  window.dispatchEvent=e=>{if(e.type==='iclusters-action-confirmation'){c.setDockerHost('node-b:lxc/101');e.detail.resolve('CONFIRM direct')}};
+  await c.confirmedApi('/docker/prune/volumes',{method:'POST'});assert.equal(calls[1].get('X-IClusters-Docker-Host'),'');
  });
  await test('request headers and cancellation signals reach fetch',async()=>{
   const c=await client(),controller=new AbortController();let seen;
@@ -88,31 +88,31 @@ try{
  });
  await test('Storage and Network use the same selection while TrueNAS share reads remain separate',async()=>{
   const c=await client();c.setDockerHost('node-a:lxc/101');const calls=[];
-  globalThis.fetch=async(url,options)=>{calls.push([url,new Headers(options.headers).get('X-HomeCloud-Docker-Host')]);return response(200)};
+  globalThis.fetch=async(url,options)=>{calls.push([url,new Headers(options.headers).get('X-IClusters-Docker-Host')]);return response(200)};
   await c.api('/storage');await c.api('/network');await c.api('/storage/shares');
   assert.equal(calls[0][1],'node-a:lxc/101');assert.equal(calls[1][1],'node-a:lxc/101');assert.equal(calls[2][1],null);
  });
  await test('cancelled confirmation never submits the destructive retry',async()=>{
-  const c=await client();let calls=0;window.dispatchEvent=e=>{if(e.type==='homecloud-action-confirmation')e.detail.reject(Error('Confirmation cancelled'))};globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
+  const c=await client();let calls=0;window.dispatchEvent=e=>{if(e.type==='iclusters-action-confirmation')e.detail.reject(Error('Confirmation cancelled'))};globalThis.fetch=async()=>{calls++;return response(409,{confirmationPhrase:'CONFIRM'})};
   await assert.rejects(c.confirmedApi('/docker/volume/data',{method:'DELETE'}),/cancelled/);assert.equal(calls,1);
  });
  await test('temporary account-service failures retain both access and refresh tokens',async()=>{
   const c=await client();c.setTokens('old','refresh');globalThis.fetch=async url=>url.endsWith('/auth/refresh')?response(503,{error:'Account service temporarily unavailable'}):response(401);
-  await assert.rejects(c.api('/auth/me'),{status:503});assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('homecloud_refresh_token'),'refresh');
+  await assert.rejects(c.api('/auth/me'),{status:503});assert.equal(c.getAccessToken(),'old');assert.equal(localStorage.getItem('iclusters_refresh_token'),'refresh');
  });
  await test('successful writes invalidate read caches while GET, SSH and failed writes do not',async()=>{
   const c=await client(),events=[];window.dispatchEvent=e=>{events.push(e.type)};globalThis.fetch=async()=>response(200,{});
   await c.api('/storage');await c.api('/ssh/session/one',{method:'POST',body:'{}'});assert.deepEqual(events,[]);
-  await c.api('/actions/docker/container/one/restart',{method:'POST',body:'{}'});assert.deepEqual(events,['homecloud-api-write']);
+  await c.api('/actions/docker/container/one/restart',{method:'POST',body:'{}'});assert.deepEqual(events,['iclusters-api-write']);
   globalThis.fetch=async()=>response(403,{error:'Denied'});await assert.rejects(c.api('/users',{method:'POST',body:'{}'}));assert.equal(events.length,1);
  });
  await test('a late refresh response cannot restore tokens after sign out',async()=>{
   const c=await client();c.setTokens('old','refresh',false);let finish,started;const ready=new Promise(resolve=>started=resolve);
   globalThis.fetch=async url=>{if(url.endsWith('/auth/refresh')){started();return new Promise(resolve=>finish=resolve)}return response(401)};
-  const pending=c.api('/auth/me');await ready;c.clearTokens();finish(response(200,{accessToken:'late',refreshToken:'late-refresh'}));await assert.rejects(pending,{status:401});assert.equal(c.getAccessToken(),'');assert.equal(sessionStorage.getItem('homecloud_refresh_token'),null);assert.equal(localStorage.getItem('homecloud_refresh_token'),null);
+  const pending=c.api('/auth/me');await ready;c.clearTokens();finish(response(200,{accessToken:'late',refreshToken:'late-refresh'}));await assert.rejects(pending,{status:401});assert.equal(c.getAccessToken(),'');assert.equal(sessionStorage.getItem('iclusters_refresh_token'),null);assert.equal(localStorage.getItem('iclusters_refresh_token'),null);
  });
  await test('concurrent reads and failures remain silent',async()=>{
-  const c=await client(),counts=[];window.dispatchEvent=e=>{if(e.type==='homecloud-network-loading')counts.push(e.detail)};let finish;
+  const c=await client(),counts=[];window.dispatchEvent=e=>{if(e.type==='iclusters-network-loading')counts.push(e.detail)};let finish;
   globalThis.fetch=async url=>url.endsWith('/one')?new Promise(resolve=>finish=resolve):Promise.reject(Error('Offline'));
   const first=c.api('/one');await assert.rejects(c.api('/two'),/Offline/);finish(response(200));await first;assert.deepEqual(counts,[]);
  });

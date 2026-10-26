@@ -5,7 +5,7 @@ fail() { echo "Error: $*" >&2; exit 1; }
 usage() {
   echo 'Usage: sudo bash install.sh [--repo https://github.com/OWNER/REPO.git] [--ref BRANCH_OR_TAG] [--url https://SERVER-IP] [--port 6003] [--https-port 6002]'
 }
-repo='https://github.com/theadekola/homecloud-hub.git' ref='' url='' web_port=6003 https_port=6002
+repo='https://github.com/theadekola/i-clusters.git' ref='' url='' web_port=6003 https_port=6002
 while (($#)); do
   case "$1" in
     --repo|--ref|--url|--port|--https-port)
@@ -27,8 +27,9 @@ done
 source /etc/os-release
 [[ $ID == ubuntu ]] || fail 'This installer supports Ubuntu.'
 command -v systemctl >/dev/null || fail 'Ubuntu with systemd is required.'
-[[ ! -e /opt/homecloud-hub ]] || fail '/opt/homecloud-hub already exists. Use sudo homecloud update for an existing installation.'
-[[ ! -e /usr/local/bin/homecloud && ! -e /etc/systemd/system/homecloud-hub.service ]] || fail 'i-Clusters command or service already exists.'
+[[ ! -e /opt/homecloud-hub ]] || fail 'An existing installation must be upgraded, not reinstalled.'
+[[ ! -e /opt/i-clusters ]] || fail '/opt/i-clusters already exists. Use sudo iclusters update for an existing installation.'
+[[ ! -e /usr/local/bin/iclusters && ! -e /etc/systemd/system/i-clusters.service ]] || fail 'i-Clusters command or service already exists.'
 apt-get update
 apt-get install -y ca-certificates curl git openssl nano iproute2 python3
 if ! command -v docker >/dev/null; then
@@ -56,12 +57,12 @@ docker compose version >/dev/null || fail 'Install the Docker Compose plugin bef
 systemctl start docker
 docker info >/dev/null || fail 'Docker Engine is unavailable.'
 install -d -m 0755 /opt
-stage=$(mktemp -d /opt/homecloud-install.XXXXXXXX)
+stage=$(mktemp -d /opt/iclusters-install.XXXXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
 git clone -- "$repo" "$stage/source"
 if [[ -n $ref ]]; then git -C "$stage/source" checkout --detach "$ref"; fi
 cd "$stage/source"
-[[ -f docker-compose.yml && -f deployment/homecloud && -f deployment/homecloud-hub.service && -f .env.example ]] || fail 'Repository does not contain the i-Clusters installation files.'
+[[ -f docker-compose.yml && -f deployment/iclusters && -f deployment/i-clusters.service && -f .env.example ]] || fail 'Repository does not contain the i-Clusters installation files.'
 sh deployment/generate-secrets.sh
 if [[ -z $url ]]; then
   source deployment/network.sh
@@ -78,15 +79,15 @@ sed -i "s|^DOMAIN=.*|DOMAIN=$domain|;s|^WEB_ORIGIN=.*|WEB_ORIGIN=$url|;s|^WEB_PO
 sed -i "s|^CADDY_TLS=.*|CADDY_TLS=|;s|^CADDY_DEFAULT_SNI=.*|CADDY_DEFAULT_SNI=${domain#https://}|" .env
 python3 deployment/configure-https.py
 docker compose config --quiet
-mv "$stage/source" /opt/homecloud-hub
-cd /opt/homecloud-hub
-install -m 0755 deployment/homecloud /usr/local/bin/homecloud
-install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+mv "$stage/source" /opt/i-clusters
+cd /opt/i-clusters
+install -m 0755 deployment/iclusters /usr/local/bin/iclusters
+install -m 0644 deployment/i-clusters.service /etc/systemd/system/i-clusters.service
 bash deployment/setup-updater.sh
 source deployment/build-env.sh
 docker compose build --pull
 systemctl daemon-reload
-systemctl enable --now homecloud-hub.service
+systemctl enable --now i-clusters.service
 echo "i-Clusters installed at $url"
 echo 'Open this URL and register your owner account using the setup code shown above.'
 echo 'Choose your name, email and password in the browser. Registration closes after the first account.'

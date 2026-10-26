@@ -8,8 +8,8 @@ export default function ActionConfirmation(){
   const next=()=>{if(active||!pending.length)return;active=pending.shift()!;setRequest(active)};
   complete.current=value=>{if(!active||value!==undefined&&value!==active.phrase)return;const current=active;active=null;setRequest(null);value===undefined?current.reject(new Error('Confirmation cancelled')):current.resolve(value);next()};
   const receive=(event:Event)=>{const detail=(event as CustomEvent).detail;pending.push({...detail,serial:++serial});next()};
-  window.addEventListener('homecloud-action-confirmation',receive);
-  return()=>{window.removeEventListener('homecloud-action-confirmation',receive);active?.reject(new Error('Confirmation cancelled'));for(const item of pending)item.reject(new Error('Confirmation cancelled'))};
+  window.addEventListener('iclusters-action-confirmation',receive);
+  return()=>{window.removeEventListener('iclusters-action-confirmation',receive);active?.reject(new Error('Confirmation cancelled'));for(const item of pending)item.reject(new Error('Confirmation cancelled'))};
  },[]);
  return <Modal open={!!request} title={request?.title||(request?.path.match(/^\/operations\/[^/]+\/tools$/)?'Install Monitoring Tools':'Confirm Action')} onClose={()=>complete.current()}>{request&&<ConfirmationForm key={request.serial} request={request} complete={value=>complete.current(value)}/>}</Modal>;
 }

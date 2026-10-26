@@ -1,12 +1,13 @@
-const ACCESS='homecloud_access_token',REFRESH='homecloud_refresh_token',ACTIVE='homecloud_last_activity',TIMEOUT='homecloud_idle_minutes',UNTIL='homecloud_remember_until',COOKIE='homecloud_cookie_session';
+import './brand-storage';
+const ACCESS='iclusters_access_token',REFRESH='iclusters_refresh_token',ACTIVE='iclusters_last_activity',TIMEOUT='iclusters_idle_minutes',UNTIL='iclusters_remember_until',COOKIE='iclusters_cookie_session';
 export const idleOptions=[5,15,30,60,120,480];
 const stores=()=>[localStorage,sessionStorage];
 const tokenStore=()=>sessionStorage.getItem(ACCESS)?sessionStorage:localStorage;
 export function getIdleMinutes(){const value=Number(localStorage.getItem(TIMEOUT));return idleOptions.includes(value)?value:30;}
-export function setIdleMinutes(value:number){if(!idleOptions.includes(value))throw Error('Choose a valid sign-out time.');localStorage.setItem(TIMEOUT,String(value));window.dispatchEvent(new Event('homecloud-session-policy'));}
+export function setIdleMinutes(value:number){if(!idleOptions.includes(value))throw Error('Choose a valid sign-out time.');localStorage.setItem(TIMEOUT,String(value));window.dispatchEvent(new Event('iclusters-session-policy'));}
 export function isSessionIdle(now=Date.now()){const store=tokenStore(),last=Number(store.getItem(ACTIVE));if(store.getItem(UNTIL))return now>=Number(store.getItem(UNTIL));return !!store.getItem(ACCESS)&&(!last||now-last>=getIdleMinutes()*60000);}
-export function clearTokens(){for(const store of stores())for(const key of [ACCESS,REFRESH,ACTIVE,UNTIL,COOKIE])store.removeItem(key);window.dispatchEvent(new Event('homecloud-session-expired'));}
-function expireIdle(){const remembered=!!tokenStore().getItem(UNTIL);clearTokens();sessionStorage.setItem('homecloud_session_message',remembered?'Your 10-day remembered sign-in has expired. Sign in again to continue.':'You were signed out after inactivity. Sign in again to continue.');}
+export function clearTokens(){for(const store of stores())for(const key of [ACCESS,REFRESH,ACTIVE,UNTIL,COOKIE])store.removeItem(key);window.dispatchEvent(new Event('iclusters-session-expired'));}
+function expireIdle(){const remembered=!!tokenStore().getItem(UNTIL);clearTokens();sessionStorage.setItem('iclusters_session_message',remembered?'Your 10-day remembered sign-in has expired. Sign in again to continue.':'You were signed out after inactivity. Sign in again to continue.');}
 export function getAccessToken(){if(isSessionIdle()){expireIdle();return '';}return tokenStore().getItem(ACCESS)||'';}
 export function getRefreshToken(){return getAccessToken()?tokenStore().getItem(REFRESH)||'':'';}
 export function setTokens(accessToken:string,refreshToken?:string,remember?:boolean,rememberUntil?:number,cookieSession=false){
@@ -24,11 +25,11 @@ export function startSessionActivity(){
  const check=()=>{if(isSessionIdle())expireIdle();};
  let written=0;const activity=()=>{check();if(Date.now()-written>1000){touchSession();written=Date.now();}};
  const visible=()=>{if(document.visibilityState==='visible')check();};
- const storage=(e:StorageEvent)=>{if([ACCESS,REFRESH,ACTIVE,UNTIL,TIMEOUT,null].includes(e.key)){check();if(!tokenStore().getItem(ACCESS))window.dispatchEvent(new Event('homecloud-session-expired'));}};
+ const storage=(e:StorageEvent)=>{if([ACCESS,REFRESH,ACTIVE,UNTIL,TIMEOUT,null].includes(e.key)){check();if(!tokenStore().getItem(ACCESS))window.dispatchEvent(new Event('iclusters-session-expired'));}};
  const events=['pointerdown','keydown','wheel','touchstart'];for(const event of events)window.addEventListener(event,activity,{passive:true});
- window.addEventListener('focus',check);window.addEventListener('storage',storage);window.addEventListener('homecloud-session-policy',check);document.addEventListener('visibilitychange',visible);
+ window.addEventListener('focus',check);window.addEventListener('storage',storage);window.addEventListener('iclusters-session-policy',check);document.addEventListener('visibilitychange',visible);
  check();const timer=window.setInterval(check,1000);
- return()=>{window.clearInterval(timer);for(const event of events)window.removeEventListener(event,activity);window.removeEventListener('focus',check);window.removeEventListener('storage',storage);window.removeEventListener('homecloud-session-policy',check);document.removeEventListener('visibilitychange',visible);};
+ return()=>{window.clearInterval(timer);for(const event of events)window.removeEventListener(event,activity);window.removeEventListener('focus',check);window.removeEventListener('storage',storage);window.removeEventListener('iclusters-session-policy',check);document.removeEventListener('visibilitychange',visible);};
 }
 
 export function usesCookieSession(){return tokenStore().getItem(COOKIE)==='1'}

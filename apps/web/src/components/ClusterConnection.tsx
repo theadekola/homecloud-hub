@@ -10,7 +10,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  const [copyMessage,setCopyMessage]=useState('');
  const copyCaCommand=async()=>{try{await navigator.clipboard.writeText('cat /etc/pve/pve-root-ca.pem');setCopyMessage('Command copied.');}catch{setCopyMessage('Select and copy the command below.');}};
  const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]),[success,setSuccess]=useState('');
- const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('homecloud-connection'));onSaved?.()}};
+ const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('iclusters-connection'));onSaved?.()}};
  const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setMessage('');setSuccess('');setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const autoOpened=useRef(false);
  useEffect(()=>{if(!autoOpen)autoOpened.current=false;if(autoOpen&&owner&&!autoOpened.current){autoOpened.current=true;void load()}},[autoOpen,owner]);
@@ -32,7 +32,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  <label>Cluster name<input name="name" required maxLength={100} defaultValue={cluster?.name||''} placeholder="Production Cluster"/></label>
  <label>Host<input name="host" required defaultValue={cluster?.host||''} placeholder="proxmox.example.com"/><small>Hostname or IP, without https:// or a port.</small></label>
  <label>Proxmox API port<input name="port" type="number" required min={1} max={65535} defaultValue={cluster?.port||8006}/></label>
- <label>API token ID<input name="tokenId" required defaultValue={cluster?.tokenId||''} placeholder="homecloud@pve!hub"/><small>Assign PVEAuditor at / with Propagate enabled to the user and, with Privilege Separation, to this token.</small></label>
+ <label>API token ID<input name="tokenId" required defaultValue={cluster?.tokenId||''} placeholder="iclusters@pve!hub"/><small>Assign PVEAuditor at / with Propagate enabled to the user and, with Privilege Separation, to this token.</small></label>
  <label className="cluster-wide">API token secret<input name="tokenSecret" type="password" autoComplete="new-password" required placeholder="Enter token secret"/><small>Secrets are never returned to your browser. Re-enter the secret when editing.</small></label>
  <label className="cluster-toggle cluster-wide"><input name="verifyTls" type="checkbox" defaultChecked={cluster?.verifyTls!==false}/><ShieldCheck size={18}/> Verify SSL certificate</label>
  <label className="cluster-wide">Private CA certificate (optional)<textarea name="ca" rows={4} placeholder="-----BEGIN CERTIFICATE-----"/><small>{cluster?.hasCa?'A CA is already saved. Paste it again when saving edits.':'Paste the public PEM CA certificate if your cluster uses a private certificate authority.'}</small></label>

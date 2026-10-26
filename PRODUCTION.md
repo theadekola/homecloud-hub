@@ -4,50 +4,50 @@
 
 ### Install from GitHub on Ubuntu
 
-On Ubuntu with systemd, install from the public `theadekola/homecloud-hub` repository:
+On Ubuntu with systemd, install from the public `theadekola/i-clusters` repository:
 
 ```sh
 sudo apt-get update
 sudo apt-get install -y curl
-curl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/install.sh -o /tmp/homecloud-install.sh
+curl -fsSL https://raw.githubusercontent.com/theadekola/i-clusters/main/install.sh -o /tmp/iclusters-install.sh
 # Inspect the downloaded installer before running it.
-less /tmp/homecloud-install.sh
-sudo bash /tmp/homecloud-install.sh
+less /tmp/iclusters-install.sh
+sudo bash /tmp/iclusters-install.sh
 ```
 
 The installer detects the VM's IPv4 source address from its default route and prints `https://DETECTED-IP:6002`. No IP or URL argument is required. If no default route is present, it selects a global address from a non-Docker interface; it stops if no usable address exists. `--url` remains available for a specific hostname or interface. Detection runs at installation time; a DHCP address change means you must use the VM's new address in your browser.
 
 The default web port is **6002**, mapped to Caddy's internal HTTPS port 443. The API runs on **6000 inside Docker**, with requests proxied through the web port. The API port is not published to the host. Chromium browsers block port 6000 as an X11 port, so the browser never connects to it directly. `--port` overrides the web port if 6002 is occupied. HTTPS uses the main port 6002 by default; HTTP uses auxiliary port 6003. Public port settings are stored as `WEB_PORT` and `HTTPS_PORT` in `.env`.
 
-For automatic HTTPS, use `--url https://homecloud.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to i-Clusters's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.1.0-rc.3` pins that release tag once published; verify it exists on the Releases page first. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `homecloud-hub` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
+For automatic HTTPS, use `--url https://iclusters.your-domain.example --port 80 --https-port 443`, with DNS pointing at the server and public certificate validation reaching Caddy. If a reverse proxy already manages ports 80/443, proxy to i-Clusters's HTTP port and set `WEB_ORIGIN` to the browser's HTTPS URL. The installer expects `--url` without a port; supply ports through the separate flags. `--ref v3.1.0-rc.3` pins that release tag once published; verify it exists on the Releases page first. The installer downloads and builds source, installs Docker from its official apt repository when absent, generates secrets, and enables the `i-clusters` systemd service. Existing Docker installations must already have the Compose plugin. It never removes conflicting Docker packages automatically.
 
-Save the **first-use setup code** printed during installation. Open i-Clusters, enter your name, username, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/homecloud-hub/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
+Save the **first-use setup code** printed during installation. Open i-Clusters, enter your name, username, password (at least 12 characters) and setup code to create the owner account. The code is also stored as `SETUP_TOKEN` in `/opt/i-clusters/.env`. Registration is available only while the users table is empty; concurrent registration requests cannot create multiple owners. Sign in after registering. Administrators add subsequent users from the Users page. The installer no longer requires an email or generates an account password.
 
 If you missed the setup code in the installation output, retrieve it **on the Ubuntu VM where i-Clusters is installed**:
 
 ```sh
-sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
+sudo grep '^SETUP_TOKEN=' /opt/i-clusters/.env
 ```
 
 The output looks like `SETUP_TOKEN=your-setup-code`. Copy **only the value after `=`** into the registration screen's **Setup code** field, without the `SETUP_TOKEN=` prefix. Fill in your name, username, password and matching confirmation, then click **Register owner account**. Sign in with the new account afterward. Keep the setup code private.
 
-Application files live in `/opt/homecloud-hub`; integration credentials are configured in its `.env` or the Proxmox form. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
+Application files live in `/opt/i-clusters`; integration credentials are configured in its `.env` or the Proxmox form. Installation requires internet access to GitHub, Docker's package repository and container registries. A private repository needs a separate authenticated checkout and the manual deployment below; tokens are not accepted in installer URLs.
 
 ```sh
-sudo homecloud status
-sudo homecloud config
-sudo homecloud restart
-sudo homecloud logs
-sudo homecloud update
-sudo homecloud stop
-sudo homecloud start
+sudo iclusters status
+sudo iclusters config
+sudo iclusters restart
+sudo iclusters logs
+sudo iclusters update
+sudo iclusters stop
+sudo iclusters start
 ```
 
-Updates pull the current branch with `git pull --ff-only`, rebuild and check container health. They preserve `.env`, certificates, runtime files and named database volumes. The standard updater now saves a consistent local database/runtime recovery point and attempts automatic image/database rollback on failure. This is separate from an encrypted off-host backup. See [security and recovery](deployment/SECURITY-AND-RECOVERY.md). Pinned releases require manually selecting the next release in the checkout. If installation fails after the checkout is placed in `/opt`, fix the reported issue there and run `sudo docker compose -f /opt/homecloud-hub/docker-compose.yml --project-directory /opt/homecloud-hub up -d --build --wait`; inspect `sudo journalctl -u homecloud-hub` and `sudo homecloud logs`.
+Updates pull the current branch with `git pull --ff-only`, rebuild and check container health. They preserve `.env`, certificates, runtime files and named database volumes. The standard updater now saves a consistent local database/runtime recovery point and attempts automatic image/database rollback on failure. This is separate from an encrypted off-host backup. See [security and recovery](deployment/SECURITY-AND-RECOVERY.md). Pinned releases require manually selecting the next release in the checkout. If installation fails after the checkout is placed in `/opt`, fix the reported issue there and run `sudo docker compose -f /opt/i-clusters/docker-compose.yml --project-directory /opt/i-clusters up -d --build --wait`; inspect `sudo journalctl -u i-clusters` and `sudo iclusters logs`.
 
 ### Manual deployment
 
-Install Docker Engine and the Compose plugin using https://docs.docker.com/engine/install/ubuntu/ . Copy this project to `/opt/homecloud-hub`. Run `sh deployment/generate-secrets.sh` once, then edit `.env`. Keep its generated database password, JWT secrets and setup code. The first owner registers in the browser; `ADMIN_EMAIL` and `ADMIN_PASSWORD` are no longer used. Existing database accounts remain intact when updating.
+Install Docker Engine and the Compose plugin using https://docs.docker.com/engine/install/ubuntu/ . Copy this project to `/opt/i-clusters`. Run `sh deployment/generate-secrets.sh` once, then edit `.env`. Keep its generated database password, JWT secrets and setup code. The first owner registers in the browser; `ADMIN_EMAIL` and `ADMIN_PASSWORD` are no longer used. Existing database accounts remain intact when updating.
 
 For initial private LAN testing:
 
@@ -63,15 +63,15 @@ WEB_ORIGIN=https://YOUR-UBUNTU-IP:6002
 For HTTPS, configure DNS and a real hostname with Caddy:
 
 ```env
-DOMAIN=homecloud.your-domain.example
+DOMAIN=iclusters.your-domain.example
 WEB_PORT=80
 HTTPS_PORT=443
-WEB_ORIGIN=https://homecloud.your-domain.example
+WEB_ORIGIN=https://iclusters.your-domain.example
 ```
 
 Use HTTPS or a trusted private access tunnel for credentials. Do not expose privileged connectors directly to the internet.
 
-To change an existing installation's port, run `sudo homecloud config`, set `WEB_PORT=6002` and `WEB_ORIGIN=https://YOUR-UBUNTU-IP:6002`, then run `sudo homecloud restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
+To change an existing installation's port, run `sudo iclusters config`, set `WEB_PORT=6002` and `WEB_ORIGIN=https://YOUR-UBUNTU-IP:6002`, then run `sudo iclusters restart`. Legacy installations without port variables keep ports 80/443. Existing accounts show the usual sign-in screen. To initialize an empty legacy database, set a new `SETUP_TOKEN` using `openssl rand -hex 16` and restart; never delete existing accounts to re-open setup.
 
 ```sh
 docker compose up -d --build
@@ -91,7 +91,7 @@ Saved connection details are encrypted with AES-256-GCM in `runtime/proxmox-conn
 
 Set `PROXMOX_URL`, `PROXMOX_TOKEN_ID` and `PROXMOX_TOKEN_SECRET`. Grant the token only required permissions. Reads generally require Sys.Audit, VM.Audit and Datastore.Audit; lifecycle/creation/backup/restore/prune need the corresponding VM and datastore privileges. Managing cluster backup schedules needs Sys.Modify. Check your Proxmox release's API permission requirements.
 
-Keep `PROXMOX_VERIFY_TLS=true`. For a private CA, put its PEM file in `secrets/ca/` and set `NODE_EXTRA_CA_CERTS=/run/homecloud/ca/your-ca.pem` in `.env`.
+Keep `PROXMOX_VERIFY_TLS=true`. For a private CA, put its PEM file in `secrets/ca/` and set `NODE_EXTRA_CA_CERTS=/run/iclusters/ca/your-ca.pem` in `.env`.
 
 Backup forms take exact node names, guest IDs, storage IDs and Proxmox calendar expressions, e.g. `02:00` or `sun 03:00`. Jobs run inside Proxmox even if i-Clusters is stopped. Manual run supports node-specific jobs; cluster-wide jobs still run through Proxmox. Restores require a new unused guest ID and a destination disk storage ID. The backup archive must be accessible from the destination node.
 
@@ -101,9 +101,9 @@ Configure a protected Engine API endpoint. Direct Unix sockets and SSH URLs are 
 
 ```env
 DOCKER_API_URL=https://YOUR-DOCKER-HOST:2376
-DOCKER_TLS_CA=/run/homecloud/docker/ca.pem
-DOCKER_TLS_CERT=/run/homecloud/docker/cert.pem
-DOCKER_TLS_KEY=/run/homecloud/docker/key.pem
+DOCKER_TLS_CA=/run/iclusters/docker/ca.pem
+DOCKER_TLS_CERT=/run/iclusters/docker/cert.pem
+DOCKER_TLS_KEY=/run/iclusters/docker/key.pem
 ```
 
 Place the files in `secrets/docker/`. See https://docs.docker.com/engine/security/protect-access/ . Docker API access is highly privileged. Do not use an unauthenticated public port 2375. Existing Compose projects are discovered using container labels; project actions operate on existing containers, not Compose files.
@@ -114,7 +114,7 @@ Place the files in `secrets/docker/`. See https://docs.docker.com/engine/securit
 TRUENAS_URL=https://YOUR-TRUENAS-HOST
 TRUENAS_API_KEY=YOUR-API-KEY
 TRUENAS_API_MODE=jsonrpc
-TRUENAS_TLS_CA=/run/homecloud/ca/truenas-ca.pem
+TRUENAS_TLS_CA=/run/iclusters/ca/truenas-ca.pem
 ```
 
 JSON-RPC connects over WSS to `/api/current`. For CORE or older SCALE, set `TRUENAS_API_MODE=legacy` to use `/websocket`; override `TRUENAS_WS_PATH` only if your reverse proxy changes the path. Snapshot methods fall back from `pool.snapshot.*` to `zfs.snapshot.*` only when a method is absent. Unsupported API methods and insufficient privileges remain visible. These transports were tested against local protocol fixtures, not every TrueNAS release.
@@ -147,14 +147,14 @@ Back up the PostgreSQL volume, host `runtime/`, Caddy data, `.env` and connector
 
 ### Updates from the dashboard
 
-For an existing Ubuntu installation, run `sudo homecloud update` once, then run the following to enable the new update service (the previous CLI version may not install it automatically):
+For an existing Ubuntu installation, run `sudo iclusters update` once, then run the following to enable the new update service (the previous CLI version may not install it automatically):
 
 ```bash
-cd /opt/homecloud-hub
+cd /opt/i-clusters
 sudo bash deployment/setup-updater.sh
 ```
 
-New installations enable it automatically. Sign in as the owner. The header Update button replaces Sign out. An orange dot appears when the one-minute GitHub check finds a newer commit on the installed branch. Click Update to pull, rebuild and restart the deployment; the dashboard reconnects and reloads after completion. Database volumes, configuration and saved connections are retained. Other roles cannot trigger updates. Pinned releases require a manual update; local tracked changes block updates. Failures appear in the dashboard; inspect `sudo journalctl -u homecloud-updater -n 100` for details. No Docker socket is exposed to the API.
+New installations enable it automatically. Sign in as the owner. The header Update button replaces Sign out. An orange dot appears when the one-minute GitHub check finds a newer commit on the installed branch. Click Update to pull, rebuild and restart the deployment; the dashboard reconnects and reloads after completion. Database volumes, configuration and saved connections are retained. Other roles cannot trigger updates. Pinned releases require a manual update; local tracked changes block updates. Failures appear in the dashboard; inspect `sudo journalctl -u iclusters-updater -n 100` for details. No Docker socket is exposed to the API.
 
 
 ### Automatic discovery and overview
@@ -175,11 +175,11 @@ For node status/services HTTP 403, in Proxmox open Datacenter → Permissions. A
 
 The overview uses compact live cards. Node selection filters resources and guests; the time selector filters collected CPU/memory history. Add Widget saves visible widgets in the browser. Refresh requests a fresh measurement; Export downloads the current report. Create VM and Run Backup open their actual action forms. AI Health Check reads the current live status. The infrastructure map shows observed node/guest relationships. API reachability is a measured percentage, not a fabricated security score. Backup counts are provider-reported archives and jobs; Monitoring shows task outcomes.
 
-For updates, use the header Update button or `sudo homecloud update`. GitHub checks run every minute. If the updater is missing, run `cd /opt/homecloud-hub && sudo bash deployment/setup-updater.sh` once.
+For updates, use the header Update button or `sudo iclusters update`. GitHub checks run every minute. If the updater is missing, run `cd /opt/i-clusters && sudo bash deployment/setup-updater.sh` once.
 
 ## Notifications and provider checks
 
-External delivery is optional. Configure channel values listed in `.env.example` in the server `.env` and apply them with `sudo homecloud restart`. Do not commit webhook URLs, bot tokens or SMTP passwords. Owner-only Settings shows delivery status and has a test action. These features do not configure an external channel or recipient automatically.
+External delivery is optional. Configure channel values listed in `.env.example` in the server `.env` and apply them with `sudo iclusters restart`. Do not commit webhook URLs, bot tokens or SMTP passwords. Owner-only Settings shows delivery status and has a test action. These features do not configure an external channel or recipient automatically.
 
 Delivery state is persisted in `runtime/live-state.json`. Pending deliveries retry during monitoring samples, independently of API response completion. Keep the runtime directory in deployment backups. The queue keeps a maximum of 1,000 pending messages and processes up to 20 per flush. At-least-once retries may duplicate messages after ambiguous network failures.
 
@@ -189,7 +189,7 @@ Provider diagnostics are read-only and owner-only. Run them after updating the V
 
 New installations detect the VM address and configure HTTPS at `https://VM-IP:6002`. Existing LAN installations migrate during a software update, preserving passwords and tokens and saving `.env.before-https-6002`. Caddy keeps its certificate authority in the existing Docker volume. Public domain configurations retain their chosen ports and certificate settings. No environment-file or Caddyfile edits are required. HTTP uses auxiliary port 6003; open the HTTPS address explicitly after migration.
 
-Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo docker compose --project-directory /opt/homecloud-hub -f /opt/homecloud-hub/docker-compose.yml exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`. Install the certificate in the client’s trusted root store. i-Clusters cannot automatically alter trust stores on users’ computers. Existing paired agents using an old address need to reconnect using the new HTTPS address.
+Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo docker compose --project-directory /opt/i-clusters -f /opt/i-clusters/docker-compose.yml exec -T caddy cat /data/caddy/pki/authorities/local/root.crt`. Install the certificate in the client’s trusted root store. i-Clusters cannot automatically alter trust stores on users’ computers. Existing paired agents using an old address need to reconnect using the new HTTPS address.
 
 ## Release candidate operations
 

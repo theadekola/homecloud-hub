@@ -74,12 +74,12 @@ Use a dedicated Ubuntu server or VM with systemd, Git/network access and capacit
 ```sh
 sudo apt-get update
 sudo apt-get install -y curl
-curl -fsSL https://raw.githubusercontent.com/theadekola/homecloud-hub/main/install.sh -o /tmp/homecloud-install.sh
-less /tmp/homecloud-install.sh
-sudo bash /tmp/homecloud-install.sh
+curl -fsSL https://raw.githubusercontent.com/theadekola/i-clusters/main/install.sh -o /tmp/iclusters-install.sh
+less /tmp/iclusters-install.sh
+sudo bash /tmp/iclusters-install.sh
 ```
 
-The installer creates `/opt/homecloud-hub`, generates deployment secrets, installs Docker if absent and starts the service at boot. It detects the VM address and prints **https://VM-IP:6002**. Port **6003** is the auxiliary HTTP port. API port 6000 is internal to Docker and must not be used as the browser URL. Existing public-domain deployments retain their selected configuration.
+The installer creates `/opt/i-clusters`, generates deployment secrets, installs Docker if absent and starts the service at boot. It detects the VM address and prints **https://VM-IP:6002**. Port **6003** is the auxiliary HTTP port. API port 6000 is internal to Docker and must not be used as the browser URL. Existing public-domain deployments retain their selected configuration.
 
 LAN HTTPS uses Caddy's local certificate authority. Install its public root certificate in your browsers and paired nodes' trust stores. Do not disable certificate verification. For public-domain HTTPS, port overrides, pinned refs and manual installation, follow [PRODUCTION.md](PRODUCTION.md).
 
@@ -95,7 +95,7 @@ LAN HTTPS uses Caddy's local certificate authority. Install its public root cert
 If you missed the first-use code, run this on the i-Clusters VM and copy only the value after `=`:
 
 ```sh
-sudo grep '^SETUP_TOKEN=' /opt/homecloud-hub/.env
+sudo grep '^SETUP_TOKEN=' /opt/i-clusters/.env
 ```
 
 Keep the code and signing keys private. They are deployment bootstrap secrets. Supported provider credentials are entered through the application's configuration forms, without manual environment-file edits.
@@ -117,7 +117,7 @@ For Proxmox pairing, install one connector per node. Linux CT access uses `pct e
 
 Use dedicated provider identities with only the privileges needed. Proxmox guest command execution needs a separate scoped privilege, not just the read role. See [connection recovery](docs/connections-and-health.md) and [warning recovery](docs/monitoring-warning-recovery.md).
 
-Connector **version 5** batches container statistics. After updating i-Clusters, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest i-Clusters agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
+Connector **version 9** batches container statistics. After updating i-Clusters, use **Settings → Connections → Update Connector** on each paired node or standalone Docker host. The owner-only popup verifies SSH identity and pairing, updates the bundled connector and waits for a fresh heartbeat. A manual update command remains available in Manage. It preserves pairing credentials. No per-guest Docker TCP port or per-guest i-Clusters agent is required. Docker, Storage and Network share the selected Docker host; Proxmox and TrueNAS resources remain independent.
 
 ## Docker image update notifications
 
@@ -138,14 +138,14 @@ AI configuration is under **Settings → Connections → Add Connection → AI A
 Owners can check/install updates with the header Update control. An up-to-date check displays a temporary message. From the Ubuntu VM:
 
 ```sh
-sudo homecloud update
-sudo homecloud status
+sudo iclusters update
+sudo iclusters status
 ```
 
 For older installations without the updater, after updating run:
 
 ```sh
-cd /opt/homecloud-hub
+cd /opt/i-clusters
 sudo bash deployment/setup-updater.sh
 ```
 
@@ -157,7 +157,7 @@ The updater checks the configured Git upstream and rebuilds the deployment. Loca
 
 i-Clusters manages provider-reported backup/snapshot operations; it does not turn every Docker volume or database into an independently protected backup. A ZFS snapshot on the same pool is not an off-host backup.
 
-Protect the controller separately: back up PostgreSQL consistently, its `runtime` directory, deployment configuration and signing/encryption keys, certificates and Caddy data as applicable. Encrypted saved credentials require the original key material. Keep backups outside the controller and test restores. Do not run `docker compose down --volumes` on a live installation unless you intend to delete its volumes. Use `sudo homecloud backup /absolute/backup-directory age1YOUR_PUBLIC_RECIPIENT` for an encrypted controller backup. See [controller recovery](deployment/SECURITY-AND-RECOVERY.md) and [production recovery](PRODUCTION.md).
+Protect the controller separately: back up PostgreSQL consistently, its `runtime` directory, deployment configuration and signing/encryption keys, certificates and Caddy data as applicable. Encrypted saved credentials require the original key material. Keep backups outside the controller and test restores. Do not run `docker compose down --volumes` on a live installation unless you intend to delete its volumes. Use `sudo iclusters backup /absolute/backup-directory age1YOUR_PUBLIC_RECIPIENT` for an encrypted controller backup. See [controller recovery](deployment/SECURITY-AND-RECOVERY.md) and [production recovery](PRODUCTION.md).
 
 ## Development
 
@@ -170,7 +170,7 @@ npm run build
 npm run dev
 ```
 
-The Vite server proxies `/api` to `http://127.0.0.1:6000`; use `HOMECLOUD_DEV_API_URL` if the development API has another address. Production uses Caddy. `npm run build` generates API build metadata and compiles the web application. Connector Python checks can be run with `python3 apps/api/test/node-agent-python.test.py`.
+The Vite server proxies `/api` to `http://127.0.0.1:6000`; use `ICLUSTERS_DEV_API_URL` if the development API has another address. Production uses Caddy. `npm run build` generates API build metadata and compiles the web application. Connector Python checks can be run with `python3 apps/api/test/node-agent-python.test.py`.
 
 If Windows workspace links are unavailable, install separately within `apps/api` and `apps/web` using `npm install --workspaces=false`, then run the root build. TLS tests require OpenSSL. Automated tests validate isolated protocols and UI behaviour; compatibility with real provider versions and permissions must also be checked on the deployment.
 
@@ -180,17 +180,17 @@ If Windows workspace links are unavailable, install separately within `apps/api`
 | --- | --- |
 | VM discovery HTTP 403 | Check user and privilege-separated token ACLs. Scope `VM.GuestAgent.Unrestricted` to intended VM paths for Proxmox 9 guest commands; retain the read role. |
 | Guest agent unavailable | Enable the VM option and install/start the guest OS service. A full shutdown/start may be necessary after adding its channel. |
-| Container statistics unavailable | Update i-Clusters first, then paired connectors to version 5. Inspect actual container state and the precise reported error. |
+| Container statistics unavailable | Update i-Clusters first, then paired connectors to version 9. Inspect actual container state and the precise reported error. |
 | Docker inventory unavailable/offline | Verify selected host, connector service, network, guest power and Docker service. No substitute host is selected silently. |
 | Browser certificate warning | Trust the deployment CA or use a valid publicly trusted hostname/certificate. |
 | Integration test fails | Check the popup's endpoint, credentials, CA, permissions and service-specific error. Save and test have different effects. |
-| Update fails | Inspect updater status and `sudo journalctl -u homecloud-updater -n 100`. Check tracked changes and upstream availability. |
+| Update fails | Inspect updater status and `sudo journalctl -u iclusters-updater -n 100`. Check tracked changes and upstream availability. |
 
 ```sh
-sudo homecloud status
-sudo homecloud logs
+sudo iclusters status
+sudo iclusters logs
 # On a paired Proxmox node:
-journalctl -u homecloud-node-agent.service -n 100 --no-pager
+journalctl -u iclusters-node-agent.service -n 100 --no-pager
 ```
 
 Do not post credentials, environment files, private SSH material or full unredacted infrastructure reports in public issues.
@@ -214,7 +214,7 @@ Commercial deployment status and remaining release gates: [20 October readiness 
 | [Licence](LICENSE) | MIT application licence |
 | [Icon assets](docs/icon-assets.md) | Third-party artwork sources and separate licences |
 
-Use [GitHub Issues](https://github.com/theadekola/homecloud-hub/issues) for reproducible bugs and feature requests. For vulnerabilities, follow [SECURITY.md](SECURITY.md) and avoid public disclosure of exploitable details.
+Use [GitHub Issues](https://github.com/theadekola/i-clusters/issues) for reproducible bugs and feature requests. For vulnerabilities, follow [SECURITY.md](SECURITY.md) and avoid public disclosure of exploitable details.
 
 ## Release and operating documentation
 
@@ -226,3 +226,5 @@ Use [GitHub Issues](https://github.com/theadekola/homecloud-hub/issues) for repr
 - [Contributing](CONTRIBUTING.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 
 Developer: **The Adekola** · Company: **ATT-Tech**. The existing repository owner and Ubuntu service/path names remain compatibility identifiers.
+
+Existing installations are migrated during the normal update. See [i-Clusters name migration](docs/brand-migration.md) for preserved data and compatibility aliases.

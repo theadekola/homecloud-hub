@@ -13,7 +13,7 @@ setup="$(openssl rand -hex 16)"
 sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$jwt|" .env
 sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$refresh|" .env
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$db|" .env
-sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://homecloud:$db@postgres:5432/homecloud|" .env
+sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://iclusters:$db@postgres:5432/iclusters|" .env
 sed -i "s|^SETUP_TOKEN=.*|SETUP_TOKEN=$setup|" .env
 chmod 600 .env
 echo "Created .env"

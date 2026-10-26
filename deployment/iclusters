@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ $EUID == 0 ]] || { echo 'Run sudo iclusters ...' >&2; exit 1; }
+cd /opt/i-clusters
+command=${1:-help}
+case "$command" in
+  status) docker compose ps;;
+  logs) docker compose logs --tail=100 -f;;
+  start) systemctl start i-clusters;;
+  stop) systemctl stop i-clusters;;
+  restart) docker compose up -d --wait --wait-timeout 180;;
+  config) "${EDITOR:-nano}" .env;;
+  backup) bash deployment/controller-backup.sh "${2:?Backup directory required}" "${3:?age public recipient required}";;
+  recover-account)
+    username=${2:?Username required}
+    read -rsp 'New password: ' account_password; echo
+    read -rsp 'Confirm password: ' account_confirm; echo
+    [[ $account_password == "$account_confirm" ]] || { echo 'Passwords do not match.' >&2; exit 1; }
+    printf '%s\n' "$account_password" | docker compose exec -T api node scripts/recover-account.mjs "$username" "${3:-}"
+    unset account_password account_confirm
+    ;;
+  update) bash deployment/upgrade.sh;;
+  *) echo 'Usage: sudo iclusters {status|logs|start|stop|restart|config|update|backup|recover-account}';;
+esac

@@ -37,4 +37,6 @@ def configure(path):
     return True
 
 if __name__ == "__main__":
+    import runpy
+    runpy.run_path(str(Path(__file__).with_name("migrate-brand.py")),run_name="__main__")
     configure(Path(".env"))

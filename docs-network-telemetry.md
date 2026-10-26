@@ -17,12 +17,12 @@ Use i-Clusters's **Pair Proxmox Node** dialog, run its installer on the chosen n
 
 ```bash
 installer=$(mktemp)
-curl --fail --silent --show-error --max-time 30 https://YOUR-HOMECLOUD-HOST/api/node-agent/install -o "$installer" &&
+curl --fail --silent --show-error --max-time 30 https://YOUR-ICLUSTERS-HOST/api/node-agent/install -o "$installer" &&
 sudo bash "$installer" --update
 rm -f "$installer"
 ```
 
-The update verifies Python syntax and the connector version before replacing the script, preserves the existing configuration/pairing, and restarts only `homecloud-node-agent.service`. If restart fails, it restores the previous script. Existing TLS trust is required; certificate verification is not disabled. Do not revoke or re-pair an existing connector just to update it.
+The update verifies Python syntax and the connector version before replacing the script, preserves the existing configuration/pairing, and restarts only `iclusters-node-agent.service`. If restart fails, it restores the previous script. Existing TLS trust is required; certificate verification is not disabled. Do not revoke or re-pair an existing connector just to update it.
 
 After two samples and the next dashboard refresh, supported readings appear. The page explains unpaired nodes, older connectors, offline/stale reports, missing counters and unsupported link speed. The paired connector's original hostname must match the Proxmox node name (an unambiguous FQDN short name is also accepted). A friendly connection label is not used to match hosts. Duplicate matching connectors must be resolved before readings are attributed to a node.
 

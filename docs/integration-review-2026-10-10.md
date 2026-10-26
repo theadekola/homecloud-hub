@@ -1,4 +1,4 @@
-# HomeCloud Hub integration review, 10 October 2026
+# i-Clusters integration review, 10 October 2026
 
 Reviewed repository baseline: `9842bb9` on `main`, after the shares commit `70abd67`. Remote main was fetched and remained at that baseline. Changes are local, not published or deployed. The combined patch includes the previously prepared NFS validation fix. No production credentials, live exports, media shares or infrastructure actions were used.
 
@@ -38,7 +38,7 @@ Reviewed repository baseline: `9842bb9` on `main`, after the shares commit `70ab
 
 | Priority | Work | Evidence and next step |
 | --- | --- | --- |
-| High | Validate real provider compatibility on a staging HomeCloud VM | Fixtures verify contracts, not installed releases or token permissions. Start with restricted discovery. Check actual node/guest/storage inventory and TrueNAS query/stat/service methods. Only test writes against disposable guests and datasets. |
+| High | Validate real provider compatibility on a staging i-Clusters VM | Fixtures verify contracts, not installed releases or token permissions. Start with restricted discovery. Check actual node/guest/storage inventory and TrueNAS query/stat/service methods. Only test writes against disposable guests and datasets. |
 | High | Bring all paired Docker hosts into global monitoring | Global monitoring currently samples the direct Engine. Dashboard discovery relies on the direct Engine and Proxmox guest inventory. Paired agent host inventory is principally consumed by the Docker page. Build a separate per-host sampler with host-qualified container identities, history and alert keys. Do not reuse one selected host as global state. |
 | Medium | Align Storage and Network Docker inventories with the host selector | `/storage` and `/network` use the global direct-Engine snapshot, while Docker tabs use the selected agent host. This is not a broken route, but the views can legitimately show different inventories. Decide whether to show a host selector or clearly label the direct provider, then add per-host inventory without changing TrueNAS/Proxmox semantics. |
 | Medium | Test the node agent under slow and larger inventories | The bridge has one job worker and bounded responses; guest execution, long pulls and queued parallel reads may hit timeouts or limits. Exercise multiple guests, offline nodes, reconnects and larger logs on staging. Installed agent scripts require their own update. |
@@ -54,8 +54,8 @@ Reviewed repository baseline: `9842bb9` on `main`, after the shares commit `70ab
 From an unmodified checkout at baseline `9842bb9`:
 
 ```sh
-git apply --check /path/to/homecloud-integration-fixes.patch
-git apply /path/to/homecloud-integration-fixes.patch
+git apply --check /path/to/iclusters-integration-fixes.patch
+git apply /path/to/iclusters-integration-fixes.patch
 npm ci --prefix apps/api --workspaces=false
 npm ci --prefix apps/web --workspaces=false
 npm test

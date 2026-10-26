@@ -21,7 +21,7 @@ link here instead of opening duplicate connection forms. Existing
   its read-only provider test. AI tests require confirmation and can incur charges.
 - **Recheck Connections** refreshes provider checks. Background checks and errors
   remain visible. Failed reads do not turn unverified sources into connected ones.
-- Removing a saved connection or revoking a connector removes HomeCloud access,
+- Removing a saved connection or revoking a connector removes i-Clusters access,
   without deleting its hosts or guests. Connector service removal is separate.
 
 The workspace opens in Grid view. On desktop, source cards and VM guest-access
@@ -76,7 +76,7 @@ selected target and required guest SSH account before installation. LXC setup us
 the paired node and enables nesting; QEMU setup uses supported guest access or the
 existing verified SSH bootstrap. QEMU Guest Agent setup does not apply to LXC.
 
-After installation, HomeCloud waits for discovery and verifies the exact selected
+After installation, i-Clusters waits for discovery and verifies the exact selected
 Docker Engine. Unrelated ready hosts cannot satisfy this check. Failed verification
 remains retryable. Success closes the popup after its message, removes the guest
 from pending setup and selects the verified host. The Docker page contains host
@@ -92,7 +92,7 @@ saves show success and close automatically. Failed tests and saves retain the fo
 Notification links from Alerts and Integrations point here. Old notification URLs
 continue to work through the central settings route.
 
-The page and its private configuration endpoints require a HomeCloud owner. Other
+The page and its private configuration endpoints require a i-Clusters owner. Other
 roles receive an access message without requesting private connection or delivery
 data. Existing TLS verification, SSH fingerprints, target privilege checks,
 confirmation grants and audit records remain in force.
@@ -101,7 +101,7 @@ confirmation grants and audit records remain in force.
 
 Owners see a connector update notice in Connections and in the header bell when a
 paired host reports older connector code than the copy bundled with the running
-HomeCloud application. Update HomeCloud first to obtain a newer connector release.
+i-Clusters application. Update i-Clusters first to obtain a newer connector release.
 The installed protocol number and SHA-256 code revision are compared; a protocol-5
 connector without a revision report receives an update notice as well. Unknown
 connectors without a heartbeat are not asserted to be outdated. One notice is
@@ -109,16 +109,16 @@ shown per paired host, not once for every discovered guest.
 
 Choose **Update Connector** on the paired host or in its Manage guide. The popup
 looks up the paired Proxmox node’s IP from the configured cluster, avoiding a
-requirement for short hostnames such as `node01` to resolve inside the HomeCloud
+requirement for short hostnames such as `node01` to resolve inside the i-Clusters
 container. Only an exact or unambiguous node-name match with a valid IP is used.
 Standalone hosts, unavailable cluster readings and ambiguous names retain manual
 SSH address entry. The popup asks for the SSH port, fresh username/password,
 verified host-key fingerprint and explicit consent. Use **Read SSH Fingerprint**
 to retry after correcting an address or a temporary connection failure. DNS errors
-explain that the address must be reachable from HomeCloud; they do not enable the
+explain that the address must be reachable from i-Clusters; they do not enable the
 verification checkbox or bypass host identity checks. HTTPS is required by the form. Credentials are
 used for this operation only and are not saved. Password-based SSH plus root or
-password-based sudo access must be available from the HomeCloud API server. If
+password-based sudo access must be available from the i-Clusters API server. If
 that access is unavailable, correct SSH access before retrying the button.
 No extra agent inside each VM/container is needed.
 
@@ -126,8 +126,8 @@ Before replacing anything, the fixed remote maintenance script checks that the
 host's existing pairing ID and token hash match the selected paired connection.
 The raw pairing token never leaves the host. It validates the bundled script's
 SHA-256 and Python syntax/protocol, retains a root-only backup under
-`/var/backups/homecloud-connector-*`, atomically replaces the standard connector
-script, and restarts only `homecloud-node-agent.service`. Immediate restart or
+`/var/backups/iclusters-connector-*`, atomically replaces the standard connector
+script, and restarts only `iclusters-node-agent.service`. Immediate restart or
 service-health failures restore the previous script and attempt its restart.
 The pairing configuration and authentication settings are not rewritten.
 
@@ -138,7 +138,7 @@ The popup tracks connecting, installing and heartbeat verification. It can be
 closed without cancelling the operation. Success requires an online heartbeat
 with the exact bundled code revision after the update started. A missing heartbeat
 is reported as unverified, not successful. Check network/TLS and the host service;
-a later matching heartbeat completes verification. A HomeCloud process restart
+a later matching heartbeat completes verification. A i-Clusters process restart
 can interrupt tracking, so inspect the service before retrying. The SSH operation
 does not grant new Proxmox permissions, reboot guests, restart Docker, or upgrade
 host packages. It supports the standard installed paths and systemd service.
@@ -155,7 +155,7 @@ The connection health guide uses buttons instead of terminal commands:
 - **Check Installed Connector** and **Check Connector & Logs** read the paired
   host's connector service, installed protocol and bounded, redacted service logs.
 - **Start Connector** starts only an inactive connector service. Success requires
-  both an active service and a fresh authenticated heartbeat to HomeCloud.
+  both an active service and a fresh authenticated heartbeat to i-Clusters.
 - **Check Docker** reads Docker's service and Engine status, container counts and
   available resource readings on the selected host or guest.
 - **Start Docker** starts only that target's inactive Docker service, then checks

@@ -3,7 +3,7 @@
 # rollback to the original images/database if the new deployment fails health.
 set -Eeuo pipefail
 [[ $EUID == 0 ]] || { echo 'Run the updater as root.' >&2; exit 1; }
-project=${HOMECLOUD_INSTALL_DIR:-/opt/homecloud-hub}
+project=${ICLUSTERS_INSTALL_DIR:-${HOMECLOUD_INSTALL_DIR:-/opt/i-clusters}}
 cd "$project"
 [[ -z $(git status --porcelain --untracked-files=no) ]] || { echo 'Tracked files have local changes; commit or revert them before updating.' >&2; exit 1; }
 git symbolic-ref --quiet HEAD >/dev/null || { echo 'This checkout is pinned. Select a reviewed release branch before updating.' >&2; exit 1; }
@@ -95,8 +95,8 @@ docker compose config --quiet
 source deployment/build-env.sh
 docker compose build --pull
 docker compose up -d --wait --wait-timeout 180
-install -m 0755 deployment/homecloud /usr/local/bin/homecloud
-install -m 0644 deployment/homecloud-hub.service /etc/systemd/system/homecloud-hub.service
+install -m 0755 deployment/iclusters /usr/local/bin/iclusters
+install -m 0644 deployment/i-clusters.service /etc/systemd/system/i-clusters.service
 bash deployment/setup-updater.sh
 systemctl daemon-reload
 rm -f runtime/maintenance.json

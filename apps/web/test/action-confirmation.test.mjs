@@ -16,7 +16,7 @@ async function mount(){
  const root=createRoot(document.querySelector('#root'));await act(async()=>root.render(React.createElement(Confirmation)));
  return {close:async()=>{await act(async()=>root.unmount());dom.window.close();for(const [key,value] of Object.entries(originals))globalThis[key]=value}};
 }
-const request=(phrase,resolve,reject)=>window.dispatchEvent(new CustomEvent('homecloud-action-confirmation',{detail:{phrase,path:'/operations/host-one/tools',resolve,reject}}));
+const request=(phrase,resolve,reject)=>window.dispatchEvent(new CustomEvent('iclusters-action-confirmation',{detail:{phrase,path:'/operations/host-one/tools',resolve,reject}}));
 const click=async button=>act(async()=>button.click());
 const enter=async value=>act(async()=>{const input=document.querySelector('input');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));input.dispatchEvent(new window.Event('change',{bubbles:true}))});
 try{
@@ -42,7 +42,7 @@ try{
  });
  await test('direct container action uses the shared popup style and requires explicit consent',async()=>{
   const page=await mount();let result;try{
-   await act(async()=>window.dispatchEvent(new CustomEvent('homecloud-action-confirmation',{detail:{phrase:'CONFIRM remove',title:'Remove container app',description:'Remove app on engine-a',path:'/actions/docker/container/c/remove',resolve:v=>result=v,reject(){}}})));
+   await act(async()=>window.dispatchEvent(new CustomEvent('iclusters-action-confirmation',{detail:{phrase:'CONFIRM remove',title:'Remove container app',description:'Remove app on engine-a',path:'/actions/docker/container/c/remove',resolve:v=>result=v,reject(){}}})));
    assert.match(document.querySelector('[role="dialog"] h3').textContent,/Remove container app/);assert.ok(document.querySelector('form.form-grid.connector-update-dialog'));assert.equal(document.querySelector('button[type="submit"]').disabled,true);assert.doesNotMatch(document.body.textContent,/Type the following/);
    await click(document.querySelector('input[type="checkbox"]'));await click(document.querySelector('button[type="submit"]'));assert.equal(result,'CONFIRM remove');
   }finally{await page.close()}

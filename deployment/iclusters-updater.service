@@ -5,5 +5,5 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/lib/homecloud-updater
+ExecStart=/usr/local/lib/iclusters-updater
 TimeoutStartSec=1800

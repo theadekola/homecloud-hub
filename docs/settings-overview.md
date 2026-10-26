@@ -19,7 +19,7 @@ System → Backup & Restore has no duplicate editable fields or edit/save icons.
 
 Site name, description and the 15–300 second page-refresh preference require administrator or owner access and are shared. Dashboard widget preferences are saved in this browser and are editable by signed-in viewers. General saves do not rewrite appearance or sidebar preferences.
 
-Appearance saves only this browser's preferences and never PUTs shared settings. Light, Dark and System themes are supported; System tracks the device's colour preference while HomeCloud is open. Other options include validated hex accents, solid/gradient accents, intensity, sidebar expansion, section labels, density, supported font families, bounded corner radius, solid/gradient backgrounds and reduced motion. The mobile hamburger is enforced. Terminals retain their own dark palette. Sidebar repositioning and image backgrounds remain unavailable.
+Appearance saves only this browser's preferences and never PUTs shared settings. Light, Dark and System themes are supported; System tracks the device's colour preference while i-Clusters is open. Other options include validated hex accents, solid/gradient accents, intensity, sidebar expansion, section labels, density, supported font families, bounded corner radius, solid/gradient backgrounds and reduced motion. The mobile hamburger is enforced. Terminals retain their own dark palette. Sidebar repositioning and image backgrounds remain unavailable.
 
 ## Runtime and maintenance
 

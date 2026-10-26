@@ -9,8 +9,8 @@ class Services(unittest.TestCase):
  def fixture(self,kind='proxmox'):
   tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup);root=pathlib.Path(tmp.name)
   (root/'etc').mkdir();(root/'usr/local/sbin').mkdir(parents=True)
-  (root/'etc/homecloud-node-agent.json').write_text(json.dumps({'id':'paired','token':'private-token','url':'https://private-hub/api','kind':kind}))
-  (root/'usr/local/sbin/homecloud-node-agent.py').write_text('VERSION=5\n')
+  (root/'etc/iclusters-node-agent.json').write_text(json.dumps({'id':'paired','token':'private-token','url':'https://private-hub/api','kind':kind}))
+  (root/'usr/local/sbin/iclusters-node-agent.py').write_text('VERSION=5\n')
   return root,{'id':'paired','tokenHash':hashlib.sha256(b'private-token').hexdigest(),'action':'connector-check','target':'node'}
  def test_binding_and_validation_before_running(self):
   root,p=self.fixture();calls=[]
@@ -18,24 +18,24 @@ class Services(unittest.TestCase):
    with self.assertRaises(RuntimeError):m.diagnose({**p,**change},root,lambda *a,**k:calls.append(a))
   self.assertEqual(calls,[])
  def test_monitoring_install_requires_exact_pairing_host_and_verifies_packages(self):
-  root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
+  root,p=self.fixture();calls=[];before=(root/'etc/iclusters-node-agent.json').read_bytes()
   def run(args,**kw):
    calls.append((args,kw))
    return ''.join(package+' install ok installed\n' for package in ('smartmontools','nut-client','nftables')) if args[0]=='dpkg-query' and len(calls)>1 else ''
   result=m.diagnose({**p,'action':'monitoring-tools'},root,run)
-  self.assertTrue(result['installed']);self.assertEqual(len(calls),4);self.assertEqual(calls[1][0],['apt-get','update']);self.assertEqual(calls[2][0],['apt-get','install','-y','smartmontools','nut-client','nftables']);self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes());self.assertNotIn('restart',str(calls))
+  self.assertTrue(result['installed']);self.assertEqual(len(calls),4);self.assertEqual(calls[1][0],['apt-get','update']);self.assertEqual(calls[2][0],['apt-get','install','-y','smartmontools','nut-client','nftables']);self.assertEqual(before,(root/'etc/iclusters-node-agent.json').read_bytes());self.assertNotIn('restart',str(calls))
   calls.clear()
   with self.assertRaises(RuntimeError):m.diagnose({**p,'action':'monitoring-tools','target':'qemu/100'},root,run)
   self.assertEqual(calls,[])
   with self.assertRaisesRegex(RuntimeError,'could not be verified'):m.diagnose({**p,'action':'monitoring-tools'},root,lambda *a,**kw:'')
  def test_connector_check_is_read_only_and_redacts_logs(self):
-  root,p=self.fixture();calls=[];before=(root/'etc/homecloud-node-agent.json').read_bytes()
+  root,p=self.fixture();calls=[];before=(root/'etc/iclusters-node-agent.json').read_bytes()
   def run(args,**kw):
    calls.append(args)
    if args[0]=='journalctl':return '\n'.join(json.dumps({'MESSAGE':message,'__REALTIME_TIMESTAMP':'123'}) for message in ['token=secret private-token https://private-hub/api','Authorization: Bearer header-credential','password=multi word credential','API Key: provider-key'])
    return STATUS
   result=m.diagnose(p,root,run)
-  self.assertEqual(result['version'],5);self.assertTrue(result['active']);self.assertNotIn('private-token',json.dumps(result));self.assertNotIn('private-hub',json.dumps(result));self.assertNotIn('token=secret',json.dumps(result));self.assertNotIn('header-credential',json.dumps(result));self.assertNotIn('multi word credential',json.dumps(result));self.assertNotIn('provider-key',json.dumps(result));self.assertNotIn('systemctl start',str(calls));self.assertNotIn('restart',str(calls));self.assertEqual(before,(root/'etc/homecloud-node-agent.json').read_bytes())
+  self.assertEqual(result['version'],5);self.assertTrue(result['active']);self.assertNotIn('private-token',json.dumps(result));self.assertNotIn('private-hub',json.dumps(result));self.assertNotIn('token=secret',json.dumps(result));self.assertNotIn('header-credential',json.dumps(result));self.assertNotIn('multi word credential',json.dumps(result));self.assertNotIn('provider-key',json.dumps(result));self.assertNotIn('systemctl start',str(calls));self.assertNotIn('restart',str(calls));self.assertEqual(before,(root/'etc/iclusters-node-agent.json').read_bytes())
  def test_guest_docker_uses_exact_guest_and_fixed_commands(self):
   root,p=self.fixture()
   for target in ('lxc/101','qemu/100','node'):

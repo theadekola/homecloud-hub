@@ -4,7 +4,7 @@ Product: **i-Clusters**. Website: https://www.i-clusters.com. Support: https://s
 
 The application uses the supplied layered cluster mark, cyan and blue accents, a dark navy sign-in surface, and local application icons. Brand artwork is bundled locally. External links do not establish that a site has been deployed; DNS, TLS and support hosting are managed separately.
 
-Existing installations update with `sudo homecloud update`. Repository location, service names, environment variables, API headers, database identities, browser storage keys and connector pairing remain compatible. Historical default names HomeCloud and HomeCloud Hub migrate to i-Clusters. Administrator-defined installation names are preserved. Existing appearance preferences remain in place; the default accent for new preferences is blue.
+Existing installations update with `sudo iclusters update`. Repository location, service names, environment variables, API headers, database identities, browser storage keys and connector pairing remain compatible. Historical default names i-Clusters and i-Clusters migrate to i-Clusters. Administrator-defined installation names are preserved. Existing appearance preferences remain in place; the default accent for new preferences is blue.
 
 First-use owner registration, remembered sessions, password visibility and account security remain supported. The sign-in support link opens the support site. It does not claim to provide an in-application password reset or access-request workflow.
 

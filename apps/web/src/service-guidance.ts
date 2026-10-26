@@ -2,7 +2,7 @@
 export function serviceGuidance(service:{provider?:string;status?:string;error?:string}){
  const error=service.error||'';
  if(service.provider==='docker'){
-  if(/offline/i.test(error))return 'The paired host or node is offline. Check homecloud-node-agent.service on its paired Linux host, its network connection and the selected guest’s power state. Recheck after it resumes reporting.';
+  if(/offline/i.test(error))return 'The paired host or node is offline. Check iclusters-node-agent.service on its paired Linux host, its network connection and the selected guest’s power state. Recheck after it resumes reporting.';
   if(/statistics unavailable/i.test(error))return 'Docker inventory is connected, but some container measurements are unavailable. Check the affected containers on that Docker host, update its paired connector to version 5, and recheck. Missing measurements remain unknown.';
   if(/timed out|timeout|time budget/i.test(error))return 'The Docker host did not answer within the measurement deadline. Check its paired connector and Docker service, update the connector to version 5, then recheck the selected host under Docker.';
   if(/HTTP (401|403)/i.test(error))return 'The Docker Engine rejected access. Check the selected Docker connection’s credentials or socket permissions. Proxmox read permissions do not grant Docker Engine access.';

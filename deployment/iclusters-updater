@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-cd /opt/homecloud-hub
-exec 9>/run/homecloud-updater.lock
+cd /opt/i-clusters
+exec 9>/run/iclusters-updater.lock
 flock -n 9 || exit 0
-mkdir -p runtime /var/lib/homecloud-updater
+mkdir -p runtime /var/lib/iclusters-updater
 check_id=$(python3 -c 'import json; print(json.load(open("runtime/update-check.json")).get("checkId", ""))' 2>/dev/null || true)
 rm -f runtime/update-check.json
 current=$(git rev-parse HEAD)
@@ -12,10 +12,10 @@ available=false
 state=ready
 message='Up to date.'
 write_status() {
-  printf '{"current":"%s","latest":"%s","available":%s,"state":"%s","message":"%s","checkedAt":"%s","checkId":"%s"}\n' "$current" "$latest" "$available" "$state" "$message" "$(date -u +%FT%TZ)" "$check_id" > /var/lib/homecloud-updater/update-status.json.tmp
-  mv /var/lib/homecloud-updater/update-status.json.tmp /var/lib/homecloud-updater/update-status.json
+  printf '{"current":"%s","latest":"%s","available":%s,"state":"%s","message":"%s","checkedAt":"%s","checkId":"%s"}\n' "$current" "$latest" "$available" "$state" "$message" "$(date -u +%FT%TZ)" "$check_id" > /var/lib/iclusters-updater/update-status.json.tmp
+  mv /var/lib/iclusters-updater/update-status.json.tmp /var/lib/iclusters-updater/update-status.json
 }
-trap 'rm -f runtime/update-request.json; state=failed; message="Update failed. Run sudo journalctl -u homecloud-updater -n 100 on Ubuntu."; write_status' ERR
+trap 'rm -f runtime/update-request.json; state=failed; message="Update failed. Run sudo journalctl -u iclusters-updater -n 100 on Ubuntu."; write_status' ERR
 if ! git symbolic-ref --quiet HEAD >/dev/null; then
   message='Pinned release: update manually on Ubuntu.'
   rm -f runtime/update-request.json
@@ -31,7 +31,7 @@ if [[ -f runtime/update-request.json ]]; then
   rm runtime/update-request.json
   if [[ $available == true ]]; then
     state=updating; message='Downloading and rebuilding. The dashboard will reconnect automatically.'; write_status
-    /usr/local/bin/homecloud update
+    /usr/local/bin/iclusters update
     current=$(git rev-parse HEAD)
     available=false; state=completed; message='Update installed.'
   fi

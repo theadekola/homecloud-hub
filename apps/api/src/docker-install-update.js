@@ -44,7 +44,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
  const lock=hostId+':'+row.containerId;if(locks.has(lock))throw fail('An update is already running for this container.');locks.add(lock);
  let pullFailure=false;
  let old,newId='',stopped=false,renamed=false,changedPolicy=false,switched=false;const disconnected=[];
- const base='/containers/'+encodeURIComponent(row.containerId),backup='homecloud-backup-'+row.containerId.slice(0,12)+'-'+crypto.randomBytes(4).toString('hex');
+ const base='/containers/'+encodeURIComponent(row.containerId),backup='iclusters-backup-'+row.containerId.slice(0,12)+'-'+crypto.randomBytes(4).toString('hex');
  try{
   onProgress(5,'Checking reviewed configuration');
   old=await query(base+'/json');if(old.Image!==input.imageId)throw fail('This container is already using a different image. Recheck updates.');
@@ -67,7 +67,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   const fresh=await query(base+'/json');if(updatePlan(fresh,oldImage).binding!==plan.binding)throw fail('The container configuration changed during download. Nothing was stopped; recheck before retrying.');
   await ensureNoContainerDependents(fresh,query);
   onProgress(75,'Preparing replacement container');
-  const temp='homecloud-update-'+crypto.randomBytes(10).toString('hex');
+  const temp='iclusters-update-'+crypto.randomBytes(10).toString('hex');
   const checkpoint={oldId:old.Id,oldImage:old.Image,oldName:plan.name,backupName:backup,tempName:temp,newImage:pulled.Id,plan,configHash:fingerprint(old.Config),hostHash:fingerprint({...old.HostConfig,RestartPolicy:null})};
   onCheckpoint(checkpoint);
   const created=await query('/containers/create?name='+temp,{method:'POST',body:JSON.stringify({...plan.config,Image:pulled.Id,Labels:{...plan.config.Labels,[trackedImageLabel]:row.image},HostConfig:plan.host,NetworkingConfig:{EndpointsConfig:plan.networks}})});newId=created.Id;if(!/^[a-f0-9]{12,64}$/.test(newId||''))throw fail('Docker did not return a replacement container identity.');

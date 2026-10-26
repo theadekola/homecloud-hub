@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {createGuestPermissionRepair,permissionRoles} from '../src/guest-permissions.js';
 const needed='VM.GuestAgent.Unrestricted';
 function fixture(options={}){
- const config={url:'https://pve.example:8006',tokenId:'homecloud@pve!reader',tokenSecret:'saved-secret',verifyTls:true,ca:'trusted-ca'},calls=[],roles=new Map(),acl=[],base={};
- for(const id of ['100','101'])for(const subject of ['homecloud@pve','homecloud@pve!reader'])base[subject+':/vms/'+id]={'VM.Audit':1,'VM.Backup':0};
+ const config={url:'https://pve.example:8006',tokenId:'iclusters@pve!reader',tokenSecret:'saved-secret',verifyTls:true,ca:'trusted-ca'},calls=[],roles=new Map(),acl=[],base={};
+ for(const id of ['100','101'])for(const subject of ['iclusters@pve','iclusters@pve!reader'])base[subject+':/vms/'+id]={'VM.Audit':1,'VM.Backup':0};
  function effective(subject,path){const row={...base[subject+':'+path]};for(const a of acl)if(a.ugid===subject&&a.path===path)for(const p of roles.get(a.roleid)||[])row[p]=Number(a.propagate);if(subject.includes('!')){const user=effective(subject.split('!')[0],path);for(const p of Object.keys(row))if(!Object.hasOwn(user,p))delete row[p];}return row;}
  const response=(data,status=200)=>({ok:status<400,status,json:async()=>({data})});
  const query=async(path,init,c)=>{
   calls.push({path,method:'token'});assert.equal(c,config);
   if(path.startsWith('/cluster/resources'))return [{vmid:100,name:'One',node:'n1',type:'qemu',status:'running'},{vmid:101,name:'Two',node:'n2',type:'qemu',status:'running'},{vmid:200,name:'CT',node:'n1',type:'lxc'}];
-  const u=new URL('https://pve.example'+path),target=u.searchParams.get('path');return {[target]:options.verifyFail?{'VM.Audit':1}:effective(options.privsep===false?'homecloud@pve':'homecloud@pve!reader',target)};
+  const u=new URL('https://pve.example'+path),target=u.searchParams.get('path');return {[target]:options.verifyFail?{'VM.Audit':1}:effective(options.privsep===false?'iclusters@pve':'iclusters@pve!reader',target)};
  };
  const transport=async(url,init,tls)=>{
   assert.equal(new URL(url).origin,new URL(config.url).origin);assert.equal(tls.rejectUnauthorized,true);assert.equal(tls.ca,config.ca);const u=new URL(url),path=u.pathname.replace('/api2/json',''),form=Object.fromEntries(new URLSearchParams(init.body));calls.push({path,method:init.method,form,headers:init.headers});
@@ -27,7 +27,7 @@ function fixture(options={}){
   if(path==='/access/roles'&&init.method==='GET')return response([...roles].map(([roleid,privs])=>({roleid,privs:privs.join(',')})));
   if(path.startsWith('/access/roles/'))return response(Object.fromEntries((options.conflicting?['Permissions.Modify']:roles.get(path.split('/').pop())||[]).map(p=>[p,1])));
   if(path==='/access/roles'&&init.method==='POST'){roles.set(form.roleid,form.privs.split(' '));return response(null);}
-  if(path==='/access/acl'&&init.method==='GET')return response(options.noAccess?[{path:'/vms/100',ugid:'homecloud@pve',type:'user',roleid:'NoAccess',propagate:1}]:[...acl].reverse());
+  if(path==='/access/acl'&&init.method==='GET')return response(options.noAccess?[{path:'/vms/100',ugid:'iclusters@pve',type:'user',roleid:'NoAccess',propagate:1}]:[...acl].reverse());
   if(path==='/access/acl'&&init.method==='PUT'){acl.push({path:form.path,ugid:form.users||form.tokens,type:form.users?'user':'token',roleid:form.roles,propagate:Number(form.propagate)});return response(null);}
   throw Error('Unexpected '+path);
  };
@@ -39,7 +39,7 @@ test('permission roles retain both direct and inherited privileges without broad
  const roles=permissionRoles({'VM.Audit':1,'VM.Backup':0});assert.deepEqual(roles.map(r=>[r.propagate,r.privs]),[[0,['VM.Backup',needed]],[1,['VM.Audit']]]);assert.deepEqual(permissionRoles({'VM.Backup':0,'VM.Audit':1}),roles);
 });
 test('repair updates only selected VM user and separated token ACLs, preserving privileges and clearing credentials',async()=>{
- const f=fixture(),input=await f.input();const result=await f.service.repair(input);assert.equal(result.verified,true);assert.equal(input.password,'');assert.ok(f.acl.length);assert.ok(f.acl.every(a=>a.path==='/vms/100'));assert.ok(f.acl.some(a=>a.type==='token'));assert.deepEqual(f.effective('homecloud@pve!reader','/vms/100'),{'VM.Audit':1,'VM.Backup':0,[needed]:0});assert.equal(f.effective('homecloud@pve!reader','/vms/101')[needed],undefined);assert.ok(!JSON.stringify(result).includes('secret'));assert.ok(!JSON.stringify(await f.service.inspect()).includes('saved-secret'));
+ const f=fixture(),input=await f.input();const result=await f.service.repair(input);assert.equal(result.verified,true);assert.equal(input.password,'');assert.ok(f.acl.length);assert.ok(f.acl.every(a=>a.path==='/vms/100'));assert.ok(f.acl.some(a=>a.type==='token'));assert.deepEqual(f.effective('iclusters@pve!reader','/vms/100'),{'VM.Audit':1,'VM.Backup':0,[needed]:0});assert.equal(f.effective('iclusters@pve!reader','/vms/101')[needed],undefined);assert.ok(!JSON.stringify(result).includes('secret'));assert.ok(!JSON.stringify(await f.service.inspect()).includes('saved-secret'));
  const repeat=await f.service.repair(await f.input());assert.equal(repeat.changed,false);
 });
 test('non-separated tokens need only a user grant and token settings stay unchanged',async()=>{
@@ -59,7 +59,7 @@ test('conflicting roles and failed verification never claim success',async()=>{
 });
 
 test('token privilege already granted but masked by its user is verified after repairing the user',async()=>{
- const f=fixture();f.base['homecloud@pve!reader:/vms/100'][needed]=1;const result=await f.service.repair(await f.input());assert.equal(result.verified,true);assert.ok(f.acl.every(a=>a.type==='user'));
+ const f=fixture();f.base['iclusters@pve!reader:/vms/100'][needed]=1;const result=await f.service.repair(await f.input());assert.equal(result.verified,true);assert.ok(f.acl.every(a=>a.type==='user'));
 });
 test('connection change during authentication stops before further calls and clears credentials',async()=>{
  const f=fixture(),input=await f.input();f.config.url='https://other.example:8006';await assert.rejects(()=>f.service.repair(input),{status:409});assert.ok(!f.calls.some(c=>c.path==='/access/ticket'));
@@ -78,14 +78,14 @@ test('repair routes are owner-only, never audit credentials, and invalidate disc
 
 test('real HTTPS repair verifies the configured CA, uses an ephemeral ticket and CSRF token, and rejects an untrusted certificate',async()=>{
  const {default:fs}=await import('node:fs'),{default:os}=await import('node:os'),{default:path}=await import('node:path'),{default:https}=await import('node:https'),{spawnSync}=await import('node:child_process');
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-guest-permissions-')),key=path.join(dir,'key.pem'),cert=path.join(dir,'cert.pem');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-guest-permissions-')),key=path.join(dir,'key.pem'),cert=path.join(dir,'cert.pem');
  try{
  const generated=spawnSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost,IP:127.0.0.1'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
  const f=fixture(),seen=[];f.config.ca=fs.readFileSync(cert,'utf8');
  const server=https.createServer({key:fs.readFileSync(key),cert:f.config.ca},async(req,res)=>{try{
  let raw='';for await(const chunk of req)raw+=chunk;seen.push({url:req.url,method:req.method,authorization:req.headers.authorization,cookie:req.headers.cookie,csrf:req.headers.csrfpreventiontoken});
  const path=req.url.replace('/api2/json','');let result;
- if(req.headers.authorization){assert.equal(req.headers.authorization,'PVEAPIToken=homecloud@pve!reader=saved-secret');result=await f.query(path,{},f.config);}else{
+ if(req.headers.authorization){assert.equal(req.headers.authorization,'PVEAPIToken=iclusters@pve!reader=saved-secret');result=await f.query(path,{},f.config);}else{
  const reply=await f.transport(f.config.url+req.url,{method:req.method,body:raw||undefined,headers:{Cookie:req.headers.cookie,CSRFPreventionToken:req.headers.csrfpreventiontoken}}, {rejectUnauthorized:true,ca:f.config.ca});result=(await reply.json()).data;
  }res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data:result}));
  }catch(error){res.statusCode=500;res.end(JSON.stringify({error:error.message}));}});
@@ -118,16 +118,16 @@ test('verified repair can clear cached discovery permission errors immediately',
 });
 
 test('repair list excludes already verified access, including direct non-propagated grants, and restores revoked VMs',async()=>{
- const f=fixture();for(const subject of ['homecloud@pve','homecloud@pve!reader'])f.base[subject+':/vms/100'][needed]=0;
+ const f=fixture();for(const subject of ['iclusters@pve','iclusters@pve!reader'])f.base[subject+':/vms/100'][needed]=0;
  let state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['101']);assert.equal(state.verifiedCount,1);assert.equal(state.totalCount,2);assert.ok(!f.calls.some(c=>c.path==='/access/ticket'));
- delete f.base['homecloud@pve!reader:/vms/100'][needed];state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
+ delete f.base['iclusters@pve!reader:/vms/100'][needed];state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
  const result=await f.service.repair(await f.input());assert.equal(result.verified,true);state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['101']);assert.equal(state.verifiedCount,1);
 });
 test('repair list checks effective token access rather than its user permission alone',async()=>{
- const f=fixture();f.base['homecloud@pve:/vms/100'][needed]=1;const state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
+ const f=fixture();f.base['iclusters@pve:/vms/100'][needed]=1;const state=await f.service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100','101']);assert.equal(state.verifiedCount,0);
 });
 test('unavailable permission checks remain visible with a warning instead of disappearing',async()=>{
- const config={url:'https://pve.example:8006',tokenId:'homecloud@pve!reader',tokenSecret:'saved',verifyTls:true};
+ const config={url:'https://pve.example:8006',tokenId:'iclusters@pve!reader',tokenSecret:'saved',verifyTls:true};
  const service=createGuestPermissionRepair({config:()=>config,query:async path=>{if(path.startsWith('/cluster/resources'))return [{vmid:100,name:'Unknown',node:'n1',type:'qemu'},{vmid:101,name:'Verified',node:'n1',type:'qemu'}];if(path.includes('100'))throw Error('Unavailable');return {'/vms/101':{[needed]:0}};}});
  const state=await service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100']);assert.match(state.guests[0].permissionError,/could not be verified/);assert.equal(state.verifiedCount,1);
 });

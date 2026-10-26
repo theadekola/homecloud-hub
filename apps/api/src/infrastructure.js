@@ -25,7 +25,7 @@ export async function createBackupJob(body){
   const node=required(body.node,'Node'),storage=required(body.storage,'Backup storage');
   const vmid=required(String(body.vmid||''),'VM/container IDs');
   const selection=await validateBackupSelection({node,storage,vmid},pve);
-  const id=`homecloud-${crypto.randomUUID()}`;
+  const id=`iclusters-${crypto.randomUUID()}`;
   await pveWrite('/cluster/backup','POST',{id,node,storage,vmid:selection.vmid,comment:required(body.name,'Name'),schedule:required(body.schedule,'Proxmox calendar schedule'),enabled:1,mode:'snapshot',compress:'zstd',...(body.retention?{'prune-backups':retention(body.retention)}:{})});
   return {id};
 }

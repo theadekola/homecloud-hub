@@ -24,11 +24,13 @@ jobs:
             exit 1
           fi
           bash -n install.sh
-          bash -n deployment/homecloud-updater
+          bash -n deployment/iclusters-updater
           bash -n deployment/setup-updater.sh
           bash deployment/test-updater.sh
-          bash -n deployment/homecloud
+          bash -n deployment/iclusters
           bash -n deployment/upgrade.sh deployment/controller-backup.sh deployment/controller-restore.sh deployment/check-controller-recovery.sh
+          python3 deployment/test-brand-migration.py
+          bash -n deployment/finish-brand-migration.sh
           python3 deployment/test-safe-extract.py
           sudo bash deployment/test-upgrade.sh
           bash -n deployment/build-env.sh
@@ -58,9 +60,9 @@ jobs:
           sh deployment/generate-secrets.sh > /dev/null
           source deployment/build-env.sh
           docker compose up -d --build --wait --wait-timeout 180
-          docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/homecloud-ci-root.crt
-          curl --fail --show-error --cacert /tmp/homecloud-ci-root.crt https://localhost:6002/api/health
-          NODE_EXTRA_CA_CERTS=/tmp/homecloud-ci-root.crt node deployment/check-registration.mjs
+          docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/iclusters-ci-root.crt
+          curl --fail --show-error --cacert /tmp/iclusters-ci-root.crt https://localhost:6002/api/health
+          NODE_EXTRA_CA_CERTS=/tmp/iclusters-ci-root.crt node deployment/check-registration.mjs
       - name: Disposable Docker worker crash recovery
         run: |
           ICLUSTERS_CI_DRILL=1 ICLUSTERS_DRILL_IMAGE="$(docker image inspect --format '{{.Id}}' "$(docker compose images -q api | head -1)")" node deployment/check-docker-crash-recovery.mjs

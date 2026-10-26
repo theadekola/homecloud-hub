@@ -4,7 +4,7 @@ project=$PWD
 temporary=$(mktemp -d)
 trap 'rm -rf -- "$temporary"' EXIT
 mkdir -p "$temporary/repo/runtime" "$temporary/status" "$temporary/bin"
-sed -e "s|/opt/homecloud-hub|$temporary/repo|g" -e "s|/var/lib/homecloud-updater|$temporary/status|g" -e "s|/run/homecloud-updater.lock|$temporary/lock|g" -e "s|/usr/local/bin/homecloud|$temporary/bin/homecloud|g" "$project/deployment/homecloud-updater" > "$temporary/worker"
+sed -e "s|/opt/i-clusters|$temporary/repo|g" -e "s|/var/lib/iclusters-updater|$temporary/status|g" -e "s|/run/iclusters-updater.lock|$temporary/lock|g" -e "s|/usr/local/bin/iclusters|$temporary/bin/iclusters|g" "$project/deployment/iclusters-updater" > "$temporary/worker"
 cat > "$temporary/bin/git" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
@@ -13,7 +13,7 @@ case "$1" in
   rev-parse) if [[ $2 == HEAD ]]; then cat "$FIXTURE/current"; else echo bbbbbbb; fi;;
 esac
 EOF
-cat > "$temporary/bin/homecloud" <<'EOF'
+cat > "$temporary/bin/iclusters" <<'EOF'
 #!/usr/bin/env bash
 [[ $1 == update ]] || exit 1
 [[ ! -e "$FIXTURE/repo/runtime/update-request.json" ]] || exit 1

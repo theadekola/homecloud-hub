@@ -3,7 +3,7 @@ import {api} from '../api';
 import {Modal} from './UI';
 export default function DockerConnection({owner,refresh,autoOpen=false,label='Configure Docker Connection',onConnected}:{owner:boolean;refresh:()=>Promise<any>;autoOpen?:boolean;label?:string;onConnected?:()=>void}){
  const [open,setOpen]=useState(false),[saved,setSaved]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[success,setSuccess]=useState('');
- const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('homecloud-connection'));void refresh().catch(e=>setError(e.message))}};
+ const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('iclusters-connection'));void refresh().catch(e=>setError(e.message))}};
  const load=async()=>{setBusy(true);setError('');try{const r=await api('/connections/docker');setSaved(r.connection);setMessage('');setSuccess('');setOpen(true)}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  useEffect(()=>{if(autoOpen&&owner)load();},[autoOpen,owner]);
  const submit=async(e:any)=>{e.preventDefault();setBusy(true);setError('');setMessage('');const test=e.nativeEvent.submitter?.value==='test',body=Object.fromEntries(new FormData(e.currentTarget));try{const r=await api('/connections/docker'+(test?'/test':''),{method:test?'POST':'PUT',body:JSON.stringify(body)});setMessage(`Connected to ${r.host.hostname} · Docker ${r.host.version}`);if(!test){setSuccess(`Docker connection successful. Connected to ${r.host.hostname}.`)}}catch(e:any){setError(e.message)}finally{setBusy(false)}};

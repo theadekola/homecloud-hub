@@ -28,9 +28,9 @@
   still runs on every request. Writes clear the cache; failures and partial
   startup snapshots are not retained. Action validation never uses this cache.
 
-## Update paired connectors after updating HomeCloud
+## Update paired connectors after updating i-Clusters
 
-The server and frontend improvements apply when HomeCloud is updated. Faster
+The server and frontend improvements apply when i-Clusters is updated. Faster
 paired-node execution requires **connector version 5 on each paired Proxmox node
 or standalone Docker host**. Versions 1–3 remain compatible, and existing pairings
 are preserved. The Docker host panel shows a reminder for older connectors.
@@ -41,13 +41,13 @@ workers are separate from the serial write/setup lane. Expired and excess queued
 jobs are rejected before execution. Docker read deadlines are passed to curl and
 the guest execution wrapper. Writes are never automatically retried.
 
-After updating HomeCloud, run this **as root on each paired host**. It reads the
+After updating i-Clusters, run this **as root on each paired host**. It reads the
 controller URL (including its port) from the existing connector configuration;
 it does not print or replace the pairing token:
 
 ```bash
 installer=$(mktemp)
-hub=$(python3 -c 'import json; print(json.load(open("/etc/homecloud-node-agent.json"))["url"].rstrip("/"))')
+hub=$(python3 -c 'import json; print(json.load(open("/etc/iclusters-node-agent.json"))["url"].rstrip("/"))')
 if curl --fail --silent --show-error --max-time 30 "$hub/api/node-agent/install" -o "$installer"; then
   bash "$installer" --update
 fi
@@ -58,7 +58,7 @@ unset hub installer
 Keep certificate verification enabled. If the controller uses a private CA,
 install that CA in the host trust store before using the command. The update
 validates the downloaded protocol version and Python syntax, preserves the
-configuration and permissions, and restarts only `homecloud-node-agent.service`.
+configuration and permissions, and restarts only `iclusters-node-agent.service`.
 Its existing rollback behavior restores the previous script if restart fails.
 No guest or Docker service restart is requested by this update.
 
@@ -79,7 +79,7 @@ hosts, provider health, network and whether each connector has been updated.
 
 Version 5 collects up to 16 container statistics records inside one guest execution, using bounded local Docker socket reads. This avoids a QEMU/pct round trip for every container. Concurrent snapshots for the same host and connection share in-flight work. Missing or failed measurements stay unknown; a container failure does not discard healthy container samples. Versions 1–4 retain the existing read path, and the UI recommends an update for the batched path.
 
-After updating HomeCloud, use the existing connector `--update` flow on each paired Proxmox node or standalone Docker host. Pairing credentials are preserved. Update the connector on the Proxmox node, not inside each VM. Statistics collection needs guest curl, base64 and a working Docker socket; it does not install another Docker agent or expose an Engine TCP port.
+After updating i-Clusters, use the existing connector `--update` flow on each paired Proxmox node or standalone Docker host. Pairing credentials are preserved. Update the connector on the Proxmox node, not inside each VM. Statistics collection needs guest curl, base64 and a working Docker socket; it does not install another Docker agent or expose an Engine TCP port.
 
 Host selectors verify the Engine before committing a new selection. Discovery now distinguishes ready hosts from the selected connection, and setup verification reports its last actual failure and can be cancelled. Duplicate IPv4/IPv6 port rows are collapsed for display. CPU samples without valid deltas remain unknown; Linux memory subtracts reported inactive cache to match Docker CLI usage.
 

@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for owner-requested i-Clusters updates
+
+[Path]
+PathExists=/opt/i-clusters/runtime/update-request.json
+PathExists=/opt/i-clusters/runtime/update-check.json
+Unit=iclusters-updater.service
+
+[Install]
+WantedBy=multi-user.target

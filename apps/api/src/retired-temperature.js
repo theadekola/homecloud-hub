@@ -1,4 +1,4 @@
-// Retire only alerts produced by the removed HomeCloud temperature monitor.
+// Retire only alerts produced by the removed i-Clusters temperature monitor.
 // Do not mark them recovered: no physical health assessment was performed.
 export function retireTemperature(state){
  const obsolete=key=>typeof key==='string'&&/^operations:.+:(?:temperature|sensor-fault):/.test(key);

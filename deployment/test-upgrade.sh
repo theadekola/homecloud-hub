@@ -33,7 +33,7 @@ for scenario in before-pause after-snapshot rollback-db rollback-config rollback
  touch "$project/.env" "$project/docker-compose.yml" "$project/deployment/Caddyfile"
  export LOG="$project/commands" CASE="$scenario"
  set +e
- PATH="$stage/bin:$PATH" HOMECLOUD_INSTALL_DIR="$project" ICLUSTERS_MAINTENANCE_LOCK="$project/lock" ICLUSTERS_UPGRADE_RECOVERY_ROOT="$project/recovery" bash "$script" > "$project/output" 2>&1
+ PATH="$stage/bin:$PATH" ICLUSTERS_INSTALL_DIR="$project" ICLUSTERS_MAINTENANCE_LOCK="$project/lock" ICLUSTERS_UPGRADE_RECOVERY_ROOT="$project/recovery" bash "$script" > "$project/output" 2>&1
  result=$?
  set -e
  test "$result" -ne 0

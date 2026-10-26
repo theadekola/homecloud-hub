@@ -11,7 +11,7 @@ import { truenas } from '../src/infrastructure.js';
 const executable=process.platform==='win32'?'C:/Program Files/Git/mingw64/bin/openssl.exe':'openssl';
 const available=spawnSync(executable,['version']).status===0;
 await test('TLS connectors authenticate, surface provider errors and support both TrueNAS protocols',{skip:!available},async()=>{
- const directory=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-tls-test-'));const key=path.join(directory,'key.pem'),cert=path.join(directory,'cert.pem');
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-tls-test-'));const key=path.join(directory,'key.pem'),cert=path.join(directory,'cert.pem');
  const generated=spawnSync(executable,['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
  const seen=[];let rejected=false,denied=false,unavailable=false,invalidResponse=false;
  const server=https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async(req,res)=>{

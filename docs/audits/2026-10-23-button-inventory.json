@@ -6270,7 +6270,7 @@
         {
           "line": 26,
           "label": "Forget saved connection",
-          "handler": "{async()=>{setBusy(true);try{await api('/ssh/connections',{method:'DELETE',body:JSON.stringify({target})});localStorage.removeItem('homecloud-ssh-'+target);setS",
+          "handler": "{async()=>{setBusy(true);try{await api('/ssh/connections',{method:'DELETE',body:JSON.stringify({target})});localStorage.removeItem('iclusters-ssh-'+target);setS",
           "form": true,
           "type": "\"button\"",
           "guarded": true

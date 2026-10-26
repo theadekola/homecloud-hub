@@ -24,7 +24,7 @@ Compose-managed containers can be updated individually; the Compose file and oth
 
 Checks follow the existing tag; they do not discover a different version tag or automatically move `app:1` to `app:2`. Digest-pinned and local-only images are not tracked. Registry authentication requirements, network failures, rate limits, missing repository digests and unsupported responses appear as **Unable to check**, rather than **Current**. An unavailable check does not clear an existing update alert. A changed multi-platform index digest may not change the image for the host's platform.
 
-Paired hosts need the connector bundled with the current HomeCloud release to relay registry-distribution requests. Update HomeCloud and then update each paired node or standalone connector under Connections. No Docker API port needs to be exposed, and no registry password is added to notifications or browser responses.
+Paired hosts need the connector bundled with the current i-Clusters release to relay registry-distribution requests. Update i-Clusters and then update each paired node or standalone connector under Connections. No Docker API port needs to be exposed, and no registry password is added to notifications or browser responses.
 
 Update results use a three-column desktop card grid, two columns on tablets and
 one column on phones. Each card keeps its image reference, status, registry
@@ -60,7 +60,7 @@ users from approving the operation.
 
 ### Reliable pulls through paired hosts
 
-After updating HomeCloud, update the relevant paired node connector under
+After updating i-Clusters, update the relevant paired node connector under
 Settings → Connections using **Update Connector**. Version 6 is required before
 installing image updates through paired hosts. Older connectors receive an
 explicit upgrade-required result before any container is stopped.

@@ -3,11 +3,11 @@
 Owners configure Discord, Telegram, SMTP, Slack, Microsoft Teams, Pushover, Gotify, custom webhooks and IFTTT under Settings → Connections → Notifications; TrueNAS under Settings → Connections; and the AI Assistant under Settings → Connections.
 
 1. Open Configure and enter the endpoint and required credentials.
-2. Click Save Configuration. Changes apply without restarting HomeCloud.
+2. Click Save Configuration. Changes apply without restarting i-Clusters.
 3. Use Test Connection. Notification tests explicitly ask before sending a real message; provider tests perform only a read. All configuration popups can test the entered details before saving. Testing never saves or enables an integration; blank secret fields retain the saved credential for the test.
 4. Enable configured notification channels using their delivery switches. A saved configuration is not evidence of successful delivery or provider permissions.
 
-The popup retains entered values after a failed save. Closing a changed form asks before discarding. Saved tokens and passwords are never returned; blank secret fields retain their previous value. An optional SMTP password can be explicitly cleared together with its username. Disconnect overrides both saved and legacy environment credentials and stops HomeCloud use of that integration. It does not delete external resources.
+The popup retains entered values after a failed save. Closing a changed form asks before discarding. Saved tokens and passwords are never returned; blank secret fields retain their previous value. An optional SMTP password can be explicitly cleared together with its username. Disconnect overrides both saved and legacy environment credentials and stops i-Clusters use of that integration. It does not delete external resources.
 
 ## Fields and transport
 
@@ -20,7 +20,7 @@ The application still requires normal database, signing-key and deployment boots
 
 ## Storage and APIs
 
-Credentials are AES-256-GCM encrypted under DATA_DIR/configuration using the existing JWT_SECRET key protection. Files are replaced atomically with mode 0600. Preserve the existing signing key and data volume during application updates and backups. Existing environment values remain a fallback until the service is saved or disconnected in HomeCloud.
+Credentials are AES-256-GCM encrypted under DATA_DIR/configuration using the existing JWT_SECRET key protection. Files are replaced atomically with mode 0600. Preserve the existing signing key and data volume during application updates and backups. Existing environment values remain a fallback until the service is saved or disconnected in i-Clusters.
 
 Owner-only authenticated endpoints:
 

@@ -1,5 +1,5 @@
 {
-  "name": "@homecloud/web",
+  "name": "@iclusters/web",
   "private": true,
   "version": "3.1.0-rc.3",
   "type": "module",

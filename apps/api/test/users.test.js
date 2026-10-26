@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 process.env.JWT_SECRET='a'.repeat(64);
 process.env.JWT_REFRESH_SECRET='b'.repeat(64);
-process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-users-test-'));
+process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-users-test-'));
 const {createApp}=await import('../src/app.js');
 const {requireRole}=await import('../src/security.js');
 test('user account reads return creation dates through the admin-only safe projection',async()=>{

@@ -7,7 +7,7 @@ import https from 'node:https';
 import { spawnSync } from 'node:child_process';
 
 const temporaryRoot=path.resolve('runtime');fs.mkdirSync(temporaryRoot,{recursive:true});
-process.env.DATA_DIR=fs.mkdtempSync(path.join(temporaryRoot,'homecloud-cluster-'));
+process.env.DATA_DIR=fs.mkdtempSync(path.join(temporaryRoot,'iclusters-cluster-'));
 process.env.JWT_SECRET='cluster-test-key'.repeat(5);
 process.env.JWT_REFRESH_SECRET='cluster-refresh-test-key'.repeat(4);
 const {validateCluster,createClusterStore,clusterStore}=await import('../src/cluster-config.js');

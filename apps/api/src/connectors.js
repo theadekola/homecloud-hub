@@ -109,7 +109,7 @@ export async function proxmoxVmAction(node,id,action,payload={},call=pve){
   await assertGuestPlacement(node,id,'qemu',call);
   const statusActions=new Set(['start','stop','shutdown','reboot','reset','suspend','resume']);
   if(statusActions.has(action)) return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by i-Clusters',vmstate:payload.vmstate?1:0})});
+  if(action==='snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`iclusters-${Date.now()}`,description:payload.description||'Created by i-Clusters',vmstate:payload.vmstate?1:0})});
   if(action==='delete-snapshot') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   if(action==='clone') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}/clone`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({newid:payload.newid,name:payload.name,target:payload.target,full:payload.full===false?0:1,storage:payload.storage})});
   if(action==='delete') return call(`/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(id)}`,{method:'DELETE'});
@@ -120,7 +120,7 @@ export async function proxmoxLxcAction(node,id,action,payload={},call=pve){
   const statusActions=new Set(['start','stop','shutdown','reboot','suspend','resume']);
   const base=`/nodes/${encodeURIComponent(node)}/lxc/${encodeURIComponent(id)}`;
   if(statusActions.has(action)) return call(`${base}/status/${action}`,{method:'POST'});
-  if(action==='snapshot') return call(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`homecloud-${Date.now()}`,description:payload.description||'Created by i-Clusters'})});
+  if(action==='snapshot') return call(`${base}/snapshot`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form({snapname:payload.name||`iclusters-${Date.now()}`,description:payload.description||'Created by i-Clusters'})});
   if(action==='delete-snapshot') return call(`${base}/snapshot/${encodeURIComponent(payload.name)}`,{method:'DELETE'});
   throw new Error(`Unsupported Proxmox LXC action: ${action}`);
 }
@@ -263,7 +263,7 @@ async function collectDockerSnapshot({timeoutMs,metrics=true}={}){
   }else if(metrics){
    for(let i=0;i<running.length;i+=5)await Promise.all(running.slice(i,i+5).map(async c=>{try{samples.set(c.Id,{stats:await read(`/containers/${encodeURIComponent(c.Id)}/stats?stream=false`)})}catch(error){samples.set(c.Id,{error:error.message})}}));
   }
-  const measured=containers.map(c=>{const sample=samples.get(c.Id);return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Labels?.['io.homecloud.update.image']||c.Image,imageId:c.ImageID,mounts:c.Mounts||[],networks:c.NetworkSettings?.Networks||{},status:c.State,ports:[...new Set((c.Ports||[]).map(p=>(p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort))+(p.Type&&p.Type!=='tcp'?`/${p.Type}`:'')))].join(', '),...dockerMetrics(sample?.stats),statsError:sample?.error?String(sample.error).slice(0,400):null,labels:publicComposeLabels(c.Labels)}});
+  const measured=containers.map(c=>{const sample=samples.get(c.Id);return {id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Labels?.['io.iclusters.update.image']||c.Labels?.['io.homecloud.update.image']||c.Image,imageId:c.ImageID,mounts:c.Mounts||[],networks:c.NetworkSettings?.Networks||{},status:c.State,ports:[...new Set((c.Ports||[]).map(p=>(p.PublicPort?`${p.PublicPort}:${p.PrivatePort}`:String(p.PrivatePort))+(p.Type&&p.Type!=='tcp'?`/${p.Type}`:'')))].join(', '),...dockerMetrics(sample?.stats),statsError:sample?.error?String(sample.error).slice(0,400):null,labels:publicComposeLabels(c.Labels)}});
   return {
     errors:measured.filter(c=>c.statsError).map(c=>`${c.name}: statistics unavailable${/timed out|timeout|time budget/i.test(c.statsError)?' (measurement deadline exceeded)':/Docker HTTP (401|403)/.test(c.statsError)?' (Docker Engine access rejected)':''}`),
     host:{engineId:info.ID||null,hostname:info.Name,version:info.ServerVersion,cores:info.NCPU,memoryTotal:info.MemTotal,os:info.OperatingSystem,kernel:info.KernelVersion,storageDriver:info.Driver,rootDirectory:info.DockerRootDir,labels:info.Labels||[]},containers:measured,
@@ -292,7 +292,7 @@ export async function dockerCreateContainer(payload){
   const body={
     Image:payload.image,
     Env:Array.isArray(payload.env)?payload.env:[],
-    Labels:{'homecloud.managed':'true'},
+    Labels:{'iclusters.managed':'true'},
     HostConfig:{
       RestartPolicy:{Name:payload.restartPolicy||'unless-stopped'},
       PortBindings:{}

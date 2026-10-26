@@ -1,6 +1,6 @@
 # Local image and icon assets
 
-HomeCloud ships its logos in `apps/web/public/assets`. No CDN requests are needed. Standard actions, hardware, status indicators and file operations retain the existing Lucide SVG system.
+i-Clusters ships its logos in `apps/web/public/assets`. No CDN requests are needed. Standard actions, hardware, status indicators and file operations retain the existing Lucide SVG system.
 
 ## OS detection
 
@@ -12,10 +12,10 @@ Docker application logos resolve from known image repository names, including re
 
 ## Identity and accessibility
 
-A shared BrandIcon component controls sizing, local paths and failed-image fallbacks. Logos next to text are decorative to avoid duplicate screen-reader announcements. Standalone marks can provide an accessible label. HomeCloud has an SVG favicon, Apple touch icon and 192/512 pixel application icons. The web manifest provides install metadata; it does not add offline operation.
+A shared BrandIcon component controls sizing, local paths and failed-image fallbacks. Logos next to text are decorative to avoid duplicate screen-reader announcements. Standalone marks can provide an accessible label. i-Clusters has an SVG favicon, Apple touch icon and 192/512 pixel application icons. The web manifest provides install metadata; it does not add offline operation.
 
 ## Sources
 
 The local `assets/brands/manifest.json` records each SVG source at an immutable upstream commit. `assets/brands/NOTICE.txt` and the included CC0/MIT license texts provide provenance and attribution. About → Credits links to the notice and lists available OS logos.
 
-Feature icons for Dashboard, Storage, Network, Backups, Monitoring, Alerts, Assistant, Shell, SFTP, Users and Settings are original HomeCloud SVG drawings under `public/assets/pages`. Sidebar links and matching page/tab headings share these assets. They remain decorative beside visible text, use fixed dimensions, and fall back to a local outline icon if an image fails. Proxmox and Docker retain their brand logos.
+Feature icons for Dashboard, Storage, Network, Backups, Monitoring, Alerts, Assistant, Shell, SFTP, Users and Settings are original i-Clusters SVG drawings under `public/assets/pages`. Sidebar links and matching page/tab headings share these assets. They remain decorative beside visible text, use fixed dimensions, and fall back to a local outline icon if an image fails. Proxmox and Docker retain their brand logos.

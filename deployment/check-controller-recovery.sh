@@ -8,7 +8,7 @@ cleanup(){ local result=$?; trap - EXIT; if [[ -f $stage/restored/.env ]]; then 
 trap cleanup EXIT
 age-keygen -o "$stage/identity" >/dev/null 2>&1
 recipient=$(age-keygen -y "$stage/identity")
-HOMECLOUD_INSTALL_DIR="$project" bash deployment/controller-backup.sh "$stage/backups" "$recipient"
+ICLUSTERS_INSTALL_DIR="$project" bash deployment/controller-backup.sh "$stage/backups" "$recipient"
 archive=$(find "$stage/backups" -name '*.tar.age' -type f -print -quit)
 bash deployment/controller-restore.sh "$archive" "$stage/identity" "$stage/restored"
 cd "$stage/restored"

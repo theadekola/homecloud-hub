@@ -1,4 +1,4 @@
-name: homecloud-hub
+name: ${COMPOSE_PROJECT_NAME:-i-clusters}
 
 services:
   caddy:
@@ -51,9 +51,9 @@ services:
     build:
       context: ./apps/api
       args:
-        HOMECLOUD_BUILD_NUMBER: ${HOMECLOUD_BUILD_NUMBER:-}
-        HOMECLOUD_BUILD_DATE: ${HOMECLOUD_BUILD_DATE:-}
-        HOMECLOUD_BUILD_REVISION: ${HOMECLOUD_BUILD_REVISION:-}
+        ICLUSTERS_BUILD_NUMBER: ${ICLUSTERS_BUILD_NUMBER:-}
+        ICLUSTERS_BUILD_DATE: ${ICLUSTERS_BUILD_DATE:-}
+        ICLUSTERS_BUILD_REVISION: ${ICLUSTERS_BUILD_REVISION:-}
     restart: unless-stopped
     env_file: .env
     expose:
@@ -67,12 +67,12 @@ services:
     environment:
       DATA_DIR: /app/runtime
       PORT: "6000"
-      UPDATE_STATUS_DIR: /run/homecloud/updater
+      UPDATE_STATUS_DIR: /run/iclusters/updater
     volumes:
       - ./runtime:/app/runtime
-      - /var/lib/homecloud-updater:/run/homecloud/updater:ro
-      - ./secrets/docker:/run/homecloud/docker:ro
-      - ./secrets/ca:/run/homecloud/ca:ro
+      - /var/lib/iclusters-updater:/run/iclusters/updater:ro
+      - ./secrets/docker:/run/iclusters/docker:ro
+      - ./secrets/ca:/run/iclusters/ca:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 20s

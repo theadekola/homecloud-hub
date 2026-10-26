@@ -5,7 +5,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);
-process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-connections-'));
+process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-connections-'));
 for(const key of ['PROXMOX_URL','TRUENAS_URL','DOCKER_API_URL'])delete process.env[key];
 const {createApp}=await import('../src/app.js');
 const {createMonitor}=await import('../src/monitor.js');
@@ -33,10 +33,10 @@ try{
   for(const [endpoint,method] of [['/docker/volume/data','DELETE'],['/docker/network/net','DELETE'],
    ['/docker/image/image','DELETE'],['/docker/prune/volumes','POST'],['/docker/stack/app/stop','POST'],
    ['/actions/docker/container/app/stop','POST']]){
-   const a=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-a:lxc/101'});
-   const b=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-b:lxc/101'});
+   const a=await call(endpoint,method,{}, {'X-IClusters-Docker-Host':'node-a:lxc/101'});
+   const b=await call(endpoint,method,{}, {'X-IClusters-Docker-Host':'node-b:lxc/101'});
    assert.equal(a.status,404);assert.equal(b.status,404);assert.match(a.body.error,/Selected Docker host/);assert.equal(a.body.confirmationPhrase,undefined);
-   const replay=await call(endpoint,method,{}, {'X-HomeCloud-Docker-Host':'node-b:lxc/101','X-HomeCloud-Confirm':'unrelated confirmation'});
+   const replay=await call(endpoint,method,{}, {'X-IClusters-Docker-Host':'node-b:lxc/101','X-IClusters-Confirm':'unrelated confirmation'});
    assert.equal(replay.status,404);
   }
  });

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);
-process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'homecloud-vm-install-'));
+process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-vm-install-'));
 const {createApp}=await import('../src/app.js');
 const calls=[];
 const upstream=http.createServer((req,res)=>{

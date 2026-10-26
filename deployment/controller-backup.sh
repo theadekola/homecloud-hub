@@ -2,7 +2,7 @@
 # Encrypted, consistent backup of the standard single-controller Compose stack.
 set -Eeuo pipefail
 [[ $EUID == 0 ]] || { echo 'Run this command as root.' >&2; exit 1; }
-project=${HOMECLOUD_INSTALL_DIR:-/opt/homecloud-hub}
+project=${ICLUSTERS_INSTALL_DIR:-/opt/i-clusters}
 destination=${1:?Usage: controller-backup.sh /absolute/backup-directory age1recipient}
 recipient=${2:?Supply your age public encryption recipient, not a private key.}
 [[ $destination = /* && $recipient = age1* ]] || { echo 'Use an absolute destination and an age public recipient.' >&2; exit 1; }

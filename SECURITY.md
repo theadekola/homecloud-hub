@@ -6,7 +6,7 @@ i-Clusters controls privileged infrastructure. Use dedicated provider identities
 
 ## Reporting vulnerabilities
 
-Do not put credentials, private infrastructure details or an exploitable vulnerability in a public issue. Use **Security → Report a vulnerability** in the [GitHub repository](https://github.com/theadekola/homecloud-hub/security) if private reporting is enabled. If it is unavailable, open a minimal issue requesting a private contact channel without the vulnerability details or personal data. No response or remediation deadline is guaranteed.
+Do not put credentials, private infrastructure details or an exploitable vulnerability in a public issue. Use **Security → Report a vulnerability** in the [GitHub repository](https://github.com/theadekola/i-clusters/security) if private reporting is enabled. If it is unavailable, open a minimal issue requesting a private contact channel without the vulnerability details or personal data. No response or remediation deadline is guaranteed.
 
 Include the installed version/build/revision, affected feature, impact, sanitized reproduction steps and any temporary mitigation. Use disposable test resources. Do not test systems without their owner's authorization.
 

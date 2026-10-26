@@ -4,5 +4,6 @@ test('browser refresh credentials are HttpOnly secure same-site cookies, never J
 test('cross-origin browser sessions are rejected and unflagged cookie-only refresh cannot authenticate',()=>{assert.throws(()=>browserSession(req({'x-iclusters-browser':'1',origin:'https://other.test',host:'controller.test'})),e=>e.status===403);assert.equal(refreshCredential(req({cookie:'__Host-iclusters-refresh=hidden'})), '');assert.equal(refreshCredential(req({'x-iclusters-browser':'1',cookie:'__Host-iclusters-refresh=hidden'})), 'hidden');assert.equal(refreshCredential(req({}, {refreshToken:'native-client'})),'native-client')});
 test('existing browser cookies remain usable during the brand migration',()=>{
  assert.equal(refreshCredential(req({'x-homecloud-browser':'1',cookie:'__Host-homecloud-refresh=existing'})),'existing');
+ assert.equal(refreshCredential(req({'x-iclusters-browser':'1',cookie:'__Host-homecloud-refresh=obsolete; __Host-iclusters-refresh=current'})),'current');
  assert.throws(()=>browserSession(req({'x-homecloud-browser':'1',origin:'https://other.test',host:'controller.test'})),{status:403});
 });

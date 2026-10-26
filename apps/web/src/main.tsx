@@ -27,3 +27,5 @@ import './components/distribution-summary.css';
 import './components/cluster-topology.css';
 
 import './components/VmCreateWizard.css';
+
+import './connection-notice.css';

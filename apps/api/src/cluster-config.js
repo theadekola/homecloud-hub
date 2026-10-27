@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-export function validateCluster(input) {
+export function validateCluster(input,saved) {
  const invalid=message=>{throw Object.assign(new Error(message),{status:400});};
  const name=String(input.name||'').trim(),host=String(input.host||'').trim(),tokenId=String(input.tokenId||'').trim();
  if(!name||name.length>100)invalid('Cluster name is required (maximum 100 characters).');
@@ -12,7 +12,8 @@ export function validateCluster(input) {
  if(!/^[^\s=!]+@[^\s=!]+![^\s=!]+$/.test(tokenId))invalid('API token ID must use user@realm!token-name.');
  if(typeof input.tokenSecret!=='string'||!input.tokenSecret||input.tokenSecret.length>4096||/[\r\n]/.test(input.tokenSecret))invalid('A valid API token secret is required.');
  if(typeof input.verifyTls!=='boolean')invalid('SSL verification must be true or false.');
- const ca=String(input.ca||'').trim();if(ca&&(ca.length>65536||!ca.includes('-----BEGIN CERTIFICATE-----')||ca.includes('PRIVATE KEY')))invalid('Enter a PEM CA certificate, not a private key.');
+ const sameEndpoint=saved?.url===`https://${host}:${port}`;
+ const ca=String((input.ca===undefined&&sameEndpoint?saved.ca:input.ca)||'').trim();if(ca&&(ca.length>65536||!ca.includes('-----BEGIN CERTIFICATE-----')||ca.includes('PRIVATE KEY')))invalid('Enter a PEM CA certificate, not a private key.');
  return {name,host,port,tokenId,tokenSecret:input.tokenSecret,verifyTls:input.verifyTls,ca,url:`https://${host}:${port}`};
 }
 export function createClusterStore(file,secret=()=>process.env.JWT_SECRET,validate=validateCluster) {

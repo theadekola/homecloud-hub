@@ -44,13 +44,12 @@ export function createGuestPermissionRepair({config=clusterConfig,query=pve,tran
    if(permissionRepairBusy)throw fail('A guest permission repair is already running.',409);
    const c=config(),connection=target(c,privilege),binding=bind(c);
    if(input?.connectionId!==binding)throw fail('The Proxmox connection changed. Reopen the repair window.',409);
-   if(!connection.trustedTls)throw fail('Enable TLS verification and configure the trusted Proxmox CA before entering administrator credentials.',409);
    if(input?.confirm!==true)throw fail(privilege==='VM.PowerMgmt'?'Confirm power management access for the selected VMs and CTs.':'Confirm guest command access for the selected VMs.');
    if(!Array.isArray(input.vmids)||!input.vmids.length||input.vmids.length>20||input.vmids.some(id=>!/^\d+$/.test(String(id))))throw fail('Select between 1 and 20 virtual machines.');
    const ids=[...new Set(input.vmids.map(String))];
    if(typeof input.username!=='string'||!/^\S+@[^\s!]+$/.test(input.username)||input.username.length>128||typeof input.password!=='string'||!input.password||input.password.length>2048||/[\r\n\0]/.test(input.password)||input.otp&&(!/^\d{6,8}$/.test(input.otp)))throw fail('Enter a Proxmox administrator username including its realm, password, and optional numeric OTP.');
    permissionRepairBusy=true;let ticket='',csrf='',changed=false;
-   const tls={rejectUnauthorized:true,...(c.ca?{ca:c.ca}:{})};
+   const tls={rejectUnauthorized:connection.trustedTls,...(c.ca?{ca:c.ca}:{})};
    const bound=()=>{if(bind(config())!==binding)throw fail('The Proxmox connection changed. Reopen the repair window.',409);};
    const admin=async(path,method='GET',body)=>{
     bound();const res=await transport(connection.endpoint+'/api2/json'+path,{method,timeoutMs:15000,headers:{...(ticket?{Cookie:'PVEAuthCookie='+encodeURIComponent(ticket),CSRFPreventionToken:csrf}:{}),...(body?{'Content-Type':'application/x-www-form-urlencoded'}:{})},...(body?{body:new URLSearchParams(body).toString()}:{})},tls);

@@ -45,7 +45,7 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
  .modal.modal .vm-create-review>div{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
 }
 .content.content .network-container-addresses div{min-inline-size:0;flex-wrap:wrap;white-space:normal}
-.modal.modal .modal-head{position:sticky;top:0;z-index:2;background:inherit;padding-block:4px}
+.modal.modal .modal-head{position:static;z-index:auto;background:inherit;padding-block:4px}
 .header-notification-panel.header-notification-panel{overflow-y:auto;overscroll-behavior:contain}
 @media(max-height:480px){.header-notification-panel .header-notification-scroll{flex-shrink:0;overflow:visible}}
 .login-page.login-page,.login-page .login-card{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}

@@ -163,7 +163,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/connections/proxmox/verify',authorize('owner'),async(req,res)=>{const config=clusterConfig();if(!config.url)return res.json({status:'not-configured',message:'No Proxmox API connection configured.'});try{const resources=await pve('/cluster/resources',{},config);if(!Array.isArray(resources))throw new Error();res.json({status:'reachable',nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))});}catch{res.json({status:'error',message:'Cannot read Proxmox resources. Check token permissions, endpoint and TLS trust.'});}});
  app.get('/api/connections/proxmox',authorize('owner'),(req,res)=>res.json({cluster:publicCluster(clusterConfig())}));
  const testCluster=async input=>{
-   const config=validateCluster(input);
+   const config=validateCluster(input,clusterConfig());
    try{const resources=await pve('/cluster/resources',{},config);
      if(!Array.isArray(resources))throw new Error('Unexpected Proxmox response.');
      return {config,nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))};

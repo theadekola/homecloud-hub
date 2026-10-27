@@ -9,8 +9,6 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  const {data:session}=useApi<any>('/auth/me',null);
  const owner=session?.user?.role==='owner';
  const [powerSetup,setPowerSetup]=useState(false),[accessProfile,setAccessProfile]=useState<'power'|'monitor'>('power');
- const [copyMessage,setCopyMessage]=useState('');
- const copyCaCommand=async()=>{try{await navigator.clipboard.writeText('cat /etc/pve/pve-root-ca.pem');setCopyMessage('Command copied.');}catch{setCopyMessage('Select and copy the command below.');}};
  const [open,setOpen]=useState(false),[cluster,setCluster]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[nodes,setNodes]=useState<any[]>([]),[success,setSuccess]=useState('');
  const close=()=>{if(busy)return;setOpen(false);if(success){setSuccess('');onConnected?.();window.dispatchEvent(new Event('iclusters-connection'));onSaved?.()}};
  const load=async()=>{setBusy(true);setError('');try{const response:any=await api('/connections/proxmox');setCluster(response.cluster);setNodes([]);setMessage('');setSuccess('');setOpen(true);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
@@ -19,7 +17,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  const submit=async(event:any)=>{
   event.preventDefault();setBusy(true);setError('');setMessage('');setNodes([]);
   const form=event.currentTarget,values=new FormData(form),test=event.nativeEvent.submitter?.value==='test';
-  const body={name:values.get('name'),host:values.get('host'),port:Number(values.get('port')),tokenId:values.get('tokenId'),tokenSecret:values.get('tokenSecret'),verifyTls:values.get('verifyTls')==='on',ca:values.get('ca')};
+  const body={name:values.get('name'),host:values.get('host'),port:Number(values.get('port')),tokenId:values.get('tokenId'),tokenSecret:values.get('tokenSecret'),verifyTls:values.get('verifyTls')==='on',ca:String(values.get('ca')||'').trim()||undefined};
   try{const result:any=await api(`/connections/proxmox${test?'/test':''}`,{method:test?'POST':'PUT',body:JSON.stringify(body)});
    setNodes(result.nodes);setMessage(`${test?'Connection verified':'Cluster saved'}. ${result.nodes.length} node(s) discovered.`);
    if(!test){form.reset();if(accessProfile==='power'){setOpen(false);setMessage('Proxmox connection saved. Complete power permission setup to enable VM and CT start, shutdown and reboot.');setPowerSetup(true)}else setSuccess(`Proxmox connection successful. ${result.nodes.length} node(s) discovered.`);}
@@ -37,20 +35,11 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  <label>API token ID<input name="tokenId" required defaultValue={cluster?.tokenId||''} placeholder="iclusters@pve!hub"/><small>Assign PVEAuditor at / with Propagate enabled to the user and, with Privilege Separation, to this token. Power permissions can be configured in the next step.</small></label>
  <label className="cluster-wide">API token secret<input name="tokenSecret" type="password" autoComplete="new-password" required placeholder="Enter token secret"/><small>Secrets are never returned to your browser. Re-enter the secret when editing.</small></label>
  <label className="cluster-wide">Connection access<select aria-label="Proxmox connection access" value={accessProfile} onChange={e=>setAccessProfile(e.target.value as 'power'|'monitor')}><option value="power">Monitoring and VM / CT power management</option><option value="monitor">Monitoring only</option></select><small>Power setup checks the saved token, then lets you grant VM.PowerMgmt to selected VMs and CTs with a Proxmox administrator account. Existing access is preserved; credentials are not saved. New guests can be configured later through Add / Edit Cluster.</small></label>
- <label className="cluster-toggle cluster-wide"><input name="verifyTls" type="checkbox" defaultChecked={cluster?.verifyTls!==false}/><ShieldCheck size={18}/> Verify SSL certificate</label>
- <label className="cluster-wide">Private CA certificate (optional)<textarea name="ca" rows={4} placeholder="-----BEGIN CERTIFICATE-----"/><small>{cluster?.hasCa?'A CA is already saved. Paste it again when saving edits.':'Paste the public PEM CA certificate if your cluster uses a private certificate authority.'}</small></label>
- <details className="cluster-wide cluster-ca-help">
- <summary>How to get your Proxmox CA certificate</summary>
- <ol>
- <li>In Proxmox, select your node, then open <strong>Shell</strong>.</li>
- <li>Run this command on the <strong>Proxmox node</strong>, not the i-Clusters Ubuntu VM:
- <div className="ca-command"><code>cat /etc/pve/pve-root-ca.pem</code><button type="button" className="btn secondary" onClick={copyCaCommand}>Copy command</button></div>
- {copyMessage&&<small role="status">{copyMessage}</small>}</li>
- <li>Copy the entire output, including <code>-----BEGIN CERTIFICATE-----</code> and <code>-----END CERTIFICATE-----</code>.</li>
- <li>Paste it into the <strong>Private CA certificate</strong> field above. Keep <strong>Verify SSL certificate</strong> checked.</li>
- <li>Click <strong>Test Connection</strong>, then <strong>Save &amp; Load Cluster</strong>.</li>
- </ol>
- <p>This applies to the default Proxmox cluster CA. A certificate from a trusted public authority usually needs no CA pasted here. The host must match the certificate's hostname or IP address.</p>
+ <p className="cluster-wide muted">No CA upload is required for the default self-signed certificate connection. HTTPS encrypts traffic; server identity verification is optional under Advanced certificate settings.</p>
+ <details className="cluster-wide cluster-ca-help"><summary>Advanced certificate settings (optional)</summary>
+ <label className="cluster-toggle"><input name="verifyTls" type="checkbox" defaultChecked={cluster?.verifyTls===true}/><ShieldCheck size={18}/> Verify server certificate</label>
+ <p>Enable verification for a trusted public certificate or your private CA. Leaving it off accepts self-signed certificates without checking server identity. This setting also applies during permission setup.</p>
+ <label>Private CA certificate (optional)<textarea name="ca" rows={4} placeholder="-----BEGIN CERTIFICATE-----"/><small>{cluster?.hasCa?'A CA is already saved. Leave blank to keep it for the same host and port.':'Only needed with verification enabled if your certificate uses a private CA.'}</small></label>
  </details>
  <details className="cluster-wide cluster-ca-help"><summary>What loads automatically with this token?</summary><p>i-Clusters discovers permitted nodes, VMs, CTs, Proxmox storage, node networks, tasks and services. PVEAuditor at / with Propagate provides cluster read access. Privilege-separated tokens need their own ACL in addition to the user ACL.</p><p>Docker images, volumes, networks and Compose applications inside a VM or CT are guest resources. A cluster read token does not expose them. VM application inventory also requires the QEMU guest agent and permission to execute the fixed inventory command. Complete Docker management requires its Engine connection.</p></details><p className="muted cluster-wide">Connection details are encrypted on the server. A successful test confirms API access; the power management option continues to permission verification after saving.</p>
  {error&&<p role="alert" className="login-error cluster-wide">{error}</p>}{message&&<p role="status" className="cluster-wide">{message}</p>}

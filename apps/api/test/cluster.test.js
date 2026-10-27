@@ -42,9 +42,20 @@ await test('owner can test and save a live cluster, secrets stay hidden and fail
   assert.equal((await call('PUT',config,'','admin')).status,403);assert.equal(calls,0);
   assert.equal((await call('POST',config,'/test')).body.nodes.length,2);assert.equal(clusterStore.read(),null);
   assert.equal((await call('PUT',config)).status,200);assert.equal(invalidated,1);
+  assert.equal((await call('POST',{...config,ca:undefined},'/test')).status,200);
+  assert.equal((await call('POST',{...config,ca:'',verifyTls:false},'/test')).status,200);
   const read=await call('GET');assert.equal(read.body.cluster.name,'Lab');assert.ok(!JSON.stringify(read).includes(input.tokenSecret));assert.ok(!JSON.stringify(read).includes(ca));
   assert.equal((await proxmoxSnapshot()).nodes.length,2);
   assert.equal((await call('PUT',{...config,tokenSecret:'wrong'})).status,502);assert.equal(clusterStore.read().tokenSecret,input.tokenSecret);
   assert.ok(!JSON.stringify(audits).includes(input.tokenSecret));assert.equal((await call('DELETE')).status,200);assert.equal(clusterStore.read(),null);
  }finally{await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>upstream.close(resolve));}
+});
+
+await test('saved CA is reused only for the same endpoint and can be explicitly cleared',()=>{
+ const ca='-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----',saved=validateCluster({...input,ca});
+ assert.equal(validateCluster({...input,ca:undefined},saved).ca,ca);
+ assert.equal(validateCluster({...input,ca:undefined,host:'other.example'},saved).ca,'');
+ assert.equal(validateCluster({...input,ca:undefined,port:8007},saved).ca,'');
+ assert.equal(validateCluster({...input,ca:''},saved).ca,'');
+ assert.equal(validateCluster({...input,verifyTls:false,ca:''}).verifyTls,false);
 });

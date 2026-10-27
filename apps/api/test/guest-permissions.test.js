@@ -13,7 +13,7 @@ function fixture(options={}){
   const u=new URL('https://pve.example'+path),target=u.searchParams.get('path');return {[target]:options.verifyFail?{'VM.Audit':1}:effective(options.privsep===false?'iclusters@pve':'iclusters@pve!reader',target)};
  };
  const transport=async(url,init,tls)=>{
-  assert.equal(new URL(url).origin,new URL(config.url).origin);assert.equal(tls.rejectUnauthorized,true);assert.equal(tls.ca,config.ca);const u=new URL(url),path=u.pathname.replace('/api2/json',''),form=Object.fromEntries(new URLSearchParams(init.body));calls.push({path,method:init.method,form,headers:init.headers});
+  assert.equal(new URL(url).origin,new URL(config.url).origin);assert.equal(tls.rejectUnauthorized,config.verifyTls!==false);assert.equal(tls.ca,config.ca);const u=new URL(url),path=u.pathname.replace('/api2/json',''),form=Object.fromEntries(new URLSearchParams(init.body));calls.push({path,method:init.method,form,headers:init.headers});
   if(path==='/access/ticket'){assert.equal(form.username,'root@pam');assert.equal(form.password,'fresh password');if(options.authFail)return response({},401);if(options.tfa)return response({NeedTFA:1,ticket:'PVE:!tfa!challenge',CSRFPreventionToken:'csrf'});return response({ticket:'ticket',CSRFPreventionToken:'csrf'});}
   assert.equal(init.headers.Cookie,'PVEAuthCookie=ticket');assert.equal(init.headers.CSRFPreventionToken,'csrf');
   if(options.failWrite&&init.method==='PUT')return response({},403);
@@ -45,11 +45,11 @@ test('repair updates only selected VM user and separated token ACLs, preserving 
 test('non-separated tokens need only a user grant and token settings stay unchanged',async()=>{
  const f=fixture({privsep:false});assert.equal((await f.service.repair(await f.input())).verified,true);assert.ok(f.acl.every(a=>a.type==='user'));assert.ok(!f.calls.some(c=>c.method==='PUT'&&c.path.includes('/token/')));
 });
-test('untrusted TLS, stale connection, unknown VM, invalid selection and missing consent never send credentials',async()=>{
+test('stale connection, unknown VM, invalid selection and missing consent never send credentials',async()=>{
  for(const extra of [{confirm:false},{vmids:[]},{vmids:['200']},{vmids:['100;reboot']},{connectionId:'stale'},{username:'root'},{otp:'wrong'}]){const f=fixture();const input=await f.input(extra);await assert.rejects(()=>f.service.repair(input));assert.ok(!f.calls.some(c=>c.path==='/access/ticket'));}
 });
 
-test('TLS verification must be enabled before administrator authentication',async()=>{const f=fixture();f.config.verifyTls=false;const input=await f.input();await assert.rejects(()=>f.service.repair(input),{status:409});assert.ok(!f.calls.some(c=>c.path==='/access/ticket'));});
+test('permission setup honors explicitly configured self-signed TLS without requiring a CA',async()=>{const f=fixture({power:true});f.config.verifyTls=false;delete f.config.ca;const input=await f.input();assert.equal((await f.service.repair(input)).verified,true);assert.equal(input.password,'');assert.ok(f.calls.some(c=>c.path==='/access/ticket'));});
 test('bad authentication, MFA challenges, limited administrators, old versions and explicit NoAccess fail before mutations',async()=>{
  for(const options of [{authFail:true},{tfa:true},{limited:true},{version:'8.4'},{noAccess:true}]){const f=fixture(options),input=await f.input();await assert.rejects(()=>f.service.repair(input));assert.equal(input.password,'');assert.ok(!f.calls.some(c=>['POST','PUT'].includes(c.method)&&c.path!=='/access/ticket'));}
 });
@@ -86,7 +86,7 @@ test('real HTTPS repair verifies the configured CA, uses an ephemeral ticket and
  let raw='';for await(const chunk of req)raw+=chunk;seen.push({url:req.url,method:req.method,authorization:req.headers.authorization,cookie:req.headers.cookie,csrf:req.headers.csrfpreventiontoken});
  const path=req.url.replace('/api2/json','');let result;
  if(req.headers.authorization){assert.equal(req.headers.authorization,'PVEAPIToken=iclusters@pve!reader=saved-secret');result=await f.query(path,{},f.config);}else{
- const reply=await f.transport(f.config.url+req.url,{method:req.method,body:raw||undefined,headers:{Cookie:req.headers.cookie,CSRFPreventionToken:req.headers.csrfpreventiontoken}}, {rejectUnauthorized:true,ca:f.config.ca});result=(await reply.json()).data;
+ const reply=await f.transport(f.config.url+req.url,{method:req.method,body:raw||undefined,headers:{Cookie:req.headers.cookie,CSRFPreventionToken:req.headers.csrfpreventiontoken}}, {rejectUnauthorized:f.config.verifyTls!==false,ca:f.config.ca});result=(await reply.json()).data;
  }res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data:result}));
  }catch(error){res.statusCode=500;res.end(JSON.stringify({error:error.message}));}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));f.config.url=`https://127.0.0.1:${server.address().port}`;
@@ -95,6 +95,7 @@ test('real HTTPS repair verifies the configured CA, uses an ephemeral ticket and
  assert.ok(seen.some(r=>r.method==='PUT'&&r.cookie==='PVEAuthCookie=ticket'&&r.csrf==='csrf'));assert.ok(seen.some(r=>r.authorization&&r.url.includes('/access/permissions')));
  const credentialCalls=seen.filter(r=>r.url.includes('/access/ticket')).length;delete f.config.ca;
  const rejected=createGuestPermissionRepair({config:()=>f.config,query:f.query});const untrusted={...await f.input()};await assert.rejects(()=>rejected.repair(untrusted),/TLS trust/);assert.equal(seen.filter(r=>r.url.includes('/access/ticket')).length,credentialCalls);
+ f.config.verifyTls=false;const selfSigned=createGuestPermissionRepair({config:()=>f.config});const inspected=await selfSigned.inspect();assert.equal(inspected.trustedTls,false);assert.equal((await selfSigned.repair({...await f.input(),connectionId:inspected.connectionId,vmids:['101']})).verified,true);
  }finally{server.closeAllConnections();await new Promise(r=>server.close(r));}
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

@@ -1,4 +1,4 @@
-.docker-updates{display:grid;gap:16px;min-width:0}.docker-updates h2{display:flex;align-items:center;gap:10px;margin:0 0 10px}.docker-updates h3{margin:0 0 8px}.docker-updates p{line-height:1.65}.docker-updates code{overflow-wrap:anywhere}.docker-updates .header-actions{margin:16px 0;gap:16px;align-items:center}.docker-updates label{display:flex;align-items:center;gap:8px;font-size:13px}.docker-updates input[type=checkbox]{width:18px;height:18px;accent-color:#6366f1}.docker-update-review{display:grid;gap:16px;min-width:0;line-height:1.65}.docker-update-review p{margin:0}.docker-update-review code{display:block;font-size:12px}.docker-update-review .ssh-save{display:flex;align-items:flex-start;gap:12px}.docker-update-review input{width:18px;height:18px;flex:none}.docker-updates .volume-toolbar>div{min-width:0;flex:1}.docker-updates .btn{white-space:nowrap;word-break:normal}.modal:has(.docker-update-review){max-height:calc(100dvh - 32px);overflow:auto}@media(max-width:600px){.docker-updates .header-actions{align-items:stretch;flex-direction:column}.docker-updates .header-actions>label{justify-content:space-between;min-height:40px}.docker-updates .volume-toolbar{align-items:flex-start}.docker-updates .volume-toolbar>.btn{width:100%}.docker-update-review>.btn{width:100%;min-height:44px}}
+.docker-updates{display:grid;gap:16px;min-width:0}.docker-updates h2{display:flex;align-items:center;gap:10px;margin:0 0 10px}.docker-updates h3{margin:0 0 8px}.docker-updates p{line-height:1.65}.docker-updates code{overflow-wrap:anywhere}.docker-updates .header-actions{margin:16px 0;gap:16px;align-items:center}.docker-updates label{display:flex;align-items:center;gap:8px;font-size:13px}.docker-updates input[type=checkbox]{width:18px;height:18px;accent-color:var(--theme-icon,#6366f1)}.docker-update-review{display:grid;gap:16px;min-width:0;line-height:1.65}.docker-update-review p{margin:0}.docker-update-review code{display:block;font-size:12px}.docker-update-review .ssh-save{display:flex;align-items:flex-start;gap:12px}.docker-update-review input{width:18px;height:18px;flex:none}.docker-updates .volume-toolbar>div{min-width:0;flex:1}.docker-updates .btn{white-space:nowrap;word-break:normal}.modal:has(.docker-update-review){max-height:calc(100dvh - 32px);overflow:auto}@media(max-width:600px){.docker-updates .header-actions{align-items:stretch;flex-direction:column}.docker-updates .header-actions>label{justify-content:space-between;min-height:40px}.docker-updates .volume-toolbar{align-items:flex-start}.docker-updates .volume-toolbar>.btn{width:100%}.docker-update-review>.btn{width:100%;min-height:44px}}
 
 .docker-update-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;min-width:0;align-items:stretch}
 .docker-update-grid>.docker-update-card{display:flex;flex-direction:column;gap:16px;margin:0;min-width:0}
@@ -10,14 +10,14 @@
 @media(max-width:1099px){.docker-update-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:699px){.docker-update-grid{grid-template-columns:minmax(0,1fr)}.docker-update-card .volume-toolbar>.btn{width:auto}}
 
-.docker-install-progress{padding:16px;border:1px solid #355776;border-radius:10px;background:#102439;min-width:0;display:grid;gap:10px}
+.docker-install-progress{padding:16px;border:1px solid var(--theme-border,#355776);border-radius:10px;background:var(--theme-surface,#102439);min-width:0;display:grid;gap:10px}
 .docker-install-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .docker-install-progress-heading b{min-width:0;overflow-wrap:anywhere}
 .docker-install-progress-heading strong{flex:none;font-size:20px;font-variant-numeric:tabular-nums}
-.docker-install-progress progress{width:100%;height:14px;accent-color:#7075ff;border:0;border-radius:7px;overflow:hidden;background:#25374d}
-.docker-install-progress progress::-webkit-progress-bar{background:#25374d;border-radius:7px}
-.docker-install-progress progress::-webkit-progress-value{background:#7075ff;border-radius:7px;transition:width .3s}
-.docker-install-progress progress::-moz-progress-bar{background:#7075ff;border-radius:7px}
+.docker-install-progress progress{width:100%;height:14px;accent-color:var(--theme-icon,#7075ff);border:0;border-radius:7px;overflow:hidden;background:var(--theme-raised,#25374d)}
+.docker-install-progress progress::-webkit-progress-bar{background:var(--theme-raised,#25374d);border-radius:7px}
+.docker-install-progress progress::-webkit-progress-value{background:var(--app-accent,#7075ff);border-radius:7px;transition:width .3s}
+.docker-install-progress progress::-moz-progress-bar{background:var(--app-accent,#7075ff);border-radius:7px}
 .docker-install-progress p{display:flex;align-items:center;gap:8px;font-size:13px}
 .docker-install-progress.failed{border-color:#af5b62}.docker-install-progress.failed progress{accent-color:#d76b78}
 @media(prefers-reduced-motion:reduce){.docker-install-progress .spin{animation:none}.docker-install-progress progress::-webkit-progress-value{transition:none}}

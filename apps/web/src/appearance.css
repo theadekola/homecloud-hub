@@ -39,3 +39,24 @@
 @media(max-width:900px){.appearance-workspace:has(.theme-selector){grid-template-columns:minmax(0,1fr)}}
 :root[data-preset] .pve-page .pve-quick button svg{background:var(--theme-highlight)}
 :root[data-preset] :is(.pve-stat,.metric-card,.storage-stat,.overview-stat){background:var(--theme-raised)!important;border-color:var(--theme-border)!important;color:var(--theme-text)}
+
+/* One palette contract for overlays, legacy components and lazy-loaded views. */
+:root[data-preset]{
+ --theme-surface:var(--app-theme-surface);
+ --surface:var(--theme-surface);--text:var(--theme-text);--muted:var(--theme-muted);--border:var(--theme-border);--input-bg:var(--theme-input);
+ accent-color:var(--app-accent);color:var(--theme-text);background:var(--theme-input);
+}
+:root[data-preset][data-theme="light"]{--theme-surface:color-mix(in srgb,var(--app-accent) 2%,#fff)}
+:root[data-preset] body{color:var(--theme-text)}
+:root[data-preset] :is(button,a,input,select,textarea,[tabindex]):focus-visible{outline-color:var(--app-accent)}
+:root[data-preset] :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--app-accent)}
+/* Neutral chart chrome follows the palette; data series retain distinct colours. */
+:root[data-preset] .recharts-default-tooltip{background:var(--theme-surface)!important;border-color:var(--theme-border)!important;color:var(--theme-text)!important}
+:root[data-preset] .recharts-tooltip-label{color:var(--theme-text)!important}
+:root[data-preset] .recharts-cartesian-axis-tick text{fill:var(--theme-muted)}
+:root[data-preset] .recharts-cartesian-grid line{stroke:var(--theme-border)}
+
+:root[data-preset][data-theme="light"] .login-page{background:radial-gradient(ellipse at 80% 0%,var(--theme-highlight),transparent 65%),#f3f6fb}
+:root[data-preset] .profile-dropdown button{color:var(--theme-text)}
+:root[data-preset] .profile-dropdown button:hover{background:var(--theme-highlight)}
+:root[data-preset] .profile-dropdown small{color:var(--theme-muted)}

@@ -111,3 +111,17 @@ test('rollback does not claim success when Docker accepts restoration but the or
  f.query=async(p,i)=>p==='/containers/'+oldId+'/start'?{}:query(p,i);
  await assert.rejects(()=>installDockerImageUpdate(row,input(),f),/automatic restoration was incomplete/);
 });
+
+test('containers updated before the rename retain their tracked tag and migrate on replacement',async()=>{
+ const prior=structuredClone(container);prior.Config.Image=imageId;prior.Config.Labels['io.homecloud.update.image']=row.image;
+ const f=fixture(),query=f.query;f.query=async(p,i)=>p==='/containers/'+oldId+'/json'?structuredClone(prior):query(p,i);
+ const result=await installDockerImageUpdate(row,{...input(),configDigest:updatePlan(prior,oldImage).binding},f);
+ assert.equal(result.containerId,newId);const created=JSON.parse(f.calls.find(c=>c.p.startsWith('/containers/create')).init.body);
+ assert.equal(created.Labels['io.iclusters.update.image'],row.image);assert.ok(f.calls.some(c=>c.p.startsWith('/images/create?')));
+});
+test('a genuine tracked tag change still blocks installation before pull or replacement',async()=>{
+ const prior=structuredClone(container);prior.Config.Labels['io.homecloud.update.image']=row.image;prior.Config.Labels['io.iclusters.update.image']='nginx:other';
+ const f=fixture(),query=f.query;f.query=async(p,i)=>p==='/containers/'+oldId+'/json'?structuredClone(prior):query(p,i);
+ await assert.rejects(()=>installDockerImageUpdate(row,{...input(),configDigest:updatePlan(prior,oldImage).binding},f),/image reference changed/);
+ assert.ok(!f.calls.some(c=>c.p.startsWith('/images/create?')||c.p.startsWith('/containers/create')||c.p.includes('/stop?')));
+});

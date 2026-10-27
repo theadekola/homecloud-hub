@@ -5,6 +5,8 @@ import {agentContext} from './node-agents.js';
 import {monitoredDocker} from './docker-fleet.js';
 import {get,mutate} from './store.js';
 export const trackedImageLabel='io.iclusters.update.image';
+// Discovery and installation must resolve labels in exactly the same order.
+export const trackedImageReference=(labels,image)=>labels?.[trackedImageLabel]||labels?.['io.homecloud.update.image']||image;
 export const updateDefaults={enabled:true,intervalHours:6};
 export const digestPattern=/^sha256:[a-f0-9]{64}$/;
 const imageReference=/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,254}$/;
@@ -34,7 +36,7 @@ export function registryCheckFailure(error,phase='registry'){
 export async function readUpdateHost(query=docker){
  const [containers,info]=await Promise.all([query('/containers/json?all=1',{timeoutMs:30000}),query('/info',{timeoutMs:30000})]);
  if(!Array.isArray(containers)||!info||Array.isArray(info)||typeof info.Name!=='string')throw Error('Invalid Docker inventory response');
- return {host:{hostname:info.Name,engineId:info.ID},containers:containers.map(c=>({id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:c.Labels?.[trackedImageLabel]||c.Labels?.['io.homecloud.update.image']||c.Image,imageId:c.ImageID}))};
+ return {host:{hostname:info.Name,engineId:info.ID},containers:containers.map(c=>({id:c.Id,name:(c.Names?.[0]||c.Id).replace(/^\//,''),image:trackedImageReference(c.Labels,c.Image),imageId:c.ImageID}))};
 }
 export function createDockerImageUpdates({persistence={get,mutate},query=docker,now=Date.now,notify=async()=>{},sleep=ms=>new Promise(r=>setTimeout(r,ms)),readHost=()=>readUpdateHost(query),scanBudgetMs=120000,inventoryBudgetMs=30000}={}){
  let lastSnapshot=null,lastSignature='',version=0;const pending=new Map(),hostReads=new Map(),hostVersions=new Map(),hostProgress=new Map(),hostRequestedAt=new Map();

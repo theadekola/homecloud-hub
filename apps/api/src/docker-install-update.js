@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import {docker} from './connectors.js';
-import {digestPattern,imageRepository,trackedImageLabel} from './docker-image-updates.js';
+import {digestPattern,imageRepository,trackedImageLabel,trackedImageReference} from './docker-image-updates.js';
 const fail=(message,status=409)=>Object.assign(Error(message),{status});
 const fingerprint=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const locks=new Set();
@@ -52,7 +52,7 @@ export async function installDockerImageUpdate(row,input,{query=docker,hostId=''
   if(input.configDigest!==plan.binding)throw fail('The container configuration changed since review. Reopen the update before installing.');
   onProgress(10,'Checking container dependencies');
   await ensureNoContainerDependents(old,query);
-  const ref=old.Config.Labels?.[trackedImageLabel]||old.Config.Image;if(ref!==row.image)throw fail('The container image reference changed. Recheck updates.');
+  const ref=trackedImageReference(old.Config.Labels,old.Config.Image);if(ref!==row.image)throw fail('The container image reference changed. Recheck updates.');
   const repository=imageRepository(row.image),pin=repository+'@'+row.remoteDigest;
   let pulled;
   try{const cached=await query('/images/'+encodeURIComponent(pin)+'/json',{timeoutMs:15000});if(cached.Id&&(cached.RepoDigests||[]).some(d=>d.endsWith('@'+row.remoteDigest)))pulled=cached}catch(error){if(error.dockerStatus!==404)throw fail('The reviewed local image could not be checked. Check Docker access and retry before replacing the container.',502)}

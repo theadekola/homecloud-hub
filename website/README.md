@@ -16,7 +16,7 @@ Open http://localhost:8080. The page also works under nested static paths becaus
 
 ## Deployment
 
-Publish the contents of this directory as the web root of a static hosting service. No Node server, Proxmox connection, credentials or backend API is needed to run the marketing page. The logo PNG is currently loaded from its canonical public GitHub repository asset; internet access is required for that image.
+Publish the contents of this directory as the web root of a static hosting service. No Node server, Proxmox connection, credentials or backend API is needed to run the marketing page. The logo PNG is bundled locally from the application's existing transparent brand asset.
 
 Once DNS and TLS are configured, serve it from https://www.i-clusters.com, which is the product website already referenced by the application. Keep the marketing host isolated from the self-hosted controller and do not expose management API ports.
 

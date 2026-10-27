@@ -1,0 +1,30 @@
+name: Marketing website checks
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - '.github/workflows/marketing-site.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/marketing-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  website:
+    name: Static site tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check browser script syntax
+        run: node --check website/script.js
+      - name: Check content and responsive contracts
+        run: node --test website/tests/*.test.mjs

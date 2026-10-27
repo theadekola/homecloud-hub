@@ -12,7 +12,7 @@ import {JSDOM} from 'jsdom';
 async function fixture({initialFailure=false}={}){
  const directory=fs.mkdtempSync(path.join(fileURLToPath(new URL('../node_modules/',import.meta.url)),'reconnect-'));
  const dom=new JSDOM('<div id="root"></div>',{url:'https://controller.test'}),original={};
- for(const key of ['window','document','Event','CustomEvent']){original[key]=globalThis[key];globalThis[key]=dom.window[key]}
+ for(const key of ['window','document','sessionStorage','Event','CustomEvent']){original[key]=globalThis[key];globalThis[key]=dom.window[key]}
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;let token='valid',failure=initialFailure,calls=0,cleared=0,retry;
  dom.window.setInterval=fn=>{retry=fn;return 1};dom.window.clearInterval=()=>{retry=null};
  globalThis.__reconnect={token:()=>token,clear:()=>{token='';cleared++},read:async()=>{calls++;if(failure)throw Object.assign(Error('Temporary refresh failure'),{status:failure===401?401:503});return {}}};
@@ -32,4 +32,9 @@ test('transient session refresh failure preserves the mounted page and unsaved w
 });
 test('initial connection failure retries on restored network and confirmed unauthorized session still signs out',async()=>{
  const f=await fixture({initialFailure:true});try{assert.match(f.container.textContent,/Reconnecting automatically/);assert.equal(f.container.querySelector('input'),null);f.setFailure(false);await f.flush(()=>window.dispatchEvent(new Event('online')));assert.ok(f.container.querySelector('input'));f.setFailure(401);await f.signal();await f.flush(()=>window.dispatchEvent(new Event('focus')));assert.match(f.container.textContent,/Sign in/);assert.equal(f.cleared(),1);assert.equal(f.container.querySelector('input'),null)}finally{await f.close()}
+});
+
+
+test('known software update shows a status banner while preserving the mounted page',async()=>{
+ const page=await fixture();try{await page.flush(()=>{sessionStorage.setItem('iclusters_update_started',String(Date.now()));window.dispatchEvent(new Event('iclusters-software-update'))});assert.match(page.container.querySelector('.connection-notice').textContent,/i-Clusters is updating/);assert.equal(page.container.querySelector('.connection-notice').getAttribute('role'),'status');await page.flush(()=>{sessionStorage.removeItem('iclusters_update_started');window.dispatchEvent(new Event('iclusters-software-update'))});assert.equal(page.container.querySelector('.connection-notice'),null);}finally{await page.close()}
 });

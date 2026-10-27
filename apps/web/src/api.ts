@@ -1,3 +1,4 @@
+import {updateAwareError} from './software-update-state';
 import {requestWithDeadline,waitForRequest} from './request-deadline';
 export function setDockerHost(id:string){localStorage.setItem('iclusters_docker_host',id);window.dispatchEvent?.(new Event('iclusters-connection'));}
 import {getAccessToken,getRefreshToken,setTokens,clearTokens,usesCookieSession} from './session';
@@ -16,6 +17,7 @@ function refreshAccessToken(){
 }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, confirmation?: string, rawResponse=false): Promise<T> {
+  try{
   const headers:any = { 'Content-Type': 'application/json', 'X-IClusters-Browser':'1', ...Object.fromEntries(new Headers(options.headers).entries()) };
   const host=localStorage.getItem('iclusters_docker_host');if(host&&!Object.hasOwn(headers,'x-iclusters-docker-host')&&(/^\/(?:docker|actions\/docker)(?:\/|\?|$)|^\/(?:storage|network)(?:\?|$)/.test(path)))headers['X-IClusters-Docker-Host']=host;
   const token=getAccessToken(); if(token) headers.Authorization=`Bearer ${token}`;
@@ -37,6 +39,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}, conf
   }
   if(options.method&&!['GET','HEAD'].includes(options.method.toUpperCase())&&path!=='/node-agents/pairing/status'&&!/^\/(auth|ssh)(?:\/|$)/.test(path))window.dispatchEvent?.(new Event('iclusters-api-write'));
   return body;
+  }catch(error){throw updateAwareError(error)}
 }
 
 export async function confirmedApi<T=any>(path:string, options:RequestInit={},review?:{title?:string;description?:string}):Promise<T>{

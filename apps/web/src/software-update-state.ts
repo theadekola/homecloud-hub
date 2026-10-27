@@ -1,0 +1,5 @@
+const key='iclusters_update_started',maximum=20*60*1000;
+export const updatingMessage='i-Clusters is updating. The server is restarting and will reconnect automatically.';
+export function isSoftwareUpdating(){try{const since=Number(sessionStorage.getItem(key));return since>0&&Date.now()-since<maximum}catch{return false}}
+export function setSoftwareUpdating(active:boolean){const before=isSoftwareUpdating();try{if(active)sessionStorage.setItem(key,String(Date.now()));else sessionStorage.removeItem(key)}catch{}if(before!==active)window.dispatchEvent(new Event('iclusters-software-update'));}
+export function updateAwareError(error:any){if(isSoftwareUpdating()&&(([502,503,504].includes(error?.status)&&(!error?.body?.error||/maintenance is in progress/i.test(error.body.error)))||(!error?.status&&(error instanceof TypeError||/fetch|network|connection|timed out/i.test(error?.message||''))))){const next=new Error(updatingMessage);return Object.assign(next,{status:error.status,updating:true})}return error;}

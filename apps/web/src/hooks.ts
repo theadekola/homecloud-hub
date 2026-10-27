@@ -1,3 +1,4 @@
+import {isSoftwareUpdating} from './software-update-state';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api';
 let interval=30000;
@@ -38,7 +39,7 @@ function load(entry:Resource,force=false,background=false):Promise<void>{
  const controller=new AbortController(),ticket=++entry.generation;let timedOut=false;const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},30000);entry.controller=controller;entry.forced=force&&!background;entry.loading=true;
  const work=(async()=>{
   try{const result=await api(entry.path,{signal:controller.signal,...(force&&!background?{headers:{'X-IClusters-Refresh':'1'}}:{})});if(ticket===entry.generation&&entry.scope===scope()){entry.data=result;entry.hasData=true;entry.updated=Date.now();entry.error='';}}
-  catch(e:any){if(ticket===entry.generation&&(!controller.signal.aborted||timedOut)){entry.error=timedOut?'Report request timed out. Check the connection and use Refresh to retry.':e.message;entry.updated=0;if(e.status===401||e.status===403){entry.hasData=false;entry.data=undefined;}}}
+  catch(e:any){if(ticket===entry.generation&&(!controller.signal.aborted||timedOut)){entry.error=(e.updating||timedOut&&isSoftwareUpdating())?'':timedOut?'Report request timed out. Check the connection and use Refresh to retry.':e.message;entry.updated=0;if(e.status===401||e.status===403){entry.hasData=false;entry.data=undefined;}}}
   finally{window.clearTimeout(timeout);if(ticket===entry.generation){entry.pending=undefined;entry.loading=false;emit(entry);}}
  })();entry.pending=work;emit(entry);return work;
 }

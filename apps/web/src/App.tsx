@@ -1,3 +1,4 @@
+import {isSoftwareUpdating,updatingMessage} from './software-update-state';
 import {startSessionActivity} from './session';
 
 import {useApi} from './hooks';
@@ -22,7 +23,8 @@ const Settings=lazy(()=>import('./pages/Settings'));
 const Shell=lazy(()=>import('./pages/Shell'));
 
 export default function App(){
- const [connectionError,setConnectionError]=useState('');
+ const [connectionError,setConnectionError]=useState(''),[updating,setUpdating]=useState(isSoftwareUpdating);
+ useEffect(()=>{const changed=()=>setUpdating(isSoftwareUpdating());window.addEventListener('iclusters-software-update',changed);const timer=window.setInterval(changed,10000);return()=>{window.removeEventListener('iclusters-software-update',changed);window.clearInterval(timer)}},[]);
  const[authenticated,setAuthenticated]=useState<boolean|null>(null);
  const checking=useRef(false);
  const check=useCallback(async()=>{
@@ -41,7 +43,7 @@ export default function App(){
   window.addEventListener('online',retry);window.addEventListener('focus',retry);document.addEventListener('visibilitychange',visible);
   return()=>{window.clearInterval(timer);window.removeEventListener('online',retry);window.removeEventListener('focus',retry);document.removeEventListener('visibilitychange',visible)};
  },[connectionError,check]);
- const connectionNotice=connectionError&&<div className="connection-notice" role="alert"><p><strong>Connection interrupted. Reconnecting automatically.</strong> {connectionError}</p><button className="btn secondary" onClick={()=>void check()}>Retry connection</button></div>;
+ const connectionNotice=(connectionError||updating)&&<div className="connection-notice" role={updating?'status':'alert'}><p>{updating?<><strong>{updatingMessage}</strong> Previously loaded readings may be out of date.</>:<><strong>Connection interrupted. Reconnecting automatically.</strong> {connectionError}</>}</p><button className="btn secondary" onClick={()=>void check()}>Retry connection</button></div>;
  if(connectionError&&authenticated!==true)return <div className="login-page">{connectionNotice}</div>;
  if(authenticated===null)return <div className="login-page"><div className="muted">Loading i-Clusters…</div></div>;
  if(!authenticated)return <Login onLogin={()=>setAuthenticated(true)}/>;

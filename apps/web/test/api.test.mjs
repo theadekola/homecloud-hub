@@ -121,4 +121,13 @@ try{
   globalThis.fetch=async(url,options)=>{if(url.endsWith('/auth/refresh')){ready();return new Promise(r=>finish=r)}return response(new Headers(options.headers).get('Authorization')==='Bearer new'?200:401,{ok:true})};
   const first=c.api('/storage',{signal:controller.signal}),second=c.api('/docker');await started;controller.abort();await assert.rejects(first,{name:'AbortError'});finish(response(200,{accessToken:'new',refreshToken:'rotated'}));assert.equal((await second).ok,true);
  });
+ await test('known update restarts use a friendly message but ordinary failures remain errors',async()=>{
+  const c=await client();globalThis.fetch=async()=>response(502);
+  await assert.rejects(c.api('/dashboard'),error=>error.status===502&&error.message==='Request failed: 502'&&!error.updating);
+  sessionStorage.setItem('iclusters_update_started',String(Date.now()));
+  await assert.rejects(c.api('/dashboard'),error=>error.status===502&&error.updating===true&&/updating.*reconnect automatically/.test(error.message)&&!error.message.includes('502'));
+  globalThis.fetch=async()=>response(403,{error:'Access denied'});await assert.rejects(c.api('/dashboard'),error=>error.status===403&&error.message==='Access denied'&&!error.updating);
+  globalThis.fetch=async()=>{throw new TypeError('Failed to fetch')};await assert.rejects(c.api('/dashboard'),error=>error.updating===true);
+  sessionStorage.setItem('iclusters_update_started',String(Date.now()-21*60*1000));globalThis.fetch=async()=>response(502);await assert.rejects(c.api('/dashboard'),error=>!error.updating&&error.message==='Request failed: 502');
+ });
 }finally{Object.assign(globalThis,original);}

@@ -1,3 +1,4 @@
+import {createClusterStore} from '../src/cluster-config.js';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 const runtimeDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-runtime-config-'));process.env.DATA_DIR=runtimeDirectory;process.env.JWT_SECRET='a'.repeat(64);process.env.JWT_REFRESH_SECRET='b'.repeat(64);
 const {createConfigurationStore,validateConfiguration,configurationStore}=await import('../src/runtime-configuration.js');const {createNotifier}=await import('../src/notifications.js');test.after(()=>fs.rmSync(runtimeDirectory,{recursive:true,force:true}));
@@ -16,5 +17,18 @@ test('TrueNAS accepts the historical jsonrpc alias and exposes the actual select
   assert.equal(validateConfiguration('truenas',{},env).TRUENAS_API_MODE,'current');assert.equal(validateConfiguration('truenas',{TRUENAS_URL:env.TRUENAS_URL,TRUENAS_API_KEY:'key'}).TRUENAS_API_MODE,'current');
   store.save('truenas',{TRUENAS_API_MODE:'jsonrpc'},env);assert.equal(store.resolve('truenas').TRUENAS_API_MODE,'current');store.save('truenas',{TRUENAS_API_MODE:'legacy'});assert.equal(store.resolve('truenas').TRUENAS_API_MODE,'legacy');
   assert.throws(()=>validateConfiguration('truenas',{...env,TRUENAS_API_MODE:'unsupported'}),/valid API protocol/);
+ }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
+
+test('TrueNAS defaults to no CA upload and preserves legacy CA verification choices',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-nas-cert-'));
+ try{const store=createConfigurationStore(dir,secret),base={TRUENAS_URL:'https://nas.test',TRUENAS_API_KEY:'secret'};
+ assert.equal(validateConfiguration('truenas',base).TRUENAS_VERIFY_TLS,'false');
+ store.save('truenas',base,{});assert.equal(store.resolve('truenas',{}).TRUENAS_VERIFY_TLS,'false');
+ store.save('truenas',{TRUENAS_VERIFY_TLS:'true'},{});assert.equal(store.environment({}).TRUENAS_VERIFY_TLS,'true');
+ const {TRUENAS_VERIFY_TLS:ignored,...legacy}=store.resolve('truenas',{});
+ const encrypted=createClusterStore(path.join(dir,'truenas.json'),secret,v=>v);encrypted.save({values:{...legacy,TRUENAS_CA_PEM:'legacy-ca'}});
+ assert.equal(store.resolve('truenas',{}).TRUENAS_VERIFY_TLS,'true');assert.equal(store.environment({}).TRUENAS_VERIFY_TLS,'true');
+ assert.throws(()=>validateConfiguration('truenas',{...base,TRUENAS_VERIFY_TLS:'nope'}),/Verify server certificate/);
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });

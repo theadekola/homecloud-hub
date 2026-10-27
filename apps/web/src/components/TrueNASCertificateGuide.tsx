@@ -14,7 +14,7 @@ openssl req -x509 -newkey rsa:3072 -sha256 -nodes \\
 export default function TrueNASCertificateGuide(){
  return <details className="truenas-certificate-guide">
   <summary>Set up HTTPS for TrueNAS: certificate instructions</summary>
-  <p>Use these steps if you need a self-signed certificate for a TrueNAS IPv4 address. If your existing trusted certificate already matches your endpoint, keep using it.</p>
+  <p>These optional steps apply only when you enable server certificate verification and need a matching certificate for a TrueNAS IPv4 address. If your existing trusted certificate already matches your endpoint, keep using it.</p>
   <p className="truenas-ip-instruction"><strong>Replace <code>XXXXX</code> in <code>CN=XXXXX</code>, <code>IP:XXXXX</code> and <code>https://XXXXX</code> with your actual TrueNAS IP address.</strong> Keep the <code>IP:</code> prefix in the SAN. Leave the six X characters in <code>iclusters-cert.XXXXXX</code> unchanged; they create a unique temporary folder name.</p>
   <ol>
    <li><h4>Open the TrueNAS shell</h4><p>In TrueNAS, open <strong>System → Shell</strong>, then become root. Run these commands on the TrueNAS system.</p><pre><code>sudo -i</code></pre></li>
@@ -32,6 +32,7 @@ export default function TrueNASCertificateGuide(){
     <tr><td>HTTPS endpoint</td><td><code>https://XXXXX</code>, replacing <code>XXXXX</code> with your actual TrueNAS IP address.</td></tr>
     <tr><td>API key</td><td>Your TrueNAS API key.</td></tr>
     <tr><td>API protocol</td><td><code>current</code> for TrueNAS 25.04 and later.</td></tr>
+    <tr><td>Verify server certificate</td><td>Enabled under Advanced certificate settings.</td></tr>
     <tr><td>Trusted CA certificate (PEM)</td><td>The complete contents of <code>truenas.crt</code> for the self-signed certificate created above.</td></tr>
    </tbody></table></div><p>Click <strong>Test Connection</strong>, then <strong>Save Configuration</strong> once successful. Keep the old <code>truenas_default</code> certificate until the new connection works. Renew the new certificate before its one-year expiry.</p></li>
   </ol>

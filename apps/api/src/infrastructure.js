@@ -4,7 +4,7 @@ import {storageAppliesToNode} from './storage-scope.js';
 import {runtimeEnvironment} from './runtime-configuration.js';
 import {validateBackupSelection} from './backup-validation.js';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
+import {truenasTls} from './truenas-tls.js';
 import WebSocket from 'ws';
 import { pve,request } from './connectors.js';
 
@@ -127,7 +127,7 @@ async function truenasCall(method,params=[],env=runtimeEnvironment(),options={})
   const legacy=env.TRUENAS_API_MODE==='legacy';
   const target=new URL(env.TRUENAS_WS_PATH||(legacy?'/websocket':'/api/current'),base);target.protocol='wss:';
   return new Promise((resolve,reject)=>{
-    const ws=new WebSocket(target,{ca:env.TRUENAS_CA_PEM|| (env.TRUENAS_TLS_CA?fs.readFileSync(env.TRUENAS_TLS_CA):undefined),rejectUnauthorized:true,maxPayload:32*1024*1024});
+    const ws=new WebSocket(target,{...truenasTls(env),maxPayload:32*1024*1024});
     let finished=false;
     const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);ws.close();error?reject(error):resolve(result);};
     const timer=setTimeout(()=>{finish(Object.assign(new Error('TrueNAS request timed out'),{code:'ETIMEDOUT'}));ws.terminate();},options.timeoutMs||Number(process.env.CONNECTOR_TIMEOUT_MS)||15000);

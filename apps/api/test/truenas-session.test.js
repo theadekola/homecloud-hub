@@ -7,7 +7,7 @@ function fixture(handler){const sockets=[],messages=[];class Socket extends Even
 const reply=(socket,message,body)=>socket.emit('message',JSON.stringify({id:message.id,...body}));
 test('a report authenticates once and serializes queries on one TLS-verified session',async()=>{
  const f=fixture((s,m)=>reply(s,m,{result:m.method==='auth.login_with_api_key'?true:[m.method]}));
- const result=await readTrueNASBatch([['system.info'],['pool.query'],['disk.query']],env,{WebSocketImpl:f.Socket});
+ const result=await readTrueNASBatch([['system.info'],['pool.query'],['disk.query']],{...env,TRUENAS_VERIFY_TLS:'true'},{WebSocketImpl:f.Socket});
  assert.equal(f.sockets.length,1);assert.equal(f.messages.filter(m=>m.method==='auth.login_with_api_key').length,1);assert.equal(f.sockets[0].options.rejectUnauthorized,true);
  assert.deepEqual(result.map(r=>r.value),[['system.info'],['pool.query'],['disk.query']]);assert.equal(f.sockets[0].closed,true);
 });

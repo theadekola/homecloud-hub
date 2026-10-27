@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import {truenasTls} from './truenas-tls.js';
 import WebSocket from 'ws';
 // A report authenticates once. Parallel one-request sockets can exhaust provider login/session limits.
 export function readTrueNASBatch(calls,env,{WebSocketImpl=WebSocket,timeoutMs=15000}={}){
@@ -6,7 +6,7 @@ export function readTrueNASBatch(calls,env,{WebSocketImpl=WebSocket,timeoutMs=15
  const base=new URL(env.TRUENAS_URL);if(base.protocol!=='https:')throw Error('TrueNAS requires an HTTPS URL');
  const legacy=env.TRUENAS_API_MODE==='legacy',target=new URL(env.TRUENAS_WS_PATH||(legacy?'/websocket':'/api/current'),base);target.protocol='wss:';
  return new Promise((resolve,reject)=>{
-  const ws=new WebSocketImpl(target,{ca:env.TRUENAS_CA_PEM||(env.TRUENAS_TLS_CA?fs.readFileSync(env.TRUENAS_TLS_CA):undefined),rejectUnauthorized:true,maxPayload:32*1024*1024});
+  const ws=new WebSocketImpl(target,{...truenasTls(env),maxPayload:32*1024*1024});
   let closed=false,authenticated=false,index=0,timer,retried=false;const results=[];
   const finish=error=>{if(closed)return;closed=true;clearTimeout(timer);ws.close();if(error&&!authenticated)return reject(error);if(error)while(results.length<calls.length)results.push({error});resolve(results)};
   const deadline=()=>{clearTimeout(timer);timer=setTimeout(()=>{finish(Object.assign(Error('TrueNAS request timed out'),{code:'ETIMEDOUT'}));ws.terminate()},timeoutMs)};

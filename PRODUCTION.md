@@ -113,8 +113,8 @@ Place the files in `secrets/docker/`. See https://docs.docker.com/engine/securit
 ```env
 TRUENAS_URL=https://YOUR-TRUENAS-HOST
 TRUENAS_API_KEY=YOUR-API-KEY
-TRUENAS_API_MODE=jsonrpc
-TRUENAS_TLS_CA=/run/iclusters/ca/truenas-ca.pem
+TRUENAS_API_MODE=current
+TRUENAS_VERIFY_TLS=false
 ```
 
 JSON-RPC connects over WSS to `/api/current`. For CORE or older SCALE, set `TRUENAS_API_MODE=legacy` to use `/websocket`; override `TRUENAS_WS_PATH` only if your reverse proxy changes the path. Snapshot methods fall back from `pool.snapshot.*` to `zfs.snapshot.*` only when a method is absent. Unsupported API methods and insufficient privileges remain visible. These transports were tested against local protocol fixtures, not every TrueNAS release.
@@ -194,3 +194,9 @@ Browsers and paired nodes must trust Caddy’s local CA. Export it with `sudo do
 ## Release candidate operations
 
 Current publisher attribution: ATT-Tech; developer: The Adekola. Follow the [release policy](docs/release-policy.md), [compatibility scope](docs/compatibility.md), [operations guide](docs/operations.md) and [acceptance checklist](docs/acceptance-checklist.md). Optional MFA is user-controlled under Settings → Security. Use the HTTPS endpoint for Secure browser cookies and screen-awake support. Screen locks are best effort; server-side jobs remain independent.
+
+### TrueNAS certificate options
+
+The connection form requires an HTTPS endpoint, API key and API protocol. New connections accept self-signed certificates without a CA upload. Certificate verification is optional under Advanced certificate settings. With verification off, HTTPS encrypts traffic but does not verify server identity. Enable verification to use the system trust store or an optional private CA. Existing CA-based configurations retain verification unless explicitly changed. The setting applies to individual API requests and batched dashboard reports; it never disables TLS verification for other integrations.
+
+For environment-based verified connections, set `TRUENAS_VERIFY_TLS=true`. If using a private CA, also set `TRUENAS_TLS_CA=/run/iclusters/ca/truenas-ca.pem` to its mounted public certificate file.

@@ -16,7 +16,7 @@ import {recoverDockerUpdate} from './docker-update-recovery.js';
 import {createDockerUpdateProgress} from './docker-update-progress.js';
 import {installDockerImageUpdate,updatePlan,ensureNoContainerDependents} from './docker-install-update.js';
 import {createGuestConnectionReader} from './guest-connections.js';
-import {guestPermissionRepair} from './guest-permissions.js';
+import {guestPermissionRepair,powerPermissionSetup} from './guest-permissions.js';
 import {resetGuestDiscovery} from './guest-discovery.js';
 import {notificationIds} from './notification-channels.js';
 import {buildInfo} from './build-info.js';
@@ -72,7 +72,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,autoConnectorUpdates=automaticConnectorUpdates,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,autoConnectorUpdates=automaticConnectorUpdates,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,powerPermissions=powerPermissionSetup,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
 
  const app=express(),readCache=createReadCache(),reportPerformance=createReportPerformance();
  app.use((req,res,next)=>{const started=performance.now();res.on('finish',()=>{if(req.method==='GET'&&req.route?.path)reportPerformance.record(req.route.path,performance.now()-started,res.statusCode)});next()});
@@ -143,6 +143,14 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
   finally{req.body.password='';req.body.otp='';}
   resetGuestDiscovery();try{await monitor.invalidate();}catch{}
   await audit(req,'connection.proxmox.guest-permissions','proxmox',{vmids:result.vmids,verified:result.verified,changed:result.changed},'success');res.json(result);
+ });
+ app.get('/api/connections/proxmox/power-permissions',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await powerPermissions.inspect());});
+ app.post('/api/connections/proxmox/power-permissions',authorize('owner'),loginLimiter,async(req,res)=>{
+  res.set('Cache-Control','no-store');let result;
+  try{if(!req.secure)throw httpError('Open i-Clusters over HTTPS before entering administrator credentials.');result=await powerPermissions.repair(req.body);}catch(error){req.body.password='';req.body.otp='';await audit(req,'connection.proxmox.power-permissions','proxmox',{vmids:Array.isArray(req.body.vmids)?req.body.vmids.filter(id=>/^\d+$/.test(String(id))).slice(0,20):[]},'failed');throw error;}
+  finally{req.body.password='';req.body.otp='';}
+  resetGuestDiscovery();try{await monitor.invalidate();}catch{}
+  await audit(req,'connection.proxmox.power-permissions','proxmox',{vmids:result.vmids,verified:result.verified,changed:result.changed},'success');res.json(result);
  });
  app.get('/api/connections/docker/verify',authorize('owner'),async(req,res)=>{const config=dockerConfig();if(!config.url)return res.json({configured:false,status:'not-configured',message:'No direct Docker endpoint is configured. Paired-node connections do not require one.'});try{const response=await request(config.url+'/info',{},dockerTlsConfig(config));if(!response.ok)throw new Error();const info=await response.json();if(!info.ServerVersion)throw new Error();res.json({configured:true,status:'reachable',host:{hostname:info.Name,version:info.ServerVersion}});}catch{res.json({configured:true,status:'error',message:'Direct Engine verification failed. Check endpoint reachability, TLS trust and client certificates. No settings were changed.'});}});
  app.get('/api/docker/hosts/:id/verify',authorize('viewer'),async(req,res)=>{const info=await agentContext.run({host:req.params.id},async()=>{if(req.params.id==='direct'){if(!dockerConfig().url)throw httpError('Direct Docker Engine is not configured',503);return agentContext.run({host:''},()=>docker('/info'));}const response=await agentRequest('/info');if(!response.ok)throw httpError('Selected Docker host verification failed',502);return response.json();});if(!info.ServerVersion)throw httpError('Selected host did not report a Docker Engine version',502);res.json({id:req.params.id,host:{hostname:info.Name,version:info.ServerVersion}});});

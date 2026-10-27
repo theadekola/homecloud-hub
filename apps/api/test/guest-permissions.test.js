@@ -4,7 +4,7 @@ import {createGuestPermissionRepair,permissionRoles} from '../src/guest-permissi
 const needed='VM.GuestAgent.Unrestricted';
 function fixture(options={}){
  const config={url:'https://pve.example:8006',tokenId:'iclusters@pve!reader',tokenSecret:'saved-secret',verifyTls:true,ca:'trusted-ca'},calls=[],roles=new Map(),acl=[],base={};
- for(const id of ['100','101'])for(const subject of ['iclusters@pve','iclusters@pve!reader'])base[subject+':/vms/'+id]={'VM.Audit':1,'VM.Backup':0};
+ for(const id of (options.power?['100','101','200']:['100','101']))for(const subject of ['iclusters@pve','iclusters@pve!reader'])base[subject+':/vms/'+id]={'VM.Audit':1,'VM.Backup':0};
  function effective(subject,path){const row={...base[subject+':'+path]};for(const a of acl)if(a.ugid===subject&&a.path===path)for(const p of roles.get(a.roleid)||[])row[p]=Number(a.propagate);if(subject.includes('!')){const user=effective(subject.split('!')[0],path);for(const p of Object.keys(row))if(!Object.hasOwn(user,p))delete row[p];}return row;}
  const response=(data,status=200)=>({ok:status<400,status,json:async()=>({data})});
  const query=async(path,init,c)=>{
@@ -31,7 +31,7 @@ function fixture(options={}){
   if(path==='/access/acl'&&init.method==='PUT'){acl.push({path:form.path,ugid:form.users||form.tokens,type:form.users?'user':'token',roleid:form.roles,propagate:Number(form.propagate)});return response(null);}
   throw Error('Unexpected '+path);
  };
- const service=createGuestPermissionRepair({config:()=>config,query,transport});
+ const service=createGuestPermissionRepair({config:()=>config,query,transport,...(options.power?{privilege:'VM.PowerMgmt',resourceTypes:['qemu','lxc']}:{})});
  const input=async extra=>({username:'root@pam',password:'fresh password',vmids:['100'],confirm:true,connectionId:(await service.inspect()).connectionId,...extra});
  return {service,config,calls,roles,acl,base,effective,input,transport,query};
 }
@@ -130,4 +130,24 @@ test('unavailable permission checks remain visible with a warning instead of dis
  const config={url:'https://pve.example:8006',tokenId:'iclusters@pve!reader',tokenSecret:'saved',verifyTls:true};
  const service=createGuestPermissionRepair({config:()=>config,query:async path=>{if(path.startsWith('/cluster/resources'))return [{vmid:100,name:'Unknown',node:'n1',type:'qemu'},{vmid:101,name:'Verified',node:'n1',type:'qemu'}];if(path.includes('100'))throw Error('Unavailable');return {'/vms/101':{[needed]:0}};}});
  const state=await service.inspect();assert.deepEqual(state.guests.map(g=>g.id),['100']);assert.match(state.guests[0].permissionError,/could not be verified/);assert.equal(state.verifiedCount,1);
+});
+
+
+test('power setup grants only VM.PowerMgmt to selected VMs and CTs for both user and token',async()=>{
+ const f=fixture({power:true}),inspection=await f.service.inspect();assert.equal(inspection.privilege,'VM.PowerMgmt');assert.deepEqual(inspection.guests.map(g=>[g.id,g.kind]),[['100','VM'],['101','VM'],['200','CT']]);
+ const input=await f.input({vmids:['100','200']}),result=await f.service.repair(input);assert.equal(result.verified,true);assert.equal(input.password,'');assert.ok(f.acl.every(a=>['/vms/100','/vms/200'].includes(a.path)));assert.ok(f.acl.some(a=>a.type==='user'));assert.ok(f.acl.some(a=>a.type==='token'));
+ for(const id of ['100','200'])assert.deepEqual(f.effective('iclusters@pve!reader','/vms/'+id),{'VM.Audit':1,'VM.Backup':0,'VM.PowerMgmt':0});assert.equal(f.effective('iclusters@pve!reader','/vms/101')['VM.PowerMgmt'],undefined);assert.ok([...f.roles.values()].flat().every(p=>!['VM.GuestAgent.Unrestricted','Permissions.Modify'].includes(p)));
+ assert.equal((await f.service.inspect()).guests.length,1);assert.equal((await f.service.repair(await f.input({vmids:['100','200']}))).changed,false);
+});
+test('power and discovery setup bindings cannot be exchanged even on the same connection',async()=>{
+ const f=fixture({power:true}),discovery=createGuestPermissionRepair({config:()=>f.config,query:f.query,transport:f.transport}),wrong=(await discovery.inspect()).connectionId;
+ await assert.rejects(f.service.repair(await f.input({connectionId:wrong})),{status:409});assert.equal(f.acl.length,0);
+});
+test('power setup HTTP routes require owner, trusted transport and explicit verified service results',async()=>{
+ process.env.JWT_SECRET||='a'.repeat(64);process.env.JWT_REFRESH_SECRET||='b'.repeat(64);const {createApp}=await import('../src/app.js');let writes=0;const audits=[];
+ const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:req.headers['x-role']||'viewer'};next()},powerPermissions:{inspect:async()=>({guests:[],privilege:'VM.PowerMgmt'}),repair:async body=>{writes++;assert.equal(body.password,'fresh');return {verified:true,vmids:['200'],changed:true}}},audit:async(req,...args)=>{assert.equal(req.body.password,'');audits.push(args)},monitor:{invalidate:async()=>{}}});app.set('trust proxy',1);const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const url=`http://127.0.0.1:${server.address().port}/api/connections/proxmox/power-permissions`;
+ try{for(const role of ['viewer','operator','admin'])for(const method of ['GET','POST']){const r=await fetch(url,{method,headers:{'x-role':role,'Content-Type':'application/json'},...(method==='POST'?{body:'{}'}:{})});assert.equal(r.status,403)}
+ const insecure=await fetch(url,{method:'POST',headers:{'x-role':'owner','Content-Type':'application/json'},body:'{"password":"fresh"}'});assert.equal(insecure.status,400);assert.equal(writes,0);
+ const r=await fetch(url,{method:'POST',headers:{'x-role':'owner','Content-Type':'application/json','X-Forwarded-Proto':'https'},body:'{"password":"fresh","vmids":["200"]}'});assert.equal(r.status,200);assert.equal(writes,1);assert.ok(!JSON.stringify(audits).includes('fresh'));assert.ok(JSON.stringify(audits).includes('connection.proxmox.power-permissions'));
+ }finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
 });

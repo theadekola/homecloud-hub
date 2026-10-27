@@ -1,0 +1,9 @@
+# Connection diagnostics, host selectors and SSH privacy
+
+The previous Proxmox connection check replaced all upstream failures with one generic message. It now reports fixed diagnostics for token rejection, insufficient inventory permissions, certificate trust or hostname failures, DNS, refused or unreachable connections, timeouts, connection resets and unexpected API endpoints. A response with no visible nodes no longer claims successful cluster discovery. No provider error text or credentials are reflected. The screenshot alone cannot establish the live failure cause; deploy and retry Test Connection to obtain its specific diagnostic.
+
+Pairing uses an owner-only, no-store host discovery endpoint. Proxmox offers discovered nodes and known paired nodes. Docker offers discovered VMs/CTs, known paired Docker hosts, and a standalone option that uses the installer hostname. There is no manually entered connection-name field. Selection labels keep node/guest identity distinguishable, with stable selection IDs even for duplicate guest names. Selection does not install software or prove the installer ran on that selected machine; actual pairing and Docker verification still occur on the installer host.
+
+All five shared SSH workflows mask host fingerprints by default with explicit Show/Hide buttons. The fingerprint text is absent from the rendered page while masked. Verification checkboxes and backend host identity checks remain in place. The displayed SHA256 value is a public host fingerprint, not a private SSH key. The separate VM.Config.Options denial shown in the screenshot still requires Proxmox administrator authorization or manually enabling the guest-agent option.
+
+Validation includes API diagnostics and selector inventory fixtures, UI pairing selection, default masking and reveal/hide controls, existing SSH/action regression fixtures, full API/web tests and the production build. No live user cluster or physical mobile browser was accessed.

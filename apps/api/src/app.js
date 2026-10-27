@@ -1,3 +1,5 @@
+import {pairingTargets} from './pairing-targets.js';
+import {proxmoxTestError} from './proxmox-test-error.js';
 import {automaticConnectorUpdates} from './connector-auto-updates.js';
 import {createHistoryCleanup} from './alert-history-cleanup.js';
 import {dashboardHistory} from './dashboard-history.js';
@@ -126,6 +128,7 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/node-agents/:id/update',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({update:connectorUpdates.status(req.params.id)});});
  app.post('/api/node-agents/:id/update',authorize('owner'),async(req,res)=>{const update=connectorUpdates.request(req.params.id,req.body);res.locals.activityStatus='queued';await audit(req,'connector.update',req.params.id,{version:update.version,revision:update.revision},'queued');res.status(202).json({update});});
  app.post('/api/node-agents/:id/maintenance',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');const result=await connectionService.perform(req.params.id,req.body);await audit(req,'connection.'+result.action,req.params.id,{target:result.target,active:result.active},'success');res.json({result});});
+ app.get('/api/node-agents/pairing-targets',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await pairingTargets(req.query.kind));});
  app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{const pairing=createPairing(req.body);await audit(req,'node-agent.pairing','nodes',{},'success');res.set('Cache-Control','no-store');res.json(pairing);});
  app.post('/api/node-agents/pairing/status',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(pairingStatus(req.body.code));});
  app.delete('/api/node-agents/:id',authorize('owner'),async(req,res)=>{revokeAgent(req.params.id);await audit(req,'node-agent.revoke',req.params.id,{},'success');res.json({ok:true});});
@@ -165,9 +168,10 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  const testCluster=async input=>{
    const config=validateCluster(input,clusterConfig());
    try{const resources=await pve('/cluster/resources',{},config);
-     if(!Array.isArray(resources))throw new Error('Unexpected Proxmox response.');
+     if(!Array.isArray(resources))throw Object.assign(new Error(),{invalidResponse:true});
+     if(!resources.some(r=>r.type==='node'))throw Object.assign(new Error(),{noNodes:true});
      return {config,nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))};
-   }catch{throw Object.assign(new Error('Cannot read the cluster. Check the host, API token permissions and TLS certificate.'),{status:502});}
+   }catch(error){throw Object.assign(new Error(proxmoxTestError(error)),{status:502});}
  };
  app.post('/api/connections/proxmox/test',authorize('owner'),async(req,res)=>{const {nodes}=await testCluster(req.body);res.json({ok:true,nodes});});
  app.put('/api/connections/proxmox',authorize('owner'),async(req,res)=>{

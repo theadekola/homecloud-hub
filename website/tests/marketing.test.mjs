@@ -13,11 +13,13 @@ test('marketing site ships as a standalone static page', () => {
   assert.ok(existsSync(resolve(root, 'index.html')));
   assert.ok(existsSync(resolve(root, 'styles.css')));
   assert.ok(existsSync(resolve(root, 'script.js')));
+  assert.ok(existsSync(resolve(root, 'assets/iclusters-192.png')));
   assert.match(html, /<html lang="en">/);
   assert.match(html, /name="viewport"/);
   assert.match(html, /href="\.\/styles\.css"/);
   assert.match(html, /src="\.\/script\.js"/);
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\//);
+  assert.match(html, /src="\.\/assets\/iclusters-192\.png"/);
 });
 
 test('all local navigation targets exist and have no duplicate IDs', () => {

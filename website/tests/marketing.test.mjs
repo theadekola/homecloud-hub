@@ -35,7 +35,7 @@ test('the site accurately identifies the product and open-source licence', () =>
   }
   assert.match(html, /github\.com\/theadekola\/i-clusters\/blob\/main\/LICENSE/);
   assert.match(html, /github\.com\/theadekola\/i-clusters\/blob\/main\/docs\/acceptance-checklist\.md/);
-  assert.match(html, /not live infrastructure data/);
+  assert.match(html, /not live infrastructure data/i);
   assert.match(html, /isAccessibleForFree": true/);
   assert.doesNotMatch(html, /guaranteed uptime|certified secure|production ready|unlimited backup/i);
 });

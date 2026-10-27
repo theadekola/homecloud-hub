@@ -1,3 +1,4 @@
+import {passwordAuthentication} from './ssh-password.js';
 const packageErrors={
  PACKAGE_REPOSITORY_AUTH:'SSH login succeeded, but a configured package repository rejected access (401/403). Check the host repository and subscription settings.',
  PACKAGE_MANAGER_LOCKED:'SSH login succeeded, but another package operation holds the APT/dpkg lock. Let it finish before retrying; do not delete lock files.',
@@ -38,7 +39,7 @@ export function createConnectionActions({persistence={get},nodes=agentNodes,begi
   begin(id);let client,password=input.password;const startedAt=now();
   try{
    client=clientFactory();
-   await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(fail('SSH authentication or host verification failed. Check the address, fingerprint and credentials.',422)));client.connect({host:input.host,port:Number(input.port??22),username:input.username,password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===input.fingerprint});});
+   await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(fail('SSH authentication or host verification failed. Check the address, fingerprint and credentials.',422)));client.connect({host:input.host,port:Number(input.port??22),username:input.username,...passwordAuthentication(client,password),readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===input.fingerprint});});
    const paired=()=>persistence.get().nodeAgents?.some(n=>n.id===id&&n.tokenHash===agent.tokenHash);if(!paired())throw fail('Pairing changed; no action was performed',409);
    const payload=Buffer.from(JSON.stringify({id,tokenHash:agent.tokenHash,action:input.action,target})).toString('base64');
    const result=await run(client,input.username,password,'python3 -c '+quote(remote)+' '+quote(payload),{timeoutMs:input.action==='monitoring-tools'?330000:65000});

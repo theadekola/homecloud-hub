@@ -15,7 +15,8 @@ const upstream=http.createServer(async(req,res)=>{
  let raw='';for await(const chunk of req)raw+=chunk;
  const body=Object.fromEntries(new URLSearchParams(raw));requests.push({path:req.url,method:req.method,body});
  let data;
- if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4,disk:25,maxdisk:100},{type:'lxc',node:'pve',vmid:103,name:'actual-lxc',status:'running',cpu:0.05,mem:1,maxmem:2,disk:4,maxdisk:8,uptime:300},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
+ if(req.method==='POST'&&/^\/api2\/json\/nodes\/pve\/(?:qemu\/101|lxc\/103)\/status\/(?:shutdown|reboot)$/.test(req.url))data='UPID:guest-power';
+ else if(req.url==='/api2/json/cluster/resources')data=[{type:'node',node:'pve',status:'online',cpu:0.42,mem:4,maxmem:8,maxcpu:4,uptime:1000},{type:'qemu',node:'pve',vmid:101,name:'actual-guest',status:'running',cpu:0.1,mem:2,maxmem:4,disk:25,maxdisk:100},{type:'lxc',node:'pve',vmid:103,name:'actual-lxc',status:'running',cpu:0.05,mem:1,maxmem:2,disk:4,maxdisk:8,uptime:300},{type:'storage',id:'storage/pve/backup',node:'pve',storage:'backup',status:'available',disk:50,maxdisk:100}];
  else if(req.url.startsWith('/api2/json/nodes/pve/tasks?'))data=[{upid:'running-task',node:'pve',type:'vzdump',status:'RUNNING',starttime:Math.floor(Date.now()/1000)}];
  else if(req.url==='/api2/json/nodes/pve/tasks/running-task/status')data={status:'running'};
  else if(req.url==='/api2/json/nodes/pve/tasks/running-task'&&req.method==='DELETE')data=null;
@@ -86,6 +87,13 @@ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('l
 const url=`http://127.0.0.1:${server.address().port}`;
 async function call(endpoint,method='GET',body,headers={}){if(headers['X-IClusters-Confirm']){const approval=await resolveActionApproval(endpoint,body,method);const legacy=/^\/proxmox\/node\//.test(endpoint)?`node:${endpoint.split('/')[3]}`:null;if(approval||legacy)headers={...headers,'X-IClusters-SSH-Grant':issueGrant('user',method,endpoint,body,approval?.scope||legacy)};}const response=await fetch(`${url}/api${endpoint}`,{method,headers:{'Content-Type':'application/json',...headers},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 try{
+ await test('VM and CT shutdown/reboot require node approval and reach the exact provider status endpoint',async()=>{
+  for(const [kind,providerKind,id] of [['vm','qemu','101'],['lxc','lxc','103']])for(const operation of ['shutdown','reboot']){
+   const endpoint=`/actions/proxmox/${kind}/${id}/${operation}`,body={node:'pve'},before=requests.length;
+   const challenge=await call(endpoint,'POST',body);assert.equal(challenge.status,409);assert.equal(challenge.body.sshTarget,'node:pve');assert.equal(requests.length,before);
+   const result=await call(endpoint,'POST',body,{'X-IClusters-Confirm':challenge.body.confirmationPhrase});assert.equal(result.status,200);assert.equal(result.body.result.task,'UPID:guest-power');assert.equal(requests.at(-1).path,`/api2/json/nodes/pve/${providerKind}/${id}/status/${operation}`);assert.equal(requests.at(-1).method,'POST');
+  }
+ });
  await test('guest installation requires owner and confirmation bound to the guest payload',async()=>{
   const endpoint='/node-agents/guest/setup',body={host:'fixture:lxc/131'};
   assert.equal((await call(endpoint,'POST',body,{'x-test-role':'viewer'})).status,403);

@@ -1,3 +1,4 @@
+import {passwordAuthentication} from './ssh-password.js';
 import {Client} from 'ssh2';
 import crypto from 'node:crypto';
 import {readFileSync} from 'node:fs';
@@ -77,7 +78,7 @@ export async function bootstrapGuest(input,{query=pve,clientFactory=()=>new Clie
  const identity=`${node}:${vmid}`;if(active.has(identity))throw failure('Setup is already running for this VM',409);
  const client=clientFactory();active.add(identity);
  try{
-  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(failure('SSH authentication, connection or host fingerprint verification failed',422)));client.connect({host,port,username,password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===fingerprint});});
+  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(failure('SSH authentication, connection or host fingerprint verification failed',422)));client.connect({host,port,username,...passwordAuthentication(client,password),readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===fingerprint});});
   bootstrapIdentity(config,await run(client,username,password,preflight,30000));
   // Revalidate placement immediately before enabling configuration, with optimistic concurrency.
   await assertGuestPlacement(node,vmid,'qemu',query);

@@ -1,0 +1,16 @@
+/* SSH credentials stay in paired rows even inside mobile modal layouts. */
+.modal.modal .ssh-dialog-row.ssh-dialog-row{display:grid;grid-column:1/-1;gap:12px;min-width:0;width:100%;align-items:start}
+.modal.modal .ssh-address-row.ssh-address-row{grid-template-columns:minmax(0,1fr) minmax(76px,100px)}
+.modal.modal .ssh-credentials-row.ssh-credentials-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ssh-dialog-row>label,.ssh-dialog-row input,.ssh-dialog-row .ssh-password{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+.ssh-dialog-row>label{display:flex;flex-direction:column;gap:6px;margin:0}
+.ssh-dialog-row input:not([type=checkbox]){min-height:44px}
+.ssh-dialog-row input[type=checkbox]{width:auto}
+.ssh-dialog-row .ssh-password{display:flex;gap:5px}
+.ssh-dialog-row .ssh-password .icon-btn{flex:none;width:38px;min-width:38px}
+.ssh-dialog-footer{grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;border-top:1px solid var(--theme-border)}
+.ssh-dialog-footer .btn{min-height:44px;min-width:130px}
+.ssh-target-label{overflow-wrap:anywhere}
+.ssh-fingerprint{background:var(--theme-input);color:var(--theme-text)}
+.ssh-fingerprint code{white-space:normal;word-break:break-all}
+@media(max-width:480px){.modal.modal .ssh-dialog-row.ssh-dialog-row{gap:8px}.ssh-dialog-row>label{font-size:12px}.ssh-dialog-row input:not([type=checkbox]){font-size:16px;padding:9px 8px}.ssh-dialog-footer .btn{width:100%}}

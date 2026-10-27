@@ -1,0 +1,9 @@
+# SSH dialogs and guest power actions, 27 October 2026
+
+The shared SSH login/approval popup now places host/IP and port in one row, and username/password in another. The disabled Authentication Method selector is removed. Confirm/Connect/Save appears below the SSH fingerprint verification section, with login errors beside that action area. Guest power approvals identify the VM or CT separately from the node used for SSH authentication. Matching paired rows are also applied to container approvals, connector updates, connection maintenance and guest installation. The shared stylesheet preserves both pairs on mobile.
+
+The reported screenshot shows SSH authentication failing before the Proxmox power request is submitted. VM and CT lifecycle requests correctly authenticate against their Proxmox node, not the guest. A fresh password for a root or sudo-capable node account remains required.
+
+The backend previously offered only the SSH password authentication method. All four JavaScript SSH clients now also support password-only PAM keyboard-interactive authentication using the same username/password fields. Only a single hidden password prompt receives the password; OTP, token, recovery and multiple-prompt challenges do not. Host fingerprint verification, fresh-password action approval, sudo checks and single-use payload-bound grants remain in place.
+
+Validation includes a real local SSH test server accepting only PAM keyboard-interactive password authentication, exact one-time approvals for VM/CT shutdown and reboot, and fixture HTTP integration checks showing that those actions challenge before execution and submit to the correct Proxmox qemu/lxc status endpoint. UI regression tests check paired controls, absence of the selector, guest identity and footer ordering. Actual power operations and SSH login on the user's installation are not verified by these fixtures.

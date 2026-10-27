@@ -1,3 +1,4 @@
+import {passwordAuthentication} from './ssh-password.js';
 import {deflateSync} from 'node:zlib';
 import {Client} from 'ssh2';
 import crypto from 'node:crypto';
@@ -21,7 +22,7 @@ export function createConnectorUpdater({persistence={get,mutate},nodes=agentNode
  const fresh=(id,job)=>nodes().some(n=>n.id===id&&n.online&&n.version===job.version&&n.revision===job.revision&&Date.parse(n.lastSeen)>=Date.parse(job.startedAt));
  function status(id){registered(id);const job=persistence.get().connectorUpdates?.[id];if(!job)return null;if(['verifying','unverified'].includes(job.state)&&fresh(id,job)){write(id,{state:'completed',message:'Connector updated and fresh heartbeat verified.',finishedAt:new Date(now()).toISOString()});return persistence.get().connectorUpdates[id];}if(!running.has(id)&&['connecting','installing','verifying'].includes(job.state))return {...job,state:'unverified',message:'Update tracking was interrupted. Check the connector heartbeat and service before retrying.'};return job;}
  async function perform(agent,input){const client=clientFactory();try{
-  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(fail('SSH authentication or host verification failed. Check the address, fingerprint and password.',422)));client.connect({host:input.host,port:input.port,username:input.username,password:input.password,readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===input.fingerprint});});
+  await new Promise((resolve,reject)=>{client.once('ready',resolve);client.once('error',()=>reject(fail('SSH authentication or host verification failed. Check the address, fingerprint and password.',422)));client.connect({host:input.host,port:input.port,username:input.username,...passwordAuthentication(client,input.password),readyTimeout:12000,keepaliveInterval:10000,hostVerifier:key=>'SHA256:'+crypto.createHash('sha256').update(key).digest('base64').replace(/=+$/,'')===input.fingerprint});});
   if(!(persistence.get().nodeAgents||[]).some(n=>n.id===agent.id&&n.tokenHash===agent.tokenHash))throw fail('Connector pairing changed; no update was performed',409);
   write(agent.id,{state:'installing',message:'Verifying pairing and replacing only the connector script.'});
   const payload=deflateSync(Buffer.from(JSON.stringify({id:agent.id,tokenHash:agent.tokenHash,...connectorRelease,sourceEncoding:'utf8',source:connectorSource})),{level:9}).toString('base64');

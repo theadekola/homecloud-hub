@@ -24,3 +24,11 @@ test('shell input rejects oversized or malformed requests without writing and ac
  for(const input of ['x'.repeat(8193),42,null])assert.throws(()=>writeShellInput(session,input),e=>e.status===400);
  assert.throws(()=>writeShellInput({...session,closed:true},'input'),e=>e.status===409);assert.deepEqual(writes,[]);writeShellInput(session,undefined);writeShellInput(session,'x'.repeat(8192));assert.equal(writes[0].length,8192);
 });
+
+test('PAM password login approves exact VM and CT power actions without requiring guest SSH',async()=>{
+ const {privateKey}=crypto.generateKeyPairSync('rsa',{modulusLength:2048});const key=privateKey.export({type:'pkcs1',format:'pem'});const clients=[];
+ const server=new Server({hostKeys:[key]},client=>{clients.push(client);client.on('error',()=>{});client.on('authentication',ctx=>{if(ctx.method!=='keyboard-interactive')return ctx.reject(['keyboard-interactive']);ctx.prompt([{prompt:'Password: ',echo:false}],answers=>ctx.username==='root'&&answers[0]==='correct'?ctx.accept():ctx.reject(['keyboard-interactive']));});client.on('ready',()=>client.on('session',accept=>accept().on('exec',(accept,reject,info)=>{if(info.command!=='/usr/bin/id -u')return reject();const stream=accept();stream.write('0\n');stream.exit(0);stream.end()})));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const fingerprint='SHA256:'+crypto.createHash('sha256').update((await import('ssh2')).default.utils.parseKey(key).getPublicSSH()).digest('base64').replace(/=+$/,'');
+ try{for(const kind of ['vm','lxc'])for(const action of ['shutdown','reboot']){const path=`/actions/proxmox/${kind}/101/${action}`,body={node:'pve'};const result=await connectSSH({host:'127.0.0.1',port:server.address().port,username:'root',password:'correct',fingerprint,target:'node:pve',mode:'authorize',path,method:'POST',body},'alice');assert.ok(result.token);assert.equal(consumeGrant(result.token,'alice','POST',path,body),true);assert.equal(consumeGrant(result.token,'alice','POST',path,body),false);}}
+ finally{for(const client of clients)client.end();await new Promise(r=>server.close(r))}
+});

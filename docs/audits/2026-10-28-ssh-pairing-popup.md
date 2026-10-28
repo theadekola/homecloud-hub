@@ -1,0 +1,7 @@
+# Separate automatic SSH pairing popup
+
+Clicking Connect Automatically with SSH for a discovered Docker guest or Proxmox node now opens a dedicated, titled SSH setup modal. The modal is portalled to the document body, so it does not extend or inherit the scroll position of the underlying host-selection dialog. Its form retains host-key verification, explicit installation approval, progress reporting and completion behavior.
+
+Closing, Escape or Back to host selection returns to the existing selected host. Dismounting the SSH form clears entered credentials, and reopening starts with a blank password. Focus explicitly returns to the automatic SSH button, including browsers that blur it when disabled. While installation is active, the close button, Escape and backdrop dismissal are disabled consistently.
+
+Validation: 611 web tests passed, followed by focused popup/focus/dismissal tests after the browser-specific focus correction. Production TypeScript/Vite build and whitespace checks passed. HTTPS fixture browser checks at desktop and mobile sizes verified distinct dialog titles, body-level portal placement, unchanged parent dialog height, no inline SSH form, closing only the top dialog, retained selection, focus restoration and cleared passwords on reopening. Other connection/AI setup flows also passed in the browser audit. Mobile SSH popup screenshots were visually inspected. No connector installations or live infrastructure changes were performed.

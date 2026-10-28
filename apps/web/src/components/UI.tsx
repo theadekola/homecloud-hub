@@ -25,8 +25,8 @@ export function Button({children,onClick,variant='primary',disabled=false}:{chil
   return <button className={`btn ${variant}`} onClick={onClick} disabled={disabled}>{children}</button>
 }
 
-export function Modal({open,onClose,title,children,success}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode;success?:string}) {
-  const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=onClose;
+export function Modal({open,onClose,title,children,success,closeDisabled=false}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode;success?:string;closeDisabled?:boolean}) {
+  const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=()=>{if(!closeDisabled)onClose()};
   useEffect(()=>{
     if(!open)return;
     const previous=document.activeElement as HTMLElement|null,unlock=lockPageScroll();
@@ -40,8 +40,8 @@ export function Modal({open,onClose,title,children,success}:{open:boolean;onClos
     return()=>{document.removeEventListener('keydown',key);unlock();if(previous?.isConnected)previous.focus({preventScroll:true});};
   },[open]);
   if(!open) return null;
-  return <div className="modal-backdrop" onMouseDown={onClose}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>
-    <div className="modal-head"><h3 id={titleId}>{title}</h3><button type="button" className="icon-btn" aria-label="Close dialog" onClick={onClose}><X size={18}/></button></div>{success?<ConnectionSuccess message={success} onDone={onClose}/>:children}
+  return <div className="modal-backdrop" onMouseDown={()=>close.current()}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>
+    <div className="modal-head"><h3 id={titleId}>{title}</h3><button type="button" className="icon-btn" aria-label="Close dialog" disabled={closeDisabled} onClick={()=>close.current()}><X size={18}/></button></div>{success?<ConnectionSuccess message={success} onDone={()=>close.current()}/>:children}
   </div></div>
 }
 

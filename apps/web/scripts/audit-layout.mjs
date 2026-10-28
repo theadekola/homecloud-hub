@@ -1,4 +1,4 @@
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,readFileSync} from 'node:fs';
 /** Read-only browser audit using fixture APIs. Install Playwright + Chromium to run:
  * node scripts/audit-layout.mjs
  * PLAYWRIGHT_MODULE and CHROMIUM_EXECUTABLE may point to an existing test runtime.
@@ -8,6 +8,9 @@ import {createServer} from 'vite';
 import {fileURLToPath} from 'node:url';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=fileURLToPath(new URL('../',import.meta.url));
+const aiMetadata=process.env.LAYOUT_CONNECTION_CHOICES?(await import('../../api/src/ai-providers.js')).publicAIProviders():null;
+const aiSchema=process.env.LAYOUT_CONNECTION_CHOICES?(await import('../../api/src/runtime-configuration.js')).configurationSchemas.ai:null;
+let aiFixture=aiSchema?{id:'ai',name:'AI Assistant',disabled:true,providers:aiMetadata,fields:aiSchema.fields.map(f=>({...f,value:f.defaultValue||'',hasValue:false}))}:null;
 const now=new Date().toISOString();
 const guests=Array.from({length:8},(_,i)=>({id:100+i,vmid:100+i,name:['Control-VM','HomeCloud','Mssql-Server','my-app-App'][i%4],node:'node01',type:i===7?'lxc':'qemu',status:'running',cpu:i+1,memory:1024**3,memoryMax:4*1024**3,disk:10*1024**3,diskMax:32*1024**3,uptime:50000}));
 const nodes=[{id:'node01',name:'node01',node:'node01',status:'online',cpu:5,memoryPercent:71,uptime:100000,ip:'192.0.2.10'}];
@@ -23,6 +26,7 @@ const sample={
  ...Object.fromEntries(['errors','alerts','networks','volumes','pools','datasets','disks','shares','interfaces','devices','routes','dns','rules','history','jobs','points','tasks','logs','users','connections','notifications','destinations','schedules','policies'].map(k=>[k,[]]))
 };
 function fixture(path){
+ if(aiFixture&&path==='/configuration/ai')return aiFixture;
  if(process.env.LAYOUT_PROXMOX_SAVE&&path==='/connections/proxmox')return {cluster:null};
  if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:process.env.LAYOUT_ROLE||'owner'}};
  if(path==='/header-notifications')return {attentionCount:1,updateCount:1,criticalCount:0,attention:[{id:'update',kind:'update',title:'Docker image update available',message:'control-vm / zabbix-postgres · postgres:16 has a new registry image',severity:'info',link:'/docker?tab=Updates'}]};
@@ -57,16 +61,26 @@ for(const section of ['connected','setup','notifications','remote'])routes.push(
 const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
 const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
-const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0}});
-let browser,clusterSaves=0,clusterTests=0;
+const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0,...(process.env.LAYOUT_HTTPS_CERT?{https:{key:readFileSync(process.env.LAYOUT_HTTPS_KEY),cert:readFileSync(process.env.LAYOUT_HTTPS_CERT)}}:{})}});
+let browser,clusterSaves=0,clusterTests=0,aiModelReads=0,aiTests=0,aiSaves=0;
 try{
  await server.listen();const base=server.resolvedUrls.local[0];
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
- const page=await browser.newPage();
+ const page=await browser.newPage({ignoreHTTPSErrors:!!process.env.LAYOUT_HTTPS_CERT});if(process.env.LAYOUT_CONNECTION_CHOICES)page.on('dialog',dialog=>dialog.accept());
  await page.addInitScript(()=>{localStorage.setItem('iclusters_access_token','layout-fixture');localStorage.setItem('iclusters_last_activity',String(Date.now()));});
  await page.route('**/api/**',async route=>{
   readCount++;if(checkRefresh)await new Promise(resolve=>setTimeout(resolve,150));
   const path=new URL(route.request().url()).pathname.replace('/api','');
+  if(process.env.LAYOUT_CONNECTION_CHOICES){
+   if(path==='/node-agents/pairing-targets'){const kind=new URL(route.request().url()).searchParams.get('kind');return route.fulfill({json:{targets:kind==='docker'?[{id:'node01:qemu/100',name:'Control-VM',label:'Control-VM · VM 100 · node01'}]:[{id:'node:node01',name:'node01',label:'node01 · Proxmox node'}]}});}
+   if(path.endsWith('/automatic-pairing/target')||path.endsWith('/automatic-docker-pairing/target'))return route.fulfill({json:{host:'192.0.2.100',connectionId:'fixture-only',controller:'https://controller.test'}});
+   if(['/configuration/ai/models','/configuration/ai/test','/configuration/ai'].includes(path)&&route.request().method()!=='GET'){
+    const posted=route.request().postDataJSON(),config=posted.configuration||posted,id=config.AI_PROVIDER||'openai';assert.ok(aiMetadata[id]);assert.equal(config.OPENAI_API_KEY,'fixture-'+id);assert.equal(config.OPENAI_API_TYPE,aiMetadata[id].types[0]);
+    if(path.endsWith('/models')){aiModelReads++;return route.fulfill({json:{result:{models:[id+'-fixture-model']}}});}
+    if(path.endsWith('/test')){aiTests++;assert.equal(posted.confirm,true);assert.equal(config.OPENAI_MODEL,id+'-fixture-model');return route.fulfill({json:{result:{verified:true,message:'AI connection verified for the entered settings. Save Configuration to apply them.'}}});}
+    aiSaves++;aiFixture={...aiFixture,disabled:false,fields:aiFixture.fields.map(f=>({...f,value:f.type==='password'?'':config[f.key]||f.value,hasValue:true}))};return route.fulfill({json:{result:aiFixture}});
+   }
+  }
   if(process.env.LAYOUT_PROXMOX_SAVE){
    assert.ok(!path.includes('power-permissions'),'Saving must not open or call the removed power setup flow');
    if(path==='/connections/proxmox'&&route.request().method()==='PUT'||path==='/connections/proxmox/test'&&route.request().method()==='POST'){
@@ -173,10 +187,22 @@ try{
    await page.waitForFunction(()=>document.querySelector('.page-breadcrumbs')?.textContent.includes('control-vm'));
    assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
   }
+  if(process.env.LAYOUT_CONNECTION_CHOICES){
+   await page.goto(base+'settings?tab=Connections&setup=proxmox');const guide=page.locator('.cluster-setup-guide');await guide.waitFor();assert.equal(await guide.getAttribute('open'),null);assert.equal(await guide.locator('summary svg').count(),1);assert.equal(await guide.evaluate(e=>getComputedStyle(e).paddingLeft),'16px');assert.equal(await guide.locator('summary').evaluate(e=>getComputedStyle(e).color),'rgb(245, 180, 75)');await guide.locator('summary').click();assert.notEqual(await guide.getAttribute('open'),null);await guide.locator('summary').click();assert.equal(await guide.getAttribute('open'),null);if(process.env.LAYOUT_SCREENSHOTS)await page.locator('.modal').last().screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-proxmox-guide.png`});
+   for(const [setup,label,host] of [['docker','Docker host','node01:qemu/100'],['proxmox-node','Proxmox node','node:node01']]){
+    await page.goto(base+'settings?tab=Connections&setup='+setup);await page.getByLabel(label,{exact:true}).selectOption(host);assert.equal(await page.getByRole('button',{name:'Generate Pairing Code',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Prepare Manual Installer',exact:true}).count(),0);await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).click();await page.locator('.automatic-node-pairing').waitFor();assert.ok(await page.getByRole('button',{name:'Back to host selection',exact:true}).isVisible());
+   }
+   await page.goto(base+'settings?tab=Connections&setup=ai');await page.getByLabel('AI provider',{exact:true}).waitFor();const beforeModels=aiModelReads,beforeTests=aiTests,beforeSaves=aiSaves;
+   for(const id of Object.keys(aiMetadata)){
+    await page.getByLabel('AI provider',{exact:true}).selectOption(id);assert.equal(await page.getByLabel('API key',{exact:true}).inputValue(),'');assert.equal(await page.getByLabel('API type',{exact:true}).inputValue(),aiMetadata[id].types[0]);assert.equal(await page.getByLabel('Model',{exact:true}).inputValue(),aiMetadata[id].defaultModel);assert.ok(await page.getByLabel('Model',{exact:true}).locator('option').count()>=3,'Provider has multiple model choices and a custom option');if(process.env.LAYOUT_SCREENSHOTS&&id==='anthropic')await page.locator('.modal').last().screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-ai-claude.png`});await page.getByLabel('API key',{exact:true}).fill('fixture-'+id);await page.getByRole('button',{name:'Load Models',exact:true}).click();await page.getByRole('option',{name:id+'-fixture-model',exact:true}).waitFor({state:'attached'});await page.getByLabel('Model',{exact:true}).selectOption(id+'-fixture-model');await page.getByRole('button',{name:'Test Connection',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.configuration-feedback')?.textContent.includes('Connection test successful')).catch(async()=>{throw Error(id+': '+await page.locator('.configuration-dialog').innerText())});
+   }
+   assert.equal(aiModelReads,beforeModels+6);assert.equal(aiTests,beforeTests+6);assert.equal(aiSaves,beforeSaves);await page.getByRole('button',{name:'Save Configuration',exact:true}).click();await page.locator('.connection-success').waitFor();assert.equal(aiSaves,beforeSaves+1);await page.goto(base+'settings?tab=Connections&setup=ai');await page.waitForFunction(()=>document.querySelector('[aria-label="AI provider"]')?.value==='mistral');assert.equal(await page.getByLabel('Model',{exact:true}).inputValue(),'mistral-fixture-model');assert.equal(await page.getByLabel('API type',{exact:true}).inputValue(),'chat-completions');assert.equal(await page.getByLabel('API key',{exact:true}).inputValue(),'');
+  }
   if(process.env.LAYOUT_PROXMOX_SAVE){
    const beforeSaves=clusterSaves,beforeTests=clusterTests;
    await page.goto(base+'settings?tab=Connections&setup=proxmox');const form=page.locator('.cluster-form');await form.waitFor();
-   assert.equal(await form.locator('details,select').count(),0,'Removed advanced sections and access selector must be absent');
+   assert.equal(await form.locator('select').count(),0,'Removed access selector must be absent');
+   const guide=form.locator('details.cluster-setup-guide');assert.equal(await guide.count(),1);assert.equal(await guide.getAttribute('open'),null);await guide.locator('summary').click();assert.notEqual(await guide.getAttribute('open'),null);await guide.locator('summary').click();assert.equal(await guide.getAttribute('open'),null);
    for(const [name,value] of Object.entries({name:'Fixture Lab',host:'pve.test',port:'8006',tokenId:'iclusters@pve!hub',tokenSecret:'fixture-only'}))await form.locator(`[name=${name}]`).fill(value);
    await form.getByRole('button',{name:'Test Connection',exact:true}).click();
    await page.waitForFunction(()=>document.querySelector('.cluster-form')?.textContent.includes('Connection verified'));

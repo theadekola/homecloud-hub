@@ -1,5 +1,5 @@
 import { useEffect,useRef,useState } from 'react';
-import { Server } from 'lucide-react';
+import { Server,ChevronDown } from 'lucide-react';
 import { api } from '../api';
 import { useApi } from '../hooks';
 import { Card, Modal } from './UI';
@@ -34,8 +34,8 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  <label>Proxmox API port<input name="port" type="number" required min={1} max={65535} defaultValue={cluster?.port||8006}/></label>
  <label>API token ID<input name="tokenId" required defaultValue={cluster?.tokenId||''} placeholder="iclusters@pve!hub"/><small>Use the full ID, for example iclusters@pve!hub. Assign PVEAdmin at / with Propagate to both the user and API token.</small></label>
  <label className="cluster-wide">API token secret<input name="tokenSecret" type="password" autoComplete="new-password" required placeholder="Enter token secret"/><small>Secrets are never returned to your browser. Re-enter the secret when editing.</small></label>
- <section className="cluster-wide cluster-setup-guide" aria-label="Proxmox user and token setup">
- <h4>Create your Proxmox user and API token</h4>
+ <details className="cluster-wide cluster-setup-guide" aria-label="Proxmox user and token setup">
+ <summary>Create your Proxmox user and API token<ChevronDown size={20} aria-hidden="true"/></summary>
  <ol>
  <li>Sign in to Proxmox as an administrator. Open <strong>Datacenter → Permissions → Users → Add</strong>. Create an enabled user such as <code>iclusters</code> in <strong>Proxmox VE authentication server (pve)</strong>.</li>
  <li>Open <strong>Datacenter → Permissions → Add → User Permission</strong>. Set Path to <code>/</code>, User to <code>iclusters@pve</code>, Role to <strong>PVEAdmin</strong>, and enable <strong>Propagate</strong>.</li>
@@ -46,7 +46,7 @@ export function ClusterConnection({compact=false,label='Cluster Settings',primar
  <p>These are two PVEAdmin permission entries for one user and one token. They enable VM / CT power and configuration. PVEAdmin does not grant Proxmox permission administration or node shutdown.</p>
  <p>Guest OS details require the QEMU Guest Agent. Connect Docker hosts separately for Docker management. Your @pve account is not a Linux SSH account.</p>
  <a href="https://pve.proxmox.com/pve-docs/pveum.1.html" target="_blank" rel="noopener noreferrer">Proxmox user and API token documentation</a>
- </section>
+ </details>
  <p className="muted cluster-wide">New connections accept self-signed Proxmox HTTPS certificates. Existing certificate-verification settings are retained when editing. Connection details are encrypted on the server.</p>
  {error&&<p role="alert" className="login-error cluster-wide">{error}</p>}{message&&<p role="status" className="cluster-wide">{message}</p>}
  {!!nodes.length&&<ul className="cluster-wide">{nodes.map(n=><li key={n.name}>{n.name} — {n.status||'Unknown'}</li>)}</ul>}

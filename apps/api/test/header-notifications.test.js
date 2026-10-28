@@ -55,5 +55,10 @@ test('manual resolution leaves attention counts and uses manual wording instead 
 
 test('owners see available updates throughout checking and get actionable warnings for stale workers',()=>{
  const {feed}=fixture();for(const state of ['ready','checking']){const result=feed.read(owner,{enabled:true,configured:true,available:true,state});assert.equal(result.updateCount,1);assert.equal(result.attention[0].title,'Software update available')}
- const stale=feed.read(owner,{enabled:false,configured:true,available:true,state:'unavailable',message:'Worker is stale.'});assert.equal(stale.updateCount,1);assert.equal(stale.attention[0].title,'Software updater needs attention');assert.equal(stale.attention[0].severity,'warning');assert.match(stale.attention[0].message,/stale/);assert.equal(feed.read(user,{enabled:false,configured:true,state:'unavailable'}).updateCount,0);assert.equal(feed.read(owner,{enabled:true,configured:true,available:false,state:'completed'}).updateCount,0);
+ const stale=feed.read(owner,{enabled:false,configured:true,available:true,state:'unavailable',message:'Worker is stale.'});assert.equal(stale.updateCount,1);assert.equal(stale.attention[0].title,'Software update available');assert.equal(stale.attention[0].severity,'warning');assert.match(stale.attention[0].message,/stale/);assert.equal(feed.read(user,{enabled:false,configured:true,state:'unavailable'}).updateCount,0);assert.equal(feed.read(owner,{enabled:true,configured:true,available:false,state:'completed'}).updateCount,0);
+});
+
+test('failed checks retain the detected update and explain the worker issue to owners',()=>{
+ const {feed}=fixture();for(const state of ['failed','error','unavailable']){const update={enabled:false,configured:true,available:true,state,message:'Fetch could not complete.'};const notice=feed.read(owner,update).attention[0];assert.equal(notice.title,'Software update available');assert.equal(notice.severity,'warning');assert.match(notice.message,/update was detected/);assert.match(notice.message,/Fetch could not complete/);assert.equal(feed.read(user,update).updateCount,0)}
+ const issue=feed.read(owner,{enabled:false,configured:true,available:false,state:'unavailable'}).attention[0];assert.equal(issue.title,'Software updater needs attention');
 });

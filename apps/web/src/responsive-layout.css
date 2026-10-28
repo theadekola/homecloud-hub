@@ -137,3 +137,13 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .page-breadcrumbs a:hover{text-decoration:underline}
 .page-path-separator{padding-inline:9px;flex-shrink:0}
 .page-breadcrumbs [aria-current=page]{color:var(--theme-muted,#a6b5cc)}
+
+/* Update availability stays visible when a short header toast is missed. */
+.software-update-notice{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:20px;border:1px solid var(--app-accent,#2563eb);border-radius:12px;background:var(--theme-surface,#102337);color:var(--theme-text,#e7edf7);min-inline-size:0}
+.software-update-notice>svg{flex-shrink:0;color:var(--app-accent,#60a5fa)}
+.software-update-notice>div{flex:1;min-inline-size:0}
+.software-update-notice p{margin:5px 0 0;color:var(--theme-muted,#a6b5cc);overflow-wrap:anywhere;line-height:1.5}
+.software-update-notice.warning{border-color:#b8862e}
+.software-update-notice.warning>svg{color:#eeb652}
+.software-update-notice>.btn{flex-shrink:0}
+@media(max-width:600px){.software-update-notice{flex-wrap:wrap;align-items:flex-start}.software-update-notice>div{flex-basis:calc(100% - 40px)}.software-update-notice>.btn{margin-inline-start:36px}}

@@ -23,7 +23,7 @@ const sample={
  ...Object.fromEntries(['errors','alerts','networks','volumes','pools','datasets','disks','shares','interfaces','devices','routes','dns','rules','history','jobs','points','tasks','logs','users','connections','notifications','destinations','schedules','policies'].map(k=>[k,[]]))
 };
 function fixture(path){
- if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:'owner'}};
+ if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:process.env.LAYOUT_ROLE||'owner'}};
  if(path==='/header-notifications')return {attentionCount:1,updateCount:1,criticalCount:0,attention:[{id:'update',kind:'update',title:'Docker image update available',message:'control-vm / zabbix-postgres · postgres:16 has a new registry image',severity:'info',link:'/docker?tab=Updates'}]};
  if(path==='/docker/updates')return {rows:[],settings:{enabled:true,intervalHours:6}};
  if(path==='/account/sessions')return {sessions:[]};
@@ -32,7 +32,7 @@ function fixture(path){
  if(path==='/storage/shares')return {...sample,resources:[{id:'share-1',resourceId:'1',name:'Backups',protocol:'SMB',provider:'truenas',path:'/mnt/pool/backups',enabled:true}]};
  if(path==='/storage/disks')return {...sample,resources:[{id:'disk-1',name:'/dev/sda',provider:'proxmox',node:'node01',type:'ssd',size:100*1024**3,health:'PASSED'}]};
  if(path==='/storage/performance')return {...sample,sources:[],series:[],pools:[],datasetIO:[],shareThroughput:[]};
- if(path==='/updates')return {enabled:false,available:false};
+ if(path==='/updates')return process.env.LAYOUT_UPDATE_NOTICE?{configured:true,enabled:process.env.LAYOUT_UPDATE_NOTICE!=='stale',available:true,latest:'fixture-new-release',state:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'unavailable':'ready',message:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'The updater has not reported a recent check.':'A new update is available.'}:{enabled:false,available:false};
  if(path==='/settings')return {settings:{refresh:30,siteName:'i-Clusters'},system:{},security:{},notifications:{},connections:[]};
  if(path==='/backups')return {...sample,archiveInventory:{configured:true,complete:true}};
  if(path==='/docker/hosts')return {hosts:[{id:'docker-fixture',name:'control-vm',online:true}]};
@@ -92,6 +92,11 @@ try{
     return issues;
    });
    failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
+   if(process.env.LAYOUT_UPDATE_NOTICE){
+    const notice=page.locator('.software-update-notice');
+    if(process.env.LAYOUT_ROLE&&process.env.LAYOUT_ROLE!=='owner')assert.equal(await notice.count(),0,'Update prompts are owner-only');
+    else{assert.ok(await notice.isVisible(),`${route}: persistent software update prompt is visible`);assert.match(await notice.innerText(),/Software update available/);assert.equal(await notice.getByRole('link').getAttribute('href'),'/settings?tab=About');if(process.env.LAYOUT_UPDATE_NOTICE==='stale')assert.equal(await notice.getAttribute('role'),'alert');}
+   }
    if(process.env.LAYOUT_CHECK_PATHS==='1'){
     const path=page.getByRole('navigation',{name:'Page path',exact:true});
     if(route==='/')assert.equal(await path.count(),0,'Overview must have no page path');
@@ -139,6 +144,12 @@ try{
     }
    }
 
+  }
+  if(process.env.LAYOUT_UPDATE_NOTICE==='available'&&!process.env.LAYOUT_ROLE){
+   await page.goto(base);await page.locator('.software-update-notice').waitFor();
+   await page.waitForTimeout(5500);
+   assert.ok(await page.getByRole('status',{name:'Software update available',exact:true}).isVisible(),'Update prompt persists beyond the old five-second toast');
+   assert.equal(await page.locator('.topbar .update-message').count(),0,'Header toast must not obscure the persistent prompt');
   }
   if(process.env.LAYOUT_CHECK_PATHS==='1'){
    await page.goto(base+'settings?tab=General');

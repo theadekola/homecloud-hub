@@ -2,11 +2,9 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const base='https://localhost:6002/api';
-const setupToken=fs.readFileSync('.env','utf8').match(/^SETUP_TOKEN=(.+)$/m)[1];
 const request=async(path,body)=>{const response=await fetch(base+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});return {status:response.status,body:await response.json()};};
 assert.equal((await request('/auth/setup')).body.registrationOpen,true);
-const account={name:'CI Owner',username:'ci_owner',email:'owner@example.test',password:'CI-only-password-12345',setupToken};
-assert.equal((await request('/auth/register',{...account,setupToken:'wrong'})).status,403);
+const account={name:'CI Owner',username:'ci_owner',email:'owner@example.test',password:'CI-only-password-12345'};
 assert.equal((await request('/auth/register',{...account,password:'short'})).status,400);
 const competing=await Promise.all([request('/auth/register',account),request('/auth/register',{...account,username:'ci_second',email:'second@example.test'})]);
 assert.deepEqual(competing.map(r=>r.status).sort(),[201,409]);

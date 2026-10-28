@@ -89,6 +89,7 @@ docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now i-clusters.service
 echo "i-Clusters installed at $url"
-echo 'Open this URL and register your owner account using the setup code shown above.'
+echo 'Keep the installation private until you have registered the owner account.'
+echo 'Open this URL and register your owner account. No setup code is required.'
 echo 'Choose your name, email and password in the browser. Registration closes after the first account.'
 echo 'Configure supported integrations in Settings: Connections, Notifications and Integrations.'

@@ -13,3 +13,9 @@ test('all bundled brand SVGs have provenance, valid local paths and no active or
  for(const name of ['NOTICE.txt','simple-icons-CC0.txt','devicon-MIT.txt'])assert.ok(fs.statSync(path.join(root,'public/assets/brands',name)).size>100);
 });
 test('application icon metadata points to correctly sized local PNGs',()=>{const manifest=JSON.parse(fs.readFileSync(path.join(root,'public/manifest.webmanifest'),'utf8'));assert.equal(manifest.name,'i-Clusters');for(const size of [180,192,512]){const bytes=fs.readFileSync(path.join(root,`public/assets/iclusters-${size}.png`));assert.equal(bytes.subarray(1,4).toString(),'PNG');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size)}for(const icon of manifest.icons)assert.ok(fs.existsSync(path.join(root,'public',icon.src)))});
+
+test('bundled product logo is the existing PNG artwork and needs no separate image request',()=>{
+ const source=fs.readFileSync(path.join(root,'src/product-logo.ts'),'utf8'),encoded=source.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)[1];
+ assert.deepEqual(Buffer.from(encoded,'base64'),fs.readFileSync(path.join(root,'public/assets/iclusters-192.png')));
+ for(const file of ['pages/Login.tsx','components/Layout.tsx','components/AboutSettings.tsx']){const component=fs.readFileSync(path.join(root,'src',file),'utf8');assert.match(component,/src=\{productLogo\}/);assert.doesNotMatch(component,/src="\/assets\/iclusters-/)}
+});

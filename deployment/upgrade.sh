@@ -89,7 +89,6 @@ snapshot=1
 git pull --ff-only
 grep -q '^WEB_PORT=' .env || echo 'WEB_PORT=80' >> .env
 grep -q '^HTTPS_PORT=' .env || echo 'HTTPS_PORT=443' >> .env
-if ! grep -q '^SETUP_TOKEN=' .env; then printf '\nSETUP_TOKEN=%s\n' "$(openssl rand -hex 16)" >> .env; fi
 python3 deployment/configure-https.py
 docker compose config --quiet
 source deployment/build-env.sh

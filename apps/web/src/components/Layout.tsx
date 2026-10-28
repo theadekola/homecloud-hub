@@ -1,3 +1,4 @@
+import {productLogo} from '../product-logo';
 import {lockPageScroll} from '../scroll-lock';
 import PersistentShell from './PersistentShell';
 import PageIcon, {pageIconForPath} from './PageIcon';
@@ -70,7 +71,7 @@ export default function Layout() {
   return <div className="app-shell">
     {mobile&&menuOpen&&<button className="nav-backdrop" aria-label="Close navigation" onClick={closeMenu}/>}
     <aside id="primary-navigation" ref={menuRef} className={`sidebar${!mobile&&collapsed?' collapsed':''}${mobile&&menuOpen?' mobile-open':''}`} inert={mobile&&!menuOpen} role={mobile&&menuOpen?'dialog':undefined} aria-modal={mobile&&menuOpen?true:undefined} aria-label="Main navigation">
-      <div className="brand"><div className="brand-icon"><img className="iclusters-product-logo" src="/assets/iclusters-512.png" alt=""/></div>{showLabels && <b title={configuration?.settings?.siteName}>{configuration?.settings?.siteName||'i-Clusters'}</b>}{mobile&&<button className="icon-btn nav-close" aria-label="Close navigation" onClick={closeMenu}><X size={20}/></button>}</div>
+      <div className="brand"><div className="brand-icon"><img className="iclusters-product-logo" src={productLogo} alt=""/></div>{showLabels && <b title={configuration?.settings?.siteName}>{configuration?.settings?.siteName||'i-Clusters'}</b>}{mobile&&<button className="icon-btn nav-close" aria-label="Close navigation" onClick={closeMenu}><X size={20}/></button>}</div>
       <nav className="nav-scroll" aria-label="Pages">
         {sections.map(sec => <div className="nav-section" key={sec.title}>
           {showLabels && <div className="nav-title">{sec.title}</div>}

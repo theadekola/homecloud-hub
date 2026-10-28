@@ -37,3 +37,6 @@ test('simultaneous automatic installation requests cannot pair the same node twi
  let release;const gate=new Promise(resolve=>release=resolve),f=fixture({gate}),job=await f.service.start(await f.input());
  await assert.rejects(f.service.start(await f.input()),{status:409});release();await f.service.wait('node01');assert.equal(f.service.status(job.id).state,'completed');assert.equal(f.calls.filter(c=>c.mode==='install').length,1);
 });
+test('Docker pairing resolves guest IP and UUID without using its Proxmox node address',async()=>{
+ const {createAutomaticDockerPairing}=await import('../src/automatic-docker-pairing.js');const service=createAutomaticDockerPairing({config:()=>({url:'https://pve',tokenId:'a@pve!t',tokenSecret:'secret'}),origin:()=> 'https://controller',query:async path=>{if(path==='/cluster/resources')return [{node:'node01',vmid:100,type:'qemu'}];if(path.endsWith('/config'))return {smbios1:'uuid=selected-uuid',net0:'virtio=AA:BB:CC:DD:EE:FF'};if(path.endsWith('/network-get-interfaces'))return {result:[{'ip-addresses':[{'ip-address':'192.0.2.100'}]}]};throw Error('Unexpected '+path)}});const target=await service.target('node01:qemu/100');assert.equal(target.host,'192.0.2.100');assert.equal(target.identity.uuid,'selected-uuid');assert.equal(target.sshTarget,'vm:node01:100');await assert.rejects(service.target('node01:qemu/999'));
+});

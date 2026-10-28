@@ -29,3 +29,11 @@ with tempfile.TemporaryDirectory() as temp:
  else: raise AssertionError('failed service accepted')
  assert not (root/'etc/iclusters-node-agent.json').exists();assert not (root/'usr/local/sbin/iclusters-node-agent.py').exists()
 print('Remote bootstrap fixture passed')
+with tempfile.TemporaryDirectory() as temp:
+ root=pathlib.Path(temp);dmi=root/'sys/class/dmi/id';dmi.mkdir(parents=True);(dmi/'product_uuid').write_text('guest-uuid')
+ docker={**payload,'kind':'docker','node':'node01:qemu/100','identity':{'uuid':'guest-uuid'}}
+ result,calls=test(root,docker);assert result['installed'];assert any(c[0]=='docker' for c in calls);assert json.loads((root/'etc/iclusters-node-agent.json').read_text())['kind']=='docker'
+with tempfile.TemporaryDirectory() as temp:
+ try:test(pathlib.Path(temp),{**payload,'kind':'docker','identity':{'uuid':'wrong'}})
+ except RuntimeError as e:assert str(e)=='wrong-guest'
+ else:raise AssertionError('Wrong Docker guest accepted')

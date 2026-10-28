@@ -3,8 +3,18 @@ import ast,base64,fcntl,hashlib,json,os,pathlib,shutil,socket,ssl,subprocess,sys
 
 def execute(payload,root=pathlib.Path('/'),run=subprocess.run,hostname=socket.gethostname,which=shutil.which,check_url=None):
     if os.geteuid()!=0: raise RuntimeError('root-required')
-    if hostname().split('.')[0]!=payload['node']: raise RuntimeError('wrong-node')
-    if not all(which(command) for command in ['qm','pct','python3','systemctl']): raise RuntimeError('not-proxmox')
+    docker=payload.get('kind')=='docker'
+    actual=hostname().split('.')[0]
+    if docker:
+        identity=payload.get('identity',{})
+        uuid=(root/'sys/class/dmi/id/product_uuid').read_text().strip().lower() if (root/'sys/class/dmi/id/product_uuid').exists() else ''
+        macs=[p.read_text().strip().lower() for p in (root/'sys/class/net').glob('*/address')]
+        if identity.get('uuid'):
+            if uuid!=identity['uuid'].lower(): raise RuntimeError('wrong-guest')
+        elif not set(identity.get('macs',[])).intersection(macs): raise RuntimeError('wrong-guest')
+        if not which('docker') or run(['docker','info','--format','{{json .}}'],capture_output=True,timeout=20).returncode: raise RuntimeError('docker-required')
+    elif actual!=payload['node']: raise RuntimeError('wrong-node')
+    if not all(which(command) for command in (['python3','systemctl'] if docker else ['qm','pct','python3','systemctl'])): raise RuntimeError('not-proxmox')
     url=urllib.parse.urlsplit(payload['url'])
     if url.scheme!='https' or not url.hostname or url.username or url.password or url.path not in ('','/') or url.query or url.fragment: raise RuntimeError('invalid-url')
     context=ssl.create_default_context(cadata=payload.get('ca') or None)
@@ -14,7 +24,7 @@ def execute(payload,root=pathlib.Path('/'),run=subprocess.run,hostname=socket.ge
             if response.status!=200: raise RuntimeError('controller-unreachable')
     config=root/'etc/iclusters-node-agent.json';agent=root/'usr/local/sbin/iclusters-node-agent.py';unit=root/'etc/systemd/system/iclusters-node-agent.service'
     if any(p.exists() or p.is_symlink() for p in [config,agent,unit,root/'etc/homecloud-node-agent.json',root/'etc/systemd/system/homecloud-node-agent.service']): raise RuntimeError('already-installed')
-    if payload['mode']=='probe': return {'ready':True,'hostname':payload['node']}
+    if payload['mode']=='probe': return {'ready':True,'hostname':actual}
     source=zlib.decompress(base64.b64decode(payload['source'],validate=True))
     if hashlib.sha256(source).hexdigest()!=payload['revision']: raise RuntimeError('source-mismatch')
     compile(ast.parse(source),str(agent),'exec')
@@ -56,5 +66,5 @@ WantedBy=multi-user.target
 if __name__=='__main__':
     try: print(json.dumps(execute(json.load(sys.stdin))))
     except Exception as error:
-        allowed=['root-required','wrong-node','not-proxmox','invalid-url','already-installed','source-mismatch','missing-pairing','service-failed','controller-unreachable']
+        allowed=['wrong-guest','docker-required','root-required','wrong-node','not-proxmox','invalid-url','already-installed','source-mismatch','missing-pairing','service-failed','controller-unreachable']
         print(json.dumps({'error':str(error) if str(error) in allowed else 'bootstrap-failed'}));sys.exit(1)

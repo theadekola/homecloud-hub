@@ -245,3 +245,18 @@ test('header announces available releases, retains their dot while checking and 
  const page=await updateFixture(false);try{page.status({available:true,latest:'new-release'});await page.poll();assert.match(page.container.textContent,/A new update is available/);assert.ok(page.container.querySelector('.update-dot'));page.status({state:'checking',checking:true});await page.poll();assert.ok(page.container.querySelector('.update-dot'));assert.equal(page.container.querySelector('button').disabled,true);page.status({state:'completed',available:false,checking:false});await page.poll();assert.equal(page.container.querySelector('button'),null);}finally{await page.close()}
  const stale=await updateFixture();try{stale.status({enabled:false,configured:true,state:'unavailable',available:true,message:'The updater has not reported a recent check.'});await stale.poll();await stale.click(stale.container.querySelector('button'));assert.equal(stale.posts(),1);assert.match(stale.container.textContent,/Checking GitHub/);}finally{await stale.close()}
 });
+
+test('paired Docker image updates display SSH credentials instead of typed confirmation',async()=>{
+ const target='docker:11111111-1111-4111-8111-111111111111';
+ const page=await mounted('components/SSHAccess.tsx',{},async p=>p==='/ssh/connections'?{}:{host:'192.168.10.100',fingerprint:'SHA256:'+'a'.repeat(43)},true,false,['/'],'SSHApproval');
+ try{
+  await act(async()=>{window.dispatchEvent(new CustomEvent('iclusters-ssh-approval',{detail:{target,path:'/docker/updates/reviewed/install',dockerHost:target.slice(7)+':node',method:'POST',body:{},resolve(){},reject(){}}}));await new Promise(r=>setTimeout(r,0));});
+  await act(async()=>{await new Promise(r=>setTimeout(r,700))});
+  assert.equal(page.container.querySelector('[aria-label="SSH host address"]').value,'192.168.10.100');
+  assert.ok(page.container.querySelector('[aria-label="SSH username"]'));
+  assert.ok(page.container.querySelector('[aria-label="SSH / sudo password"]'));
+  assert.ok([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Confirm Action').disabled);
+  assert.doesNotMatch(page.container.textContent,/Type the following confirmation/);
+  const form=page.container.querySelector('form');assert.ok(form.querySelector('.ssh-fingerprint').compareDocumentPosition([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Confirm Action'))&page.dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+ }finally{await page.close()}
+});

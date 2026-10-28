@@ -36,7 +36,7 @@ export async function connectSSH(input,user,sessionId){
  if(input.saved){const saved=savedSSH(user,input.target);if(!saved)throw failure('No saved connection',404);input={...saved,target:input.target,mode:input.mode==='sftp'?'sftp':'shell'};}
  if(input.useSavedPassword){const existing=savedSSH(user,input.target);if(!existing||existing.host!==input.host||existing.port!==Number(input.port||22)||existing.username!==input.username)throw failure('Enter a password for the changed connection');input={...input,password:existing.password};}
  if(typeof input.host!=='string'||!input.host||input.host.length>253||/[\s/]/.test(input.host))throw failure('Enter the target SSH hostname or IP address');
- if(!/^(node|vm|lxc):/.test(input.target||''))throw failure('Invalid target');
+ if(!/^(node|vm|lxc):/.test(input.target||'')&&!/^docker:[a-f0-9-]{36}$/.test(input.target||''))throw failure('Invalid target');
  const port=Number(input.port||22);if(!Number.isInteger(port)||port<1||port>65535)throw failure('Invalid SSH port');
  if(typeof input.username!=='string'||!input.username||typeof input.password!=='string'||!input.password)throw failure('SSH username and password are required');
  const client=new Client();let fingerprint='';

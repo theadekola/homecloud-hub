@@ -49,3 +49,29 @@ test('container approval maps each protected action to its actual guest and cann
   const token=issueGrant('alice','POST',p,{},approval.scope);assert.equal(consumeGrant(token,'alice','POST','/actions/docker/container/other/stop',{},approval.scope),false);assert.equal(consumeGrant(token,'alice','POST',p,{},approval.scope),false);
  }
 });
+
+test('standalone Docker connector mutations require SSH approval bound to that connector',async()=>{
+ const docker={...agent,id:'11111111-1111-4111-8111-111111111111',kind:'docker'};
+ const identity=`${docker.id}:node`,ctx={nodes:()=>[docker],hosts:()=>[{id:identity,agent:docker.id,online:true}],dockerHost:identity};
+ for(const [path,method] of [['/docker/updates/reviewed-image/install','POST'],['/actions/docker/container/app/restart','POST'],['/docker/volume/data','DELETE']]){
+  const approval=await resolveActionApproval(path,{},method,ctx);
+  assert.equal(approval.target,`docker:${docker.id}`);assert.equal(approval.scope,`docker:${docker.id}|docker:${identity}`);
+  const grant=issueGrant('alice',method,path,{},approval.scope);
+  assert.equal(consumeGrant(grant,'alice',method,path,{},approval.scope),true);
+  assert.equal(consumeGrant(grant,'alice',method,path,{},approval.scope),false);
+ }
+ await assert.rejects(resolveActionApproval('/docker/updates/image/install',{},'POST',{...ctx,nodes:()=>[{...docker,online:false}]}),{status:503});
+ await assert.rejects(resolveActionApproval('/docker/updates/image/install',{},'POST',{...ctx,dockerHost:'other:node'}),{status:404});
+});
+
+test('Docker image install challenge requests SSH and the typed phrase alone cannot authorize it',async()=>{
+ const {createPairing,pairNode,pollAgent,revokeAgent}=await import('../src/node-agents.js');
+ const registration=pairNode(createPairing({kind:'docker'}).code,'control-vm','docker');
+ pollAgent({...registration}, {hosts:[{id:'node',online:true}],results:[]});
+ const {createApp}=await import('../src/app.js'),app=createApp({authenticate:(req,res,next)=>{req.user={sub:'fixture',role:'owner'};next()},audit:async()=>{}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{
+  const url=`http://127.0.0.1:${server.address().port}/api/docker/updates/image/install`,headers={'Content-Type':'application/json','x-iclusters-docker-host':`${registration.id}:node`};
+  const first=await fetch(url,{method:'POST',headers,body:'{}'});assert.equal(first.status,409);const challenge=await first.json();assert.equal(challenge.sshTarget,`docker:${registration.id}`);
+  const typed=await fetch(url,{method:'POST',headers:{...headers,'x-iclusters-confirm':challenge.confirmationPhrase},body:'{}'});assert.equal(typed.status,428);assert.equal((await typed.json()).sshTarget,challenge.sshTarget);
+ }finally{revokeAgent(registration.id);server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

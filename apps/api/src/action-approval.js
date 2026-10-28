@@ -35,7 +35,13 @@ export async function resolveActionApproval(path,body={},method='POST',{dockerHo
  if(!setup&&!(docker&&dockerHost))return null;
  const identity=setup?body.host:dockerHost,host=hosts().find(h=>h.id===identity),agent=nodes().find(n=>n.id===host?.agent);
  if(!host||!agent)fail('Selected Docker host is unavailable',404);
- if(agent.kind!=='proxmox'){if(setup)fail('Guest installation requires a paired Proxmox node');return null;}
+ if(agent.kind!=='proxmox'){
+  if(setup)fail('Guest installation requires a paired Proxmox node');
+  if(agent.kind!=='docker'||host.id!==`${agent.id}:node`)fail('Invalid Docker connector target',403);
+  if(!agent.online||host.online===false)fail('Selected Docker host is offline',503);
+  const target=`docker:${agent.id}`;
+  return {target,scope:`${target}|docker:${identity}`,dockerHost:identity,description:'Verify a fresh Linux root or sudo password on this Docker host before continuing.'};
+ }
  if(setup&&!host.setup)fail('This guest is no longer eligible for installation. Refresh discovery.',409);
  if(!agent.online)fail('Paired Proxmox node is offline',503);
  if(!query)query=(await import('./connectors.js')).pve;

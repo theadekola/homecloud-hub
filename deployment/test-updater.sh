@@ -10,6 +10,7 @@ cat > "$temporary/bin/git" <<'EOF'
 case "$1" in
   symbolic-ref) exit 0;;
   fetch) grep -q '"state":"checking"' "$FIXTURE/status/update-status.json" || exit 1; if [[ -e "$FIXTURE/retain" ]]; then grep -q '"available":true' "$FIXTURE/status/update-status.json" || exit 1; fi; [[ ! -e "$FIXTURE/fail-fetch" ]]; exit $?;;
+  log) printf '%s\n' 'Fix "SSH" popup' 'Improve update review';;
   rev-parse) if [[ $2 == HEAD ]]; then cat "$FIXTURE/current"; else echo bbbbbbb; fi;;
 esac
 EOF
@@ -26,6 +27,11 @@ export FIXTURE=$temporary PATH="$temporary/bin:$PATH"
 echo aaaaaaa > "$temporary/current"
 bash "$temporary/worker"
 grep -q '"available":true' "$temporary/status/update-status.json"
+python3 - "$temporary/status/update-status.json" <<'PYTHON'
+import json, sys
+status = json.load(open(sys.argv[1]))
+assert status['changes'] == ['Fix "SSH" popup', 'Improve update review']
+PYTHON
 touch "$temporary/retain"
 bash "$temporary/worker"
 touch "$temporary/fail-fetch"

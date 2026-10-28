@@ -25,19 +25,22 @@ export function Button({children,onClick,variant='primary',disabled=false}:{chil
   return <button className={`btn ${variant}`} onClick={onClick} disabled={disabled}>{children}</button>
 }
 
+const modalLayers:HTMLDivElement[]=[];
+let nextModalLayer=1000;
 export function Modal({open,onClose,title,children,success,closeDisabled=false}:{open:boolean;onClose:()=>void;title:string;children:React.ReactNode;success?:string;closeDisabled?:boolean}) {
   const dialog=useRef<HTMLDivElement>(null),close=useRef(onClose),titleId=useId();close.current=()=>{if(!closeDisabled)onClose()};
   useEffect(()=>{
     if(!open)return;
-    const previous=document.activeElement as HTMLElement|null,unlock=lockPageScroll();
+    const previous=document.activeElement as HTMLElement|null,unlock=lockPageScroll(),element=dialog.current!;
+    modalLayers.push(element);if(element.parentElement)element.parentElement.style.zIndex=String(++nextModalLayer);
     const focusable=()=>Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')||[]).filter(el=>!el.closest('[hidden],[inert]')&&el.getAttribute('type')!=='hidden');
     const key=(event:KeyboardEvent)=>{
-      const modals=document.querySelectorAll('.modal-backdrop');if(dialog.current?.parentElement!==modals[modals.length-1])return;
+      if(modalLayers.at(-1)!==dialog.current)return;
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close.current();}
       if(event.key==='Tab'){const controls=focusable(),first=controls[0],last=controls.at(-1);if(!first){event.preventDefault();dialog.current?.focus();return;}if(event.shiftKey&&(document.activeElement===first||!dialog.current?.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey&&(document.activeElement===last||!dialog.current?.contains(document.activeElement))){event.preventDefault();first.focus();}}
     };
     (focusable()[0]||dialog.current)?.focus({preventScroll:true});document.addEventListener('keydown',key);
-    return()=>{document.removeEventListener('keydown',key);unlock();if(previous?.isConnected)previous.focus({preventScroll:true});};
+    return()=>{document.removeEventListener('keydown',key);const layer=modalLayers.indexOf(element);if(layer>=0)modalLayers.splice(layer,1);if(!modalLayers.length)nextModalLayer=1000;unlock();if(previous?.isConnected)previous.focus({preventScroll:true});};
   },[open]);
   if(!open) return null;
   return <div className="modal-backdrop" onMouseDown={()=>close.current()}><div ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={e=>e.stopPropagation()}>

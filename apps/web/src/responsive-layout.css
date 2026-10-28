@@ -58,3 +58,50 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .connection-notice.connection-notice{min-inline-size:0;max-inline-size:100%;overflow-wrap:anywhere}
 .connection-notice.connection-notice>p{min-inline-size:0;flex:1}
 .toast.toast{right:max(12px,env(safe-area-inset-right));min-inline-size:0;max-inline-size:calc(100vw - 24px);max-block-size:calc(100dvh - 24px);overflow:auto;white-space:normal;overflow-wrap:anywhere}
+
+/* Choose dashboard columns from the workspace width, including the sidebar and
+   browser zoom, rather than keeping three narrow panels until a viewport cutoff. */
+.content .overview-v2 .overview-grid{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));
+}
+.content .overview-v2 .health-layout{
+ display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px;
+}
+.content .overview-v2 .health-layout>.actual-health{flex:0 0 112px}
+.content .overview-v2 .health-layout>div:last-child{flex:1 1 210px;min-inline-size:min(100%,210px)}
+.content .overview-v2 .health-line{
+ grid-template-columns:minmax(100px,1fr) minmax(44px,.7fr) max-content;
+ gap:8px;min-inline-size:0;line-height:1.5;
+}
+.content .overview-v2 .health-line>span{overflow-wrap:normal;word-break:normal}
+.content .overview-v2 .health-line>b{white-space:nowrap}
+.content .overview-v2 .health-line .mini-meter{min-inline-size:0;margin:0}
+.content .overview-v2 .resource-tiles{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));
+}
+.content .overview-v2 .resource-tile{display:flex;flex-direction:column;gap:8px}
+.content .overview-v2 .resource-tile strong{margin:0}
+.content .overview-v2 .resource-tile small{min-block-size:0;flex:1}
+.content .overview-v2 .resource-tile .mini-meter{margin:12px 0}
+.content .overview-v2 .resource-tile>.recharts-responsive-container{flex:none}
+.content .overview-v2 .quick-grid{
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));
+}
+.content .overview-v2 .quick-grid .btn{min-block-size:48px}
+.content .overview-v2 .quick-grid .btn>span{min-inline-size:0;overflow-wrap:normal;word-break:normal}
+.content .overview-v2 .quick-grid .btn>svg{flex:none}
+
+/* Let toolbars move complete controls to another row. Emergency word breaking
+   is for addresses and diagnostics, not ordinary action labels and statuses. */
+:where(.content,.modal) .btn{overflow-wrap:normal;word-break:normal}
+.content :is(.widget-heading,.widget-title,.section-title){flex-wrap:wrap;row-gap:10px}
+.content :is(.widget-heading,.widget-title,.section-title)>h3{flex:1 1 140px;min-inline-size:0}
+.content :is(.widget-heading,.widget-title,.section-title)>:is(a,span,.btn){flex-shrink:0}
+.content :is(.widget-heading,.widget-title,.section-title)>a{white-space:nowrap}
+.content .overview-controls{justify-content:flex-end;min-inline-size:0;max-inline-size:100%}
+.content .overview-controls>*{flex-shrink:0;max-inline-size:100%}
+.content .badge{white-space:nowrap;overflow-wrap:normal;word-break:normal;flex-shrink:0}
+.content :is(.tabs,.pve-tabbar){max-inline-size:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.content :is(.tabs,.pve-tabbar)>button{flex-shrink:0;white-space:nowrap}
+.content :is(.users-table-scroll,.monitor-table-scroll){min-inline-size:0;max-inline-size:100%;overflow:auto;overscroll-behavior-inline:contain}
+@media(max-width:800px){.content .overview-controls{justify-content:flex-start}}

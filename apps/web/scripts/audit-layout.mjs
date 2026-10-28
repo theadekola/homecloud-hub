@@ -1,0 +1,101 @@
+/** Read-only browser audit using fixture APIs. Install Playwright + Chromium to run:
+ * node scripts/audit-layout.mjs
+ * PLAYWRIGHT_MODULE and CHROMIUM_EXECUTABLE may point to an existing test runtime.
+ */
+import assert from 'node:assert/strict';
+import {createServer} from 'vite';
+import {fileURLToPath} from 'node:url';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const root=fileURLToPath(new URL('../',import.meta.url));
+const now=new Date().toISOString();
+const guests=Array.from({length:8},(_,i)=>({id:100+i,vmid:100+i,name:['Control-VM','HomeCloud','Mssql-Server','my-app-App'][i%4],node:'node01',type:i===7?'lxc':'qemu',status:'running',cpu:i+1,memory:1024**3,memoryMax:4*1024**3,disk:10*1024**3,diskMax:32*1024**3,uptime:50000}));
+const nodes=[{id:'node01',name:'node01',node:'node01',status:'online',cpu:5,memoryPercent:71,uptime:100000,ip:'192.0.2.10'}];
+const sample={
+ sampledAt:now,nodes,hosts:nodes,guests,vms:guests.filter(g=>g.type==='qemu'),lxc:guests.filter(g=>g.type==='lxc'),
+ host:{hostname:'control-vm',version:'27.0.0',memory:4*1024**3},
+ cluster:{name:'Homelab',url:'https://192.0.2.10:8006'},
+ storage:[{id:'local',name:'local',node:'node01',status:'online',usage:28}],resources:guests,
+ services:[{name:'Proxmox',provider:'proxmox',status:'reachable'},{name:'Docker',provider:'docker',status:'reachable'}],
+ metrics:Array.from({length:24},(_,i)=>({time:new Date(Date.now()-(23-i)*3600000).toISOString(),cpu:5+i%4,memory:71})),
+ containers:[{id:'c1',name:'zabbix-postgres',image:'postgres:16',status:'running',cpu:2,memory:128*1024**2,ports:[],networks:[]}],
+ images:[{id:'image1',tags:['postgres:16'],size:1024**3}],
+ ...Object.fromEntries(['errors','alerts','networks','volumes','pools','datasets','disks','shares','interfaces','devices','routes','dns','rules','history','jobs','points','tasks','logs','users','connections','notifications','destinations','schedules','policies'].map(k=>[k,[]]))
+};
+function fixture(path){
+ if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:'owner'}};
+ if(path==='/header-notifications')return {attentionCount:1,updateCount:1,criticalCount:0,attention:[{id:'update',kind:'update',title:'Docker image update available',message:'control-vm / zabbix-postgres · postgres:16 has a new registry image',severity:'info',link:'/docker?tab=Updates'}]};
+ if(path==='/docker/updates')return {rows:[],settings:{enabled:true,intervalHours:6}};
+ if(path==='/security')return {password:{minimumCharacters:12,maximumBytes:72},roles:['owner','admin','operator','viewer'],twoFactor:true};
+ if(path==='/storage/shares')return {...sample,resources:[{id:'share-1',resourceId:'1',name:'Backups',protocol:'SMB',provider:'truenas',path:'/mnt/pool/backups',enabled:true}]};
+ if(path==='/storage/disks')return {...sample,resources:[{id:'disk-1',name:'/dev/sda',provider:'proxmox',node:'node01',type:'ssd',size:100*1024**3,health:'PASSED'}]};
+ if(path==='/storage/performance')return {...sample,sources:[],series:[],pools:[],datasetIO:[],shareThroughput:[]};
+ if(path==='/updates')return {enabled:false,available:false};
+ if(path==='/settings')return {settings:{refresh:30,siteName:'i-Clusters'},system:{},security:{},notifications:{},connections:[]};
+ if(path==='/backups')return {...sample,archiveInventory:{configured:true,complete:true}};
+ if(path==='/docker/hosts')return {hosts:[{id:'docker-fixture',name:'control-vm',online:true}]};
+ if(path==='/users')return {users:[{id:'owner',name:'Layout Review',email:'review@example.test',role:'owner',status:'active'}]};
+ if(path==='/ssh/connections')return {};
+ if(path==='/ssh/fingerprint')return {host:'192.0.2.100',fingerprint:'SHA256:'+'a'.repeat(43)};
+ return sample;
+}
+const routes=['/','/proxmox','/docker','/storage','/network','/backups','/monitoring','/alerts','/ai','/users','/settings','/tools/sftp','/tools/shell'];
+for(const [page,tabs] of Object.entries({
+ proxmox:['Nodes','Virtual Machines','LXC Containers','Storage','Tasks & Logs'],
+ docker:['Images','Volumes','Networks','Compose Stacks','Events','Updates'],
+ storage:['Disks','Datasets / Volumes','Snapshots','Shares','Performance'],
+ network:['Interfaces','Devices','Routing','DNS','Traffic Analysis'],
+ backups:['Restore Points','Schedules','Retention Policies','Destinations','Reports'],
+ alerts:['Alert History','Alert Rules'],users:['Audit Logs'],
+ settings:['System','Security','Connections','Appearance','About']
+}))for(const tab of tabs)routes.push(`/${page}?tab=${encodeURIComponent(tab)}`);
+const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
+const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
+const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0}});
+let browser;
+try{
+ await server.listen();const base=server.resolvedUrls.local[0];
+ browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage();
+ await page.addInitScript(()=>{localStorage.setItem('iclusters_access_token','layout-fixture');localStorage.setItem('iclusters_last_activity',String(Date.now()));});
+ await page.route('**/api/**',route=>{
+  const path=new URL(route.request().url()).pathname.replace('/api','');
+  // The audit must never reach an actual provider or perform a management write.
+  if(route.request().method()!=='GET'&&path!=='/ssh/fingerprint')failures.push(`Unexpected write: ${path}`);
+  return route.fulfill({json:fixture(path)});
+ });
+ let errors=[];page.on('pageerror',e=>errors.push(e.stack||e.message));
+ for(const width of widths){
+  await page.setViewportSize({width,height:1000});
+  for(const route of selectedRoutes){
+   errors=[];await page.goto(base.replace(/\/$/,'')+route);await page.waitForTimeout(350);
+   const problems=await page.evaluate(()=>{
+    const issues=[];
+    if(document.documentElement.scrollWidth>innerWidth+1)issues.push('Page has horizontal overflow');
+    const scrollContainer=e=>{for(let p=e.parentElement;p&&p!==document.body;p=p.parentElement){const c=getComputedStyle(p);if(/auto|scroll|hidden|clip/.test(c.overflowX))return true;}return false;};
+    for(const e of document.querySelectorAll('.content .btn,.content select,.content input,.modal .btn')){
+     const r=e.getBoundingClientRect();
+     if(r.width&&r.right>innerWidth+1&&!scrollContainer(e))issues.push(`Control is outside viewport: ${e.textContent.slice(0,50)||e.getAttribute('aria-label')}`);
+    }
+    // A label may wrap at spaces, but ordinary words must not break vertically.
+    for(const e of document.querySelectorAll('.health-line>span,.quick-grid .btn>span')){
+     for(const node of e.childNodes){if(node.nodeType!==Node.TEXT_NODE)continue;
+      for(const word of node.textContent.matchAll(/\S+/g)){const range=document.createRange();range.setStart(node,word.index);range.setEnd(node,word.index+word[0].length);if(new Set([...range.getClientRects()].map(r=>Math.round(r.top))).size>1)issues.push(`Broken word: ${word[0]}`);}
+     }
+    }
+    return issues;
+   });
+   failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
+  }
+  await page.goto(base);await page.getByRole('button',{name:'Add Widget'}).click();
+  await page.getByRole('dialog').waitFor();
+  assert.ok(await page.getByRole('button',{name:'Close dialog',exact:true}).isVisible());
+  await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('iclusters-ssh-approval',{detail:{target:'docker:11111111-1111-4111-8111-111111111111',path:'/docker/updates/image/install',dockerHost:'11111111-1111-4111-8111-111111111111:node',method:'POST',body:{},resolve(){},reject(){}}})));
+  await page.getByLabel('SSH username',{exact:true}).waitFor();
+  assert.ok(await page.getByLabel('SSH / sudo password',{exact:true}).isVisible());
+  await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+ }
+ console.log(`Reviewed ${selectedRoutes.length*widths.length} page/section layouts and ${widths.length*2} dialogs.`);
+ assert.deepEqual(failures,[]);
+ console.log('No page overflow, escaped controls, broken dashboard words or runtime errors.');
+}finally{await browser?.close();await server.close();}

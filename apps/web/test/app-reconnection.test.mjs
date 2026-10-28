@@ -35,6 +35,6 @@ test('initial connection failure retries on restored network and confirmed unaut
 });
 
 
-test('known software update shows a status banner while preserving the mounted page',async()=>{
- const page=await fixture();try{await page.flush(()=>{sessionStorage.setItem('iclusters_update_started',String(Date.now()));window.dispatchEvent(new Event('iclusters-software-update'))});assert.match(page.container.querySelector('.connection-notice').textContent,/i-Clusters is updating/);assert.equal(page.container.querySelector('.connection-notice').getAttribute('role'),'status');await page.flush(()=>{sessionStorage.removeItem('iclusters_update_started');window.dispatchEvent(new Event('iclusters-software-update'))});assert.equal(page.container.querySelector('.connection-notice'),null);}finally{await page.close()}
+test('known software update preserves the mounted page without a top status banner',async()=>{
+ const page=await fixture();try{await page.flush(()=>{sessionStorage.setItem('iclusters_update_started',String(Date.now()));window.dispatchEvent(new Event('iclusters-software-update'))});assert.equal(page.container.querySelector('.connection-notice'),null);assert.ok(page.container.querySelector('input'));await page.flush(()=>{sessionStorage.removeItem('iclusters_update_started');window.dispatchEvent(new Event('iclusters-software-update'))});assert.equal(page.container.querySelector('.connection-notice'),null);}finally{await page.close()}
 });

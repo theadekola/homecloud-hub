@@ -15,7 +15,19 @@ message='Up to date.'
 prior_latest=$(python3 -c 'import json,re; s=json.load(open("/var/lib/iclusters-updater/update-status.json")); v=s.get("latest", ""); print(v if s.get("available") and re.fullmatch(r"[a-fA-F0-9]{7,40}", v) else "")' 2>/dev/null || true)
 if [[ -n $prior_latest && $prior_latest != "$current" ]]; then latest=$prior_latest; available=true; fi
 write_status() {
-  printf '{"current":"%s","latest":"%s","available":%s,"state":"%s","message":"%s","checkedAt":"%s","checkId":"%s"}\n' "$current" "$latest" "$available" "$state" "$message" "$(date -u +%FT%TZ)" "$check_id" > /var/lib/iclusters-updater/update-status.json.tmp
+  python3 - "$current" "$latest" "$available" "$state" "$message" "$check_id" > /var/lib/iclusters-updater/update-status.json.tmp <<'PYTHON'
+import datetime, json, subprocess, sys
+current, latest, available, state, message, check_id = sys.argv[1:]
+changes = []
+if current != latest:
+    try:
+        result = subprocess.run(['git', 'log', '--no-decorate', '--format=%s', '-n', '20', current + '..' + latest], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            changes = [line[:500] for line in result.stdout.splitlines() if line.strip()][:20]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+json.dump(dict(current=current, latest=latest, available=available == 'true', state=state, message=message, checkedAt=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), checkId=check_id, changes=changes), sys.stdout, separators=(',', ':'))
+PYTHON
   mv /var/lib/iclusters-updater/update-status.json.tmp /var/lib/iclusters-updater/update-status.json
 }
 trap 'rm -f runtime/update-request.json; state=failed; message="Update failed. Run sudo journalctl -u iclusters-updater -n 100 on Ubuntu."; write_status' ERR

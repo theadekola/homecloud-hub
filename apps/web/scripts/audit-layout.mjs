@@ -37,7 +37,7 @@ function fixture(path){
  if(path==='/storage/shares')return {...sample,resources:[{id:'share-1',resourceId:'1',name:'Backups',protocol:'SMB',provider:'truenas',path:'/mnt/pool/backups',enabled:true}]};
  if(path==='/storage/disks')return {...sample,resources:[{id:'disk-1',name:'/dev/sda',provider:'proxmox',node:'node01',type:'ssd',size:100*1024**3,health:'PASSED'}]};
  if(path==='/storage/performance')return {...sample,sources:[],series:[],pools:[],datasetIO:[],shareThroughput:[]};
- if(path==='/updates')return process.env.LAYOUT_UPDATE_NOTICE?{configured:true,enabled:process.env.LAYOUT_UPDATE_NOTICE!=='stale',available:true,latest:'fixture-new-release',state:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'unavailable':'ready',message:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'The updater has not reported a recent check.':'A new update is available.'}:{enabled:false,available:false};
+ if(path==='/updates')return process.env.LAYOUT_UPDATE_NOTICE?{configured:true,enabled:process.env.LAYOUT_UPDATE_NOTICE!=='stale',available:true,current:'fixture-old-release',latest:'fixture-new-release',changes:['Fix SSH popup layout'],state:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'unavailable':'ready',message:process.env.LAYOUT_UPDATE_NOTICE==='stale'?'The updater has not reported a recent check.':'A new update is available.'}:{enabled:false,available:false};
  if(path==='/settings')return {settings:{refresh:30,siteName:'i-Clusters'},system:{},security:{},notifications:{},connections:[]};
  if(path==='/backups')return {...sample,archiveInventory:{configured:true,complete:true}};
  if(path==='/docker/hosts')return {hosts:[{id:'docker-fixture',name:'control-vm',online:true}]};
@@ -62,6 +62,8 @@ const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
 const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
 const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0,...(process.env.LAYOUT_HTTPS_CERT?{https:{key:readFileSync(process.env.LAYOUT_HTTPS_KEY),cert:readFileSync(process.env.LAYOUT_HTTPS_CERT)}}:{})}});
+let restartPower='running',restartVerified=false,restartWrites=[];
+let updateWrites=0;
 let browser,clusterSaves=0,clusterTests=0,aiModelReads=0,aiTests=0,aiSaves=0;
 try{
  await server.listen();const base=server.resolvedUrls.local[0];
@@ -71,6 +73,19 @@ try{
  await page.route('**/api/**',async route=>{
   readCount++;if(checkRefresh)await new Promise(resolve=>setTimeout(resolve,150));
   const path=new URL(route.request().url()).pathname.replace('/api','');
+  if(process.env.LAYOUT_GUEST_RESTART){
+   if(path==='/connections/proxmox/guests')return route.fulfill({json:{guests:[{id:'100',node:'node01',name:'Control-VM',status:restartVerified?'connected':'disabled'}]}});
+   if(path==='/node-agents/guest/agent')return route.fulfill({json:{result:{requiresPowerCycle:true,agentVerified:false,message:'Setup installed. Shutdown and start required.'}}});
+   if(path==='/proxmox/vm/node01/100/details')return route.fulfill({json:{status:{status:restartPower}}});
+   if(path.startsWith('/actions/proxmox/vm/100/')){
+    const operation=path.split('/').at(-1);assert.ok(['shutdown','start'].includes(operation));
+    if(operation==='shutdown'&&!route.request().headers()['x-iclusters-ssh-grant'])return route.fulfill({status:409,json:{confirmationPhrase:'CONFIRM FIXTURE SHUTDOWN',sshTarget:'node:node01'}});
+    restartWrites.push(operation);return route.fulfill({json:{result:{task:operation+'-fixture-task'}}});
+   }
+   if(path==='/ssh/connect')return route.fulfill({json:{token:'fixture-approval'}});
+   if(path.startsWith('/tasks/node01/')){await new Promise(resolve=>setTimeout(resolve,150));restartPower=path.includes('shutdown')?'stopped':'running';if(restartPower==='running')restartVerified=true;return route.fulfill({json:{status:'stopped',exitstatus:'OK'}});}
+  }
+  if(process.env.LAYOUT_UPDATE_NOTICE&&path==='/updates'&&route.request().method()==='POST'){updateWrites++;return route.fulfill({json:{ok:true,state:'queued'}})}
   if(process.env.LAYOUT_CONNECTION_CHOICES){
    if(path==='/node-agents/pairing-targets'){const kind=new URL(route.request().url()).searchParams.get('kind');return route.fulfill({json:{targets:kind==='docker'?[{id:'node01:qemu/100',name:'Control-VM',label:'Control-VM · VM 100 · node01'}]:[{id:'node:node01',name:'node01',label:'node01 · Proxmox node'}]}});}
    if(path.endsWith('/automatic-pairing/target')||path.endsWith('/automatic-docker-pairing/target'))return route.fulfill({json:{host:'192.0.2.100',connectionId:'fixture-only',controller:'https://controller.test'}});
@@ -115,11 +130,7 @@ try{
     return issues;
    });
    failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
-   if(process.env.LAYOUT_UPDATE_NOTICE){
-    const notice=page.locator('.software-update-notice');
-    if(process.env.LAYOUT_ROLE&&process.env.LAYOUT_ROLE!=='owner')assert.equal(await notice.count(),0,'Update prompts are owner-only');
-    else{assert.ok(await notice.isVisible(),`${route}: persistent software update prompt is visible`);assert.match(await notice.innerText(),/Software update available/);assert.equal(await notice.getByRole('link').getAttribute('href'),'/settings?tab=About');if(process.env.LAYOUT_UPDATE_NOTICE==='stale')assert.equal(await notice.getAttribute('role'),'alert');}
-   }
+   assert.equal(await page.locator('.software-update-notice').count(),0,'No update banner above page content');
    if(process.env.LAYOUT_CHECK_PATHS==='1'){
     const path=page.getByRole('navigation',{name:'Page path',exact:true});
     if(route==='/')assert.equal(await path.count(),0,'Overview must have no page path');
@@ -169,10 +180,12 @@ try{
 
   }
   if(process.env.LAYOUT_UPDATE_NOTICE==='available'&&!process.env.LAYOUT_ROLE){
-   await page.goto(base);await page.locator('.software-update-notice').waitFor();
-   await page.waitForTimeout(5500);
-   assert.ok(await page.getByRole('status',{name:'Software update available',exact:true}).isVisible(),'Update prompt persists beyond the old five-second toast');
-   assert.equal(await page.locator('.topbar .update-message').count(),0,'Header toast must not obscure the persistent prompt');
+   await page.goto(base);await page.getByRole('button',{name:'Review software update',exact:true}).click();
+   const review=page.getByRole('dialog',{name:'Software update',exact:true});await review.waitFor();assert.equal(updateWrites,0,'Opening review does not install');assert.match(await review.innerText(),/fixture-old-release/);assert.match(await review.innerText(),/Fix SSH popup layout/);
+   if(process.env.LAYOUT_SCREENSHOTS)await review.screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-software-update-review.png`});
+   await review.getByRole('button',{name:'Update Software',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.software-update-review .update-spinner'));assert.equal(updateWrites,1);assert.equal(await page.locator('.connection-notice').count(),0);assert.equal(await page.locator('.update-message').count(),0);
+   assert.ok(await review.getByRole('status').first().isVisible());await review.getByRole('button',{name:'Close',exact:true}).click();
+   await page.evaluate(()=>sessionStorage.removeItem('iclusters_update_started'));updateWrites=0;
   }
   if(process.env.LAYOUT_CHECK_PATHS==='1'){
    await page.goto(base+'settings?tab=General');
@@ -187,10 +200,20 @@ try{
    await page.waitForFunction(()=>document.querySelector('.page-breadcrumbs')?.textContent.includes('control-vm'));
    assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
   }
+  if(process.env.LAYOUT_GUEST_RESTART){
+   restartPower='running';restartVerified=false;restartWrites=[];
+   await page.goto(base+'settings?tab=Connections&section=setup');await page.getByRole('button',{name:'Set Up Guest Agent',exact:true}).click();
+   const setup=page.getByRole('dialog',{name:'Set Up QEMU Guest Agent · Control-VM',exact:true});await setup.getByLabel('VM SSH address',{exact:true}).fill('192.0.2.100');await setup.getByLabel('SSH / sudo password',{exact:true}).fill('fixture-only');await setup.getByRole('button',{name:'Show SSH fingerprint',exact:true}).waitFor();await setup.getByRole('checkbox').check();await setup.getByRole('button',{name:'Install / Start & Verify',exact:true}).click();
+   const restart=page.getByRole('dialog',{name:'Restart VM · Control-VM',exact:true});await restart.waitFor();assert.deepEqual(restartWrites,[],'Installing must not restart without explicit consent');assert.equal(await restart.evaluate(e=>e.closest('.modal-backdrop').parentElement===document.body),true);
+   if(process.env.LAYOUT_SCREENSHOTS)await restart.screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-guest-restart.png`});await restart.getByRole('button',{name:'Shutdown, Start & Verify',exact:true}).click();assert.equal(await restart.getByRole('button',{name:'Close dialog',exact:true}).isDisabled(),true);
+   const approval=page.getByRole('dialog',{name:'Authenticate node:node01',exact:true});await approval.waitFor();await approval.getByLabel('Password',{exact:true}).fill('fixture-only');await approval.getByRole('button',{name:'Show SSH fingerprint',exact:true}).waitFor();await approval.getByRole('checkbox').check();
+   assert.ok(await approval.evaluate(e=>e.contains(document.activeElement)),'Nested SSH approval owns keyboard focus');assert.ok(Number(await approval.evaluate(e=>e.closest('.modal-backdrop').style.zIndex))>Number(await restart.evaluate(e=>e.closest('.modal-backdrop').style.zIndex)),'SSH approval is above restart popup');
+   assert.equal(await restart.getByRole('button',{name:'Shutdown, Start & Verify',exact:true}).evaluate(e=>getComputedStyle(e,'::before').animationName),'update-rotate');await approval.getByRole('button',{name:'Confirm',exact:true}).click();await restart.waitFor({state:'detached'});assert.deepEqual(restartWrites,['shutdown','start']);await page.locator('.connection-success').waitFor();
+  }
   if(process.env.LAYOUT_CONNECTION_CHOICES){
    await page.goto(base+'settings?tab=Connections&setup=proxmox');const guide=page.locator('.cluster-setup-guide');await guide.waitFor();assert.equal(await guide.getAttribute('open'),null);assert.equal(await guide.locator('summary svg').count(),1);assert.equal(await guide.evaluate(e=>getComputedStyle(e).paddingLeft),'16px');assert.equal(await guide.locator('summary').evaluate(e=>getComputedStyle(e).color),'rgb(245, 180, 75)');await guide.locator('summary').click();assert.notEqual(await guide.getAttribute('open'),null);await guide.locator('summary').click();assert.equal(await guide.getAttribute('open'),null);if(process.env.LAYOUT_SCREENSHOTS)await page.locator('.modal').last().screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-proxmox-guide.png`});
    for(const [setup,label,host] of [['docker','Docker host','node01:qemu/100'],['proxmox-node','Proxmox node','node:node01']]){
-    await page.goto(base+'settings?tab=Connections&setup='+setup);await page.getByLabel(label,{exact:true}).selectOption(host);assert.equal(await page.getByRole('button',{name:'Generate Pairing Code',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Prepare Manual Installer',exact:true}).count(),0);const parent=page.getByLabel(label,{exact:true}).locator('xpath=ancestor::div[@role="dialog"][1]'),height=await parent.evaluate(e=>e.getBoundingClientRect().height);await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).click();const ssh=page.getByRole('dialog',{name:setup==='docker'?'Connect Docker host with SSH':'Connect Proxmox node with SSH',exact:true});await ssh.waitFor();assert.ok(await ssh.locator('.automatic-node-pairing').isVisible());assert.equal(await parent.locator('.automatic-node-pairing').count(),0,'SSH must not extend the host-selection page');assert.equal(await ssh.evaluate(e=>e.closest('.modal-backdrop').parentElement===document.body),true);assert.ok(Math.abs(await parent.evaluate(e=>e.getBoundingClientRect().height)-height)<2);await ssh.getByLabel('SSH / sudo password',{exact:true}).fill('fixture-only');await page.keyboard.press('Escape');await ssh.waitFor({state:'detached'});assert.ok(await parent.isVisible());assert.equal(await page.getByLabel(label,{exact:true}).inputValue(),host);await page.waitForFunction(()=>document.activeElement?.textContent==='Connect Automatically with SSH');assert.equal(await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).evaluate(e=>e===document.activeElement),true);await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).click();await ssh.waitFor();assert.equal(await ssh.getByLabel('SSH / sudo password',{exact:true}).inputValue(),'');if(process.env.LAYOUT_SCREENSHOTS)await ssh.screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-${setup}-ssh-popup.png`});await ssh.getByRole('button',{name:'Close dialog',exact:true}).click();await ssh.waitFor({state:'detached'});
+    await page.goto(base+'settings?tab=Connections&setup='+setup);await page.getByLabel(label,{exact:true}).selectOption(host);assert.equal(await page.getByRole('button',{name:'Generate Pairing Code',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Prepare Manual Installer',exact:true}).count(),0);const parent=page.getByLabel(label,{exact:true}).locator('xpath=ancestor::div[@role="dialog"][1]'),height=await parent.evaluate(e=>e.getBoundingClientRect().height);await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).click();const ssh=page.getByRole('dialog',{name:setup==='docker'?'Connect Docker host with SSH':'Connect Proxmox node with SSH',exact:true});await ssh.waitFor();assert.ok(await ssh.locator('.automatic-node-pairing').isVisible());assert.equal(await parent.locator('.automatic-node-pairing').count(),0,'SSH must not extend the host-selection page');assert.equal(await ssh.evaluate(e=>e.closest('.modal-backdrop').parentElement===document.body),true);assert.ok(Math.abs(await parent.evaluate(e=>e.getBoundingClientRect().height)-height)<2);await ssh.getByRole('button',{name:'Show SSH fingerprint',exact:true}).waitFor();const toggle=await ssh.getByRole('button',{name:'Show SSH fingerprint',exact:true}).boundingBox(),box=await ssh.getByLabel('Verify SSH host identity',{exact:true}).boundingBox();assert.ok(Math.abs((toggle.y+toggle.height/2)-(box.y+box.height/2))<2,'Fingerprint checkbox shares show/hide row');assert.ok(box.x>toggle.x+toggle.width);await ssh.getByRole('button',{name:'Show SSH fingerprint',exact:true}).click();assert.ok(await ssh.getByRole('button',{name:'Hide SSH fingerprint',exact:true}).isVisible());await ssh.getByLabel('SSH / sudo password',{exact:true}).fill('fixture-only');await page.keyboard.press('Escape');await ssh.waitFor({state:'detached'});assert.ok(await parent.isVisible());assert.equal(await page.getByLabel(label,{exact:true}).inputValue(),host);await page.waitForFunction(()=>document.activeElement?.textContent==='Connect Automatically with SSH');assert.equal(await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).evaluate(e=>e===document.activeElement),true);await page.getByRole('button',{name:'Connect Automatically with SSH',exact:true}).click();await ssh.waitFor();assert.equal(await ssh.getByLabel('SSH / sudo password',{exact:true}).inputValue(),'');await ssh.getByRole('button',{name:'Show SSH fingerprint',exact:true}).waitFor();if(process.env.LAYOUT_SCREENSHOTS)await ssh.screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-${setup}-ssh-popup.png`});await ssh.getByRole('button',{name:'Close dialog',exact:true}).click();await ssh.waitFor({state:'detached'});
    }
    await page.goto(base+'settings?tab=Connections&setup=ai');await page.getByLabel('AI provider',{exact:true}).waitFor();const beforeModels=aiModelReads,beforeTests=aiTests,beforeSaves=aiSaves;
    for(const id of Object.keys(aiMetadata)){

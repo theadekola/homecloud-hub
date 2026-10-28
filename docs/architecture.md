@@ -51,7 +51,7 @@ Reading is separate from action authorization. Acknowledging an alert is separat
 
 ## External services and data
 
-Notifications use only configured Discord, Telegram and SMTP channels. Delivery history and preferences are local; messages leave the controller when the feature is enabled or a user confirms a test. OpenAI model discovery and requests use the configured key and API type. Assistant requests include user text and selected measurements and cannot invoke infrastructure actions. See [privacy](../PRIVACY.md).
+Notifications use only configured Discord, Telegram and SMTP channels. Delivery history and preferences are local; messages leave the controller when the feature is enabled or a user confirms a test. AI model discovery and requests use the selected provider’s configured key, native API format and fixed HTTPS destination. Switching providers requires a new key; blank fields retain credentials only within the same provider. Assistant requests include user text and selected measurements and cannot invoke infrastructure actions. See [privacy](../PRIVACY.md).
 
 ## Repository layout
 

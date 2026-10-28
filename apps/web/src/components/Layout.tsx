@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState,useEffect,useRef } from 'react';
 import UpdateButton from './UpdateButton';
+import SoftwareUpdateNotice from './SoftwareUpdateNotice';
 import { useApi,configureRefresh } from '../hooks';
 import { api,clearTokens } from '../api';
 
@@ -86,7 +87,7 @@ export default function Layout() {
         <button ref={toggleRef} className="icon-btn nav-toggle" aria-label={mobile?(menuOpen?'Close navigation':'Open navigation'):(collapsed?'Expand navigation':'Collapse navigation')} aria-controls="primary-navigation" aria-expanded={mobile?menuOpen:!collapsed} onClick={()=>mobile?setMenuOpen(v=>!v):setCollapsed(v=>!v)}><Menu size={19}/></button>
         <div className="top-actions"><HeaderNotifications/>{session?.user?.role==='owner' && <UpdateButton/>}<div className="profile-menu" ref={profileRef}><button className="profile-trigger" aria-haspopup="menu" aria-expanded={profileOpen} onClick={()=>setProfileOpen(v=>!v)}><span className="profile"><b>{session?.user?.name||'Signed in'}</b><span>{session?.user?.role||''}</span></span><ChevronDown size={15}/></button>{profileOpen&&<div className="profile-dropdown" role="menu"><button role="menuitem" onClick={signOut}><LogOut size={15}/>Sign out</button></div>}</div></div>
       </header>
-      <main className="content"><PersistentShell authorized={['admin','owner'].includes(session?.user?.role)}/><div key={location.pathname}><Outlet/></div></main>
+      <main className="content">{session?.user?.role==='owner'&&<SoftwareUpdateNotice/>}<PersistentShell authorized={['admin','owner'].includes(session?.user?.role)}/><div key={location.pathname}><Outlet/></div></main>
     </div>
   </div>
 }

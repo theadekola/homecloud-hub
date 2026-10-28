@@ -1,0 +1,7 @@
+# Proxmox single-save setup
+
+Removed the Proxmox certificate-options and token-discovery accordions, the connection-access selector, and the transition into a separate power-permission dialog. The primary action is Save. Instructions in the same form cover the PVE realm, user creation, token creation and one propagated PVEAdmin ACL for each identity.
+
+Test and Save request management verification using the entered candidate token. The API checks inherited root privileges and effective node/guest privileges before persistence. It never asks the token to grant itself permissions, collects no second administrator credentials, and leaves the previous connection intact on verification failure. The same token already grants the requested power/configuration access when both PVEAdmin ACLs are present. Saved TLS verification and CA behavior are preserved without exposing the removed fields.
+
+Validation: 606 web tests and 541 API tests passed, including effective-permission denials, read-only tokens, propagation flags, node/VM/CT restrictions, saved-connection preservation, single-request success and inline errors. Production TypeScript/Vite build and whitespace checks passed. Desktop/mobile fixture browser tests verified Test Connection and Save, absence of removed sections, one save request, successful completion and no power-permission popup. No live Proxmox permissions or VM states were changed.

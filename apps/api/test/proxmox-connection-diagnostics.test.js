@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {proxmoxTestError} from '../src/proxmox-test-error.js';
 import {pairingTargets} from '../src/pairing-targets.js';
 test('Proxmox connection diagnostics distinguish authentication, permissions, TLS, network and endpoint failures without secrets',()=>{
- for(const [error,pattern] of [[{providerStatus:401},/token secret/],[{providerStatus:403},/PVEAuditor/],[{noNodes:true},/Privilege Separation/],[{code:'DEPTH_ZERO_SELF_SIGNED_CERT'},/Advanced certificate/],[{code:'ERR_TLS_CERT_ALTNAME_INVALID'},/does not match/],[{code:'ECONNREFUSED'},/8006/],[{code:'ENOTFOUND'},/DNS/],[{code:'ETIMEDOUT'},/timeout/],[{code:'EHOSTUNREACH'},/VLANs/],[{invalidResponse:true},/node inventory/],[{providerStatus:503},/HTTP 503/],[{},/could not be checked/]]){
+ for(const [error,pattern] of [[{providerStatus:401},/token secret/],[{providerStatus:403},/PVEAdmin/],[{noNodes:true},/Privilege Separation/],[{code:'DEPTH_ZERO_SELF_SIGNED_CERT'},/certificate/],[{code:'ERR_TLS_CERT_ALTNAME_INVALID'},/does not match/],[{code:'ECONNREFUSED'},/8006/],[{code:'ENOTFOUND'},/DNS/],[{code:'ETIMEDOUT'},/timeout/],[{code:'EHOSTUNREACH'},/VLANs/],[{invalidResponse:true},/node inventory/],[{providerStatus:503},/HTTP 503/],[{},/could not be checked/]]){
  const message=proxmoxTestError({...error,message:'SECRET_TOKEN'});assert.match(message,pattern);assert.doesNotMatch(message,/SECRET_TOKEN/);
  }
 });

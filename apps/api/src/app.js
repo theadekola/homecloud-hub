@@ -1,3 +1,4 @@
+import {verifyProxmoxManagement} from './proxmox-management-access.js';
 import {automaticDockerPairing} from './automatic-docker-pairing.js';
 import {automaticNodePairing} from './automatic-node-pairing.js';
 import {pairingTargets} from './pairing-targets.js';
@@ -178,14 +179,14 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
    try{const resources=await pve('/cluster/resources',{},config);
      if(!Array.isArray(resources))throw Object.assign(new Error(),{invalidResponse:true});
      if(!resources.some(r=>r.type==='node'))throw Object.assign(new Error(),{noNodes:true});
-     return {config,nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status}))};
-   }catch(error){throw Object.assign(new Error(proxmoxTestError(error)),{status:502});}
+     return {config,nodes:resources.filter(r=>r.type==='node').map(r=>({name:r.node,status:r.status})),...(input.management===true?{management:await verifyProxmoxManagement(config,resources)}:{})};
+   }catch(error){if(error.managementAccess)throw error;throw Object.assign(new Error(proxmoxTestError(error)),{status:502});}
  };
- app.post('/api/connections/proxmox/test',authorize('owner'),async(req,res)=>{const {nodes}=await testCluster(req.body);res.json({ok:true,nodes});});
+ app.post('/api/connections/proxmox/test',authorize('owner'),async(req,res)=>{const {nodes,management}=await testCluster(req.body);res.json({ok:true,nodes,...(management?{management}:{})});});
  app.put('/api/connections/proxmox',authorize('owner'),async(req,res)=>{
-   const {config,nodes}=await testCluster(req.body);clusterStore.save(config);await monitor.invalidate();
+   const {config,nodes,management}=await testCluster(req.body);clusterStore.save(config);await monitor.invalidate();
    await audit(req,'connection.proxmox.save',config.name,{host:config.host,nodeCount:nodes.length},'success');
-   res.json({ok:true,cluster:publicCluster(config),nodes});
+   res.json({ok:true,cluster:publicCluster(config),nodes,...(management?{management}:{})});
  });
  app.delete('/api/connections/proxmox',authorize('owner'),async(req,res)=>{
    clusterStore.remove();await monitor.invalidate();await audit(req,'connection.proxmox.remove','proxmox',{},'success');

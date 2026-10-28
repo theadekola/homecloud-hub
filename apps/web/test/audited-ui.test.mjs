@@ -93,7 +93,7 @@ test('task charts filter reported operations and selecting a row loads its match
 
 test('Docker host selection precedes cards and setup links to central Connections',async()=>{
  const calls=[];const page=await mounted('pages/Docker.tsx',{},async p=>{calls.push(p);if(p==='/auth/me')return {user:{role:'owner'}};if(p==='/docker/hosts')return {hosts:[],directEnabled:true};if(p==='/docker')return {host:{hostname:'fixture'},containers:[],images:[],volumes:[],networks:[]};return {}});
- try{assert.ok(page.container.querySelector('.docker-host-picker').compareDocumentPosition(page.container.querySelector('.docker-stats'))&4);assert.ok(page.container.querySelector('a[href="/settings?tab=Connections&section=setup"]'));assert.equal(button(page.container,'Pair Proxmox Node'),undefined);assert.equal(page.container.querySelector('#automatic-docker-host-details'),null);assert.ok(!calls.includes('/node-agents'));}finally{await page.close()}
+ try{assert.ok(page.container.querySelector('.docker-host-selector.compact').compareDocumentPosition(page.container.querySelector('.docker-stats'))&4);assert.ok(page.container.querySelector('a[href="/settings?tab=Connections"]'));assert.ok(page.container.querySelector('.page-header .docker-host-selector.compact'));assert.equal(page.container.querySelector('.docker-host-picker'),null);assert.equal(button(page.container,'Pair Proxmox Node'),undefined);assert.equal(page.container.querySelector('#automatic-docker-host-details'),null);assert.ok(!calls.includes('/node-agents'));}finally{await page.close()}
 });
 
 test('Docker image inspection opens only for requested image without side panels',async()=>{

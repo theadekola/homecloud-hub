@@ -99,3 +99,19 @@ test('inaccessible background progress unlocks the popup without permitting a du
  try{await page.click(button(page,'Review & Install'));const loading=page.container.querySelector('[aria-label="Loading update review"]');assert.ok(loading);assert.equal(loading.textContent,'Loading');assert.ok(loading.querySelector('.spin'));assert.equal(button(page,'Review & Install').disabled,true);assert.equal(page.container.querySelector('[role=dialog]'),null);await page.click(button(page,'Review & Install'));assert.equal(calls,1);await act(async()=>{finish();await new Promise(r=>setTimeout(r,0))});assert.equal(page.container.querySelector('[aria-label="Loading update review"]'),null);assert.equal(button(page,'Review & Install').disabled,false);if(fail)assert.match(page.container.querySelector('[role=alert]').textContent,/Review unavailable/);else assert.ok(page.container.querySelector('[role=dialog]'));}finally{await page.close()}
  }
  });
+
+test('Docker updates enables scheduled checks for a legacy disabled setting and keeps the manual check in its page heading',async()=>{
+ let enabled=false;const writes=[];
+ const page=await mounted('components/DockerUpdates.tsx',{owner:true,onUpdated(){}},async(p,init)=>{
+  if(p==='/docker/updates/settings'){writes.push(JSON.parse(init.body));enabled=true;return {}}
+  return {rows:[],settings:{enabled,intervalHours:6}};
+ });
+ try{
+  await act(async()=>{await new Promise(r=>setTimeout(r,0))});
+  assert.deepEqual(writes,[{enabled:true,intervalHours:6}]);
+  assert.ok(button(page,'Check for Updates').closest('.page-header'));
+  assert.equal(page.container.querySelector('[aria-label="Automatic Docker update checks"]'),null);
+  assert.doesNotMatch(page.container.textContent,/Container image updates/);
+  assert.match(page.container.textContent,/Checks automatically every 6 hours/);
+ }finally{await page.close()}
+});

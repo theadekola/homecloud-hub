@@ -1,3 +1,4 @@
+import {mkdirSync} from 'node:fs';
 /** Read-only browser audit using fixture APIs. Install Playwright + Chromium to run:
  * node scripts/audit-layout.mjs
  * PLAYWRIGHT_MODULE and CHROMIUM_EXECUTABLE may point to an existing test runtime.
@@ -89,6 +90,25 @@ try{
     return issues;
    });
    failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
+   if(process.env.LAYOUT_CHECK_COMPACT==='1'){
+    const compact=await page.evaluate(()=>{
+     const issues=[];
+     if(location.pathname==='/'){
+      if(document.body.textContent.includes('Alerts & Updates'))issues.push('Removed overview panel is still present');
+      if(innerWidth>=1440){const cards=[...document.querySelectorAll('.overview-primary-row>.card')].map(e=>e.getBoundingClientRect());if(cards.length===2&&Math.abs(cards[0].top-cards[1].top)>2)issues.push('Primary widgets are not in the same row');const tiles=[...document.querySelectorAll('.overview-primary-row .resource-tile')].map(e=>e.getBoundingClientRect().top);if(new Set(tiles.map(Math.round)).size>1)issues.push('Resource metrics do not share a desktop row');}
+     }
+     if(location.pathname==='/docker'){
+      if(document.querySelector('.docker-host-picker'))issues.push('Separate host picker panel is still present');
+      const picker=document.querySelector('.docker-host-selector.compact'),header=picker?.closest('.page-header,.volume-header,.vm-toolbar');
+      if(!header)issues.push('Host selector is outside the page heading');
+      else if(innerWidth>=1440){const heading=header.querySelector('h1,h2'),a=heading?.getBoundingClientRect(),b=picker.getBoundingClientRect();if(a&&Math.min(a.bottom,b.bottom)<=Math.max(a.top,b.top))issues.push('Host selector wraps away from the desktop title');}
+      if(new URLSearchParams(location.search).get('tab')==='Updates'&&!document.querySelector('.docker-updates .page-header .refresh-button'))issues.push('Update check button is outside the header');
+     }
+     return issues;
+    });failures.push(...compact.map(p=>`${width}px ${route}: ${p}`));
+   }
+   if(process.env.LAYOUT_SCREENSHOTS){mkdirSync(process.env.LAYOUT_SCREENSHOTS,{recursive:true});await page.screenshot({path:`${process.env.LAYOUT_SCREENSHOTS}/${width}-${route.replace(/[^a-z0-9]/gi,'_')}.png`,fullPage:true});}
+
    if(checkRefresh){
     const buttons=page.locator('button.refresh-button:visible');
     for(let index=0;index<await buttons.count();index++){

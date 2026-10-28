@@ -68,7 +68,7 @@ test('LXC information does not display VM permission repair after successful dis
 test('Overview uses the bell attention total and links pending connector updates to setup',async()=>{
  const updates=[{id:'update',kind:'update',severity:'info',title:'Connector update available: node02',message:'Update the paired host',link:'/settings?tab=Connections&connector=node02'}];
  const page=await mounted('pages/Overview.tsx',{},async p=>p==='/auth/me'?{user:{role:'owner'}}:p==='/header-notifications'?{attentionCount:2,updateCount:2,criticalCount:0,attention:updates}:p==='/backups'?{points:[],jobs:[]}:sample());
- try{assert.equal(stat(page,'Alerts').querySelector('strong').textContent,'2');assert.match(stat(page,'Alerts').textContent,/0 Critical.*2 Updates/);assert.equal(stat(page,'Alerts').getAttribute('href'),updates[0].link);assert.ok(page.container.textContent.includes(updates[0].title));assert.match(page.container.querySelector('.overview-toolbar').textContent,/2 item\(s\) need attention/);}finally{await page.close()}
+ try{assert.equal(stat(page,'Alerts').querySelector('strong').textContent,'2');assert.match(stat(page,'Alerts').textContent,/0 Critical.*2 Updates/);assert.equal(stat(page,'Alerts').getAttribute('href'),updates[0].link);assert.equal(page.container.textContent.includes('Alerts & Updates'),false);assert.equal(page.container.querySelector('.alert-preview'),null);assert.match(page.container.querySelector('.overview-toolbar').textContent,/2 item\(s\) need attention/);}finally{await page.close()}
 });
 test('backup archive coverage and job coverage are independent and shared archives count once',async()=>{
  const point={shared:true,storage:'shared',volid:'shared:backup/one'};

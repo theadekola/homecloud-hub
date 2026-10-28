@@ -1,3 +1,4 @@
+import BrandIcon from '../components/BrandIcon';
 import RefreshButton from '../components/RefreshButton';
 import {cardValue} from '../components/ReportLoading';
 import {InspectableRow} from '../components/TableActions';
@@ -28,9 +29,9 @@ export default function DockerVolumes({navigation,hostSelector,data,enabled,admi
  const reload=async()=>{await Promise.all([refresh(),usage.refresh()]);};
  const run=async(path:string,method='POST',body:any={})=>{setBusy(true);setError('');setNotice('');try{const result=await confirmedApi(path,{method,body:method==='DELETE'?undefined:JSON.stringify(body)});setNotice(result.result?.SpaceReclaimed!=null?`Completed. Docker reclaimed ${bytes(result.result.SpaceReclaimed)}.`:'Operation completed.');if(modal==='Create Volume')setSuccess('Docker volume configured successfully.');else setModal('');await reload();}catch(e:any){setError(e.message)}finally{setBusy(false)}};
  const submit=(e:any)=>{e.preventDefault();return run('/docker/volume','POST',Object.fromEntries(new FormData(e.currentTarget)));};
- return <div className="docker-volumes"><div className="volume-header"><div><small className="muted">Docker › {data?.host?.hostname||'Engine connection'} › Volumes</small><h2>Docker Volumes</h2><p className="muted">Manage persistent storage for your containers.</p></div><div className="header-actions"><button className="btn secondary" disabled={!enabled||!admin||busy} onClick={()=>run('/docker/prune/volumes')}><Trash2 size={14}/>Prune Unused Anonymous Volumes</button><button className="btn primary" disabled={!enabled||busy} onClick={()=>{setError('');setModal('Create Volume')}}><Plus size={14}/>Create Volume</button></div></div>
+ return <div className="docker-volumes"><div className="volume-header"><div><small className="muted">Docker › {data?.host?.hostname||'Engine connection'} › Volumes</small><h2><BrandIcon brand="docker" size={24}/>Docker Volumes</h2><p className="muted">Manage persistent storage for your containers.</p></div><div className="header-actions"><button className="btn secondary" disabled={!enabled||!admin||busy} onClick={()=>run('/docker/prune/volumes')}><Trash2 size={14}/>Prune Unused Anonymous Volumes</button><button className="btn primary" disabled={!enabled||busy} onClick={()=>{setError('');setModal('Create Volume')}}><Plus size={14}/>Create Volume</button></div>{hostSelector}</div>
  {error&&<p className="error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
- {hostSelector}
+
  <div className="volume-summary metric-grid">{[[Database,'Total Volumes',data?.host?volumes.length:'Unknown','Engine inventory'],[HardDrive,'Used Space',bytes(total),`${known.length} measured volumes`],[Archive,'Unused Volumes',data?.host?unused.length:'Unknown','No container references'],[Trash2,'Unused Data Size',bytes(reclaimable),'Pruning may remove only a subset']].map(([Icon,label,value,sub]:any)=><Card className="volume-stat" key={label}><span className="volume-stat-icon"><Icon size={24}/></span><div><small>{label}</small><strong>{cardValue(value,{data})}</strong><small className="muted">{sub}</small></div></Card>)}</div>
  {navigation}
  {usage.error&&data?.host&&<p className="muted">Volume sizes unavailable: {usage.error}. Inventory and container references remain available.</p>}

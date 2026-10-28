@@ -1,3 +1,4 @@
+import BrandIcon from './BrandIcon';
 import {lockPageScroll} from '../scroll-lock';
 import {cardValue} from './ReportLoading';
 import PageIcon, {pageIconForTitle} from './PageIcon';
@@ -5,7 +6,7 @@ import React, { useEffect, useState, useRef, useId } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 
 export function PageHeader({title, subtitle, actions}:{title:string; subtitle:string; actions?:React.ReactNode}) {
-  return <div className="page-header"><div><h1><PageIcon name={pageIconForTitle(title)} className="page-title-icon"/>{title}</h1><p>{subtitle}</p></div><div className="header-actions">{actions}</div></div>
+  return <div className="page-header"><div><h1>{/docker|compose|container/i.test(title)?<BrandIcon brand="docker" size={27}/>:<PageIcon name={pageIconForTitle(title)} className="page-title-icon"/>}{title}</h1><p>{subtitle}</p></div><div className="header-actions">{actions}</div></div>
 }
 
 export function Card({children, className=''}:{children:React.ReactNode; className?:string}) {

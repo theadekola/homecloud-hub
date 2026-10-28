@@ -110,3 +110,21 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .refresh-button[data-refreshing="true"] :is(.lucide-refresh-cw,.lucide-refresh-ccw){animation:report-loading-rotate .8s linear infinite;transform-origin:center}
 .refresh-button-error{color:var(--theme-text);font-size:12px;line-height:1.5;flex-basis:100%;overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.refresh-button[data-refreshing="true"] :is(.lucide-refresh-cw,.lucide-refresh-ccw){animation:none;opacity:.65}}
+
+/* The dashboard's primary measurements share one row; optional widgets follow. */
+.overview-v2{container:overview / inline-size}
+.content .overview-v2 .overview-primary-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;min-inline-size:0;align-items:stretch}
+.content .overview-v2 .overview-primary-row.single-widget{grid-template-columns:minmax(0,1fr)}
+.content .overview-v2 .overview-primary-row .resource-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+@container overview (max-width:740px){.content .overview-v2 .overview-primary-row{grid-template-columns:minmax(0,1fr)}}
+@container overview (max-width:430px){.content .overview-v2 .overview-primary-row .resource-tiles{grid-template-columns:minmax(0,1fr)}}
+/* Host selection belongs to the resource heading, rather than a second panel. */
+.docker-host-selector.compact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-inline-size:0;max-inline-size:100%}
+.docker-host-selector.compact>label{display:flex;align-items:center;gap:8px;min-inline-size:0;margin:0;font-size:12px;white-space:nowrap}
+.docker-host-selector.compact select{max-inline-size:260px;min-inline-size:0}
+.content .docker-manager :is(.page-header,.volume-header,.vm-toolbar)>.docker-host-selector{margin-left:auto}
+.content .docker-manager :is(.page-header,.volume-header,.vm-toolbar){flex-wrap:wrap;gap:12px}
+.content .docker-manager :is(h1,h2){display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.content :is(.vm-title,.nodes-title,.page-header,.network-panel-head) :is(h1,h2)>.page-title-icon{vertical-align:middle}
+.docker-update-status{display:block;line-height:1.6;margin:0 0 12px}
+@media(max-width:700px){.docker-host-selector.compact,.docker-host-selector.compact>label{width:100%}.docker-host-selector.compact select{flex:1;max-inline-size:100%}.content .docker-manager :is(.page-header,.volume-header,.vm-toolbar)>.docker-host-selector{margin-left:0}}

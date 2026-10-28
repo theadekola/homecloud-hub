@@ -43,14 +43,16 @@ function fixture(path){
 }
 const routes=['/','/proxmox','/docker','/storage','/network','/backups','/monitoring','/alerts','/ai','/users','/settings','/tools/sftp','/tools/shell'];
 for(const [page,tabs] of Object.entries({
- proxmox:['Nodes','Virtual Machines','LXC Containers','Storage','Tasks & Logs'],
+ proxmox:['Overview','Nodes','Virtual Machines','LXC Containers','Storage','Networks','Tasks & Logs'],
  docker:['Images','Volumes','Networks','Compose Stacks','Events','Updates'],
- storage:['Disks','Datasets / Volumes','Snapshots','Shares','Performance'],
- network:['Interfaces','Devices','Routing','DNS','Traffic Analysis'],
- backups:['Restore Points','Schedules','Retention Policies','Destinations','Reports'],
+ storage:['Configuration','Disks','Datasets / Volumes','Snapshots','Shares','Performance'],
+ network:['Interfaces','Devices','Routing','DNS','Traffic Analysis','Docker Networks'],
+ backups:['Restore Points','Schedules','Retention Policies','Destinations','Reports','Recovery Tests'],
+ monitoring:['Provider Jobs','Hardware & Diagnostics'],
  alerts:['Alert History','Alert Rules'],users:['Audit Logs'],
- settings:['System','Security','Connections','Appearance','About']
+ settings:['General','System','Security','Connections','Appearance','About']
 }))for(const tab of tabs)routes.push(`/${page}?tab=${encodeURIComponent(tab)}`);
+for(const section of ['connected','setup','notifications','remote'])routes.push(`/settings?tab=Connections&section=${section}`);
 const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
 const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
@@ -90,6 +92,20 @@ try{
     return issues;
    });
    failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
+   if(process.env.LAYOUT_CHECK_PATHS==='1'){
+    const path=page.getByRole('navigation',{name:'Page path',exact:true});
+    if(route==='/')assert.equal(await path.count(),0,'Overview must have no page path');
+    else{
+     assert.equal(await path.count(),1,`${route}: exactly one shared page path`);
+     const current=path.locator('[aria-current=page]');assert.equal(await current.count(),1,`${route}: one current section`);
+     const requested=new URL(route,base).searchParams.get('tab');
+     if(requested&&route.startsWith('/settings')){
+      assert.ok((await path.innerText()).includes(requested),`${route}: selected Settings tab in path`);
+      const titles={General:'General Settings',System:'System Settings',Security:'Security Settings',Connections:'Connections',Appearance:'Appearance Settings',About:'About i-Clusters'};
+      assert.equal(await page.locator('.content h1').first().innerText(),titles[requested],`${route}: Settings title matches tab`);
+     }
+    }
+   }
    if(process.env.LAYOUT_CHECK_COMPACT==='1'){
     const compact=await page.evaluate(()=>{
      const issues=[];
@@ -123,6 +139,19 @@ try{
     }
    }
 
+  }
+  if(process.env.LAYOUT_CHECK_PATHS==='1'){
+   await page.goto(base+'settings?tab=General');
+   await page.getByRole('navigation',{name:'Settings sections',exact:true}).getByRole('button',{name:'Security',exact:true}).click();
+   await page.getByRole('heading',{name:'Security Settings',exact:true}).waitFor();
+   assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Security');
+   await page.getByRole('navigation',{name:'Page path',exact:true}).getByRole('link',{name:'Settings',exact:true}).click();
+   await page.getByRole('heading',{name:'General Settings',exact:true}).waitFor();
+   await page.goto(base+'docker?tab=Volumes');
+   await page.locator('.page-breadcrumbs').waitFor();
+   await page.evaluate(()=>{localStorage.setItem('iclusters_docker_host','docker-fixture');window.dispatchEvent(new Event('iclusters-connection'));});
+   await page.waitForFunction(()=>document.querySelector('.page-breadcrumbs')?.textContent.includes('control-vm'));
+   assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
   }
   await page.goto(base);await page.getByRole('button',{name:'Add Widget'}).click();
   await page.getByRole('dialog').waitFor();

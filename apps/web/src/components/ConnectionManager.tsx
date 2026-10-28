@@ -25,7 +25,7 @@ const titles:any={proxmox:'Proxmox',docker:'Docker',truenas:'TrueNAS'};
 const Icon=({provider,size=26}:{provider:string;size?:number})=><BrandIcon brand={provider} size={size} fallback="server"/>;
 const time=(value:string)=>value&&!Number.isNaN(Date.parse(value))?new Date(value).toLocaleString():'Not yet checked';
 const compactTime=(value:string)=>value&&!Number.isNaN(Date.parse(value))?new Date(value).toLocaleString([],{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'Not yet checked';
-function ConnectionHeader({actions}:{actions?:ReactNode}){return <header className="settings-overview-heading"><PageIcon name="settings" size={31}/><div><h1>Settings</h1><p>Configure and customize your i-Clusters.</p></div>{actions}</header>}
+function ConnectionHeader({actions}:{actions?:ReactNode}){return <header className="settings-overview-heading"><PageIcon name="settings" size={31}/><div><h1>Connections</h1><p>Configure and customize your i-Clusters.</p></div>{actions}</header>}
 export default function ConnectionManager({navigation}:{navigation?:ReactNode}={}){
  const session=useApi<any>('/auth/me',null);
  if(session.error)return <p role="alert">{session.error}</p>;

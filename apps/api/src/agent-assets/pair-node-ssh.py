@@ -1,4 +1,5 @@
 """Fixed SSH bootstrap, scoped to one verified Proxmox node. Input is never shell text."""
+import urllib.error
 import ast,base64,fcntl,hashlib,json,os,pathlib,shutil,socket,ssl,subprocess,sys,tempfile,urllib.request,urllib.parse,zlib
 
 def execute(payload,root=pathlib.Path('/'),run=subprocess.run,hostname=socket.gethostname,which=shutil.which,check_url=None):
@@ -63,8 +64,19 @@ WantedBy=multi-user.target
             except Exception: pass
             raise
 
+def read_payload(stream):
+    # sudo may consume the password line, or leave it when NOPASSWD applies.
+    # The fixed marker makes both cases unambiguous without treating input as code.
+    line=stream.readline().rstrip('\r\n')
+    if line!='ICLUSTERS_PAIRING_V1': line=stream.readline().rstrip('\r\n')
+    if line!='ICLUSTERS_PAIRING_V1': raise RuntimeError('invalid-payload')
+    return json.load(stream)
+
 if __name__=='__main__':
-    try: print(json.dumps(execute(json.load(sys.stdin))))
+    try: print(json.dumps(execute(read_payload(sys.stdin))))
     except Exception as error:
-        allowed=['wrong-guest','docker-required','root-required','wrong-node','not-proxmox','invalid-url','already-installed','source-mismatch','missing-pairing','service-failed','controller-unreachable']
-        print(json.dumps({'error':str(error) if str(error) in allowed else 'bootstrap-failed'}));sys.exit(1)
+        reason=str(error)
+        if isinstance(error,ssl.SSLError) or isinstance(getattr(error,'reason',None),ssl.SSLError): reason='controller-tls'
+        elif isinstance(error,(urllib.error.URLError,TimeoutError,ConnectionError)): reason='controller-network'
+        allowed=['controller-tls','controller-network','invalid-payload','wrong-guest','docker-required','root-required','wrong-node','not-proxmox','invalid-url','already-installed','source-mismatch','missing-pairing','service-failed','controller-unreachable']
+        print(json.dumps({'error':reason if reason in allowed else 'bootstrap-failed'}));sys.exit(1)

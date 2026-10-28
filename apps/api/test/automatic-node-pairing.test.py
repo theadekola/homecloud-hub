@@ -37,3 +37,10 @@ with tempfile.TemporaryDirectory() as temp:
  try:test(pathlib.Path(temp),{**payload,'kind':'docker','identity':{'uuid':'wrong'}})
  except RuntimeError as e:assert str(e)=='wrong-guest'
  else:raise AssertionError('Wrong Docker guest accepted')
+
+import io
+for prefix in ['', 'sudo-password\n']:
+    assert module.read_payload(io.StringIO(prefix+'ICLUSTERS_PAIRING_V1\n'+json.dumps({'mode':'probe'})))=={'mode':'probe'}
+try: module.read_payload(io.StringIO('bad\nnot-a-marker\n{}'))
+except RuntimeError as e: assert str(e)=='invalid-payload'
+else: raise AssertionError('Invalid framing accepted')

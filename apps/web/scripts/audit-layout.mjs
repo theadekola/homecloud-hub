@@ -25,6 +25,8 @@ function fixture(path){
  if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:'owner'}};
  if(path==='/header-notifications')return {attentionCount:1,updateCount:1,criticalCount:0,attention:[{id:'update',kind:'update',title:'Docker image update available',message:'control-vm / zabbix-postgres · postgres:16 has a new registry image',severity:'info',link:'/docker?tab=Updates'}]};
  if(path==='/docker/updates')return {rows:[],settings:{enabled:true,intervalHours:6}};
+ if(path==='/account/sessions')return {sessions:[]};
+ if(path==='/account/security')return {mfaEnabled:false,recoveryCodesRemaining:0};
  if(path==='/security')return {password:{minimumCharacters:12,maximumBytes:72},roles:['owner','admin','operator','viewer'],twoFactor:true};
  if(path==='/storage/shares')return {...sample,resources:[{id:'share-1',resourceId:'1',name:'Backups',protocol:'SMB',provider:'truenas',path:'/mnt/pool/backups',enabled:true}]};
  if(path==='/storage/disks')return {...sample,resources:[{id:'disk-1',name:'/dev/sda',provider:'proxmox',node:'node01',type:'ssd',size:100*1024**3,health:'PASSED'}]};
@@ -67,7 +69,7 @@ try{
  for(const width of widths){
   await page.setViewportSize({width,height:1000});
   for(const route of selectedRoutes){
-   errors=[];await page.goto(base.replace(/\/$/,'')+route);await page.waitForTimeout(350);
+   errors=[];await page.goto(base.replace(/\/$/,'')+route);await page.locator('.content h1,.content h2').first().waitFor({timeout:15000}).catch(async()=>{throw Error(`Page did not render: ${route}; ${errors.join('; ')}; ${(await page.locator('body').innerText()).slice(0,300)}`)});await page.waitForTimeout(350);
    const problems=await page.evaluate(()=>{
     const issues=[];
     if(document.documentElement.scrollWidth>innerWidth+1)issues.push('Page has horizontal overflow');

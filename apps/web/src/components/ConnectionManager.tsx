@@ -1,3 +1,4 @@
+import PageIcon from './PageIcon';
 import {connectionTestState} from '../connection-test-state';
 import {cardValue} from './ReportLoading';
 import ReportLoading from './ReportLoading';
@@ -6,9 +7,9 @@ import ConnectorUpdateDialog from './ConnectorUpdateDialog';
 import EmptyStateArtwork from './EmptyStateArtwork';
 import BrandIcon from './BrandIcon';
 import ConfigurationDialog from './ConfigurationDialog';
-import {useEffect,useState} from 'react';
+import {useEffect,useState,type ReactNode} from 'react';
 import {Link,useNavigate,useSearchParams} from 'react-router-dom';
-import {Link2,Plus,Search,Check,ArrowUpRight,Settings,LayoutGrid,List,RefreshCw,Wifi,AlertCircle,Bell} from 'lucide-react';
+import {Plus,Search,Check,ArrowUpRight,Settings,LayoutGrid,List,RefreshCw,Wifi,AlertCircle,Bell} from 'lucide-react';
 import {useApi} from '../hooks';
 import {api,setDockerHost} from '../api';
 import {Card,Badge,Modal} from './UI';
@@ -23,13 +24,14 @@ const titles:any={proxmox:'Proxmox',docker:'Docker',truenas:'TrueNAS'};
 const Icon=({provider,size=26}:{provider:string;size?:number})=><BrandIcon brand={provider} size={size} fallback="server"/>;
 const time=(value:string)=>value&&!Number.isNaN(Date.parse(value))?new Date(value).toLocaleString():'Not yet checked';
 const compactTime=(value:string)=>value&&!Number.isNaN(Date.parse(value))?new Date(value).toLocaleString([],{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}):'Not yet checked';
-export default function ConnectionManager(){
+function ConnectionHeader({actions}:{actions?:ReactNode}){return <header className="settings-overview-heading"><PageIcon name="settings" size={31}/><div><h1>Settings</h1><p>Configure and customize your i-Clusters.</p></div>{actions}</header>}
+export default function ConnectionManager({navigation}:{navigation?:ReactNode}={}){
  const session=useApi<any>('/auth/me',null);
  if(session.error)return <p role="alert">{session.error}</p>;
  if(!session.data)return <p>Checking connection permissions…</p>;
- return session.data.user.role==='owner'?<OwnerConnections/>:<Card><h3>Connections</h3><p>Ask an i-Clusters owner to add or change connections.</p></Card>;
+ return session.data.user.role==='owner'?<OwnerConnections navigation={navigation}/>:<><ConnectionHeader/>{navigation}<Card><h3>Connections</h3><p>Ask an i-Clusters owner to add or change connections.</p></Card></>;
 }
-function OwnerConnections(){
+function OwnerConnections({navigation}:{navigation?:ReactNode}){
  const notifications=useApi<any>('/notifications',null),ai=useApi<any>('/configuration/ai',null);
  const [guestRevision,setGuestRevision]=useState(0);
  const [configuration,setConfiguration]=useState(''),[updateNode,setUpdateNode]=useState<any>(null);
@@ -68,9 +70,10 @@ function OwnerConnections(){
  const row=rows.find((r:any)=>r.id===selected),edit=(r:any)=>r.id==='proxmox'?'proxmox':r.id==='direct'?'direct':['truenas','ai'].includes(r.provider)?r.provider:'';
  const gotoSetup=()=>{setSelected('');setFilter('all');setSearch('');changeSection('setup');setTimeout(()=>document.getElementById('connection-guest-setup')?.scrollIntoView?.({behavior:'smooth',block:'start'}),0)};
  return <section className="connections-page" aria-label="Connections">
- <header className="connections-hero"><div className="connection-title-icon"><Link2 size={28}/></div><div><small>SETTINGS / CONNECTIONS</small><h1>Your infrastructure, connected</h1><p>Set up providers, connect guests and manage alert delivery in one place.</p></div><div className="connection-heading-actions"><button className="btn secondary" aria-busy={busy||health.loading} disabled={busy||health.loading} onClick={checkSetup}><RefreshCw size={16}/>{busy?'Checking…':'Recheck Connections'}</button><button className="btn primary" aria-busy={busy} disabled={busy} onClick={()=>choose('choose')}><Plus size={17}/>Add Connection</button></div></header>
+ <ConnectionHeader actions={<div className="settings-overview-actions connection-heading-actions"><button className="btn secondary" aria-busy={busy||health.loading} disabled={busy||health.loading} onClick={checkSetup}><RefreshCw size={16}/>{busy?'Checking…':'Recheck Connections'}</button><button className="btn primary" aria-busy={busy} disabled={busy} onClick={()=>choose('choose')}><Plus size={17}/>Add Connection</button></div>}/>
+ {navigation}
  <div className="connection-overview" aria-label="Connection summary"><button type="button" onClick={()=>changeSection('connected')}><span className="connection-stat-icon"><Wifi size={22}/></span><span><strong>{cardValue(ready.length,summaryReading)}</strong><small>Connected sources</small></span><Check size={18}/></button><button type="button" onClick={()=>changeSection('setup')}><span className="connection-stat-icon warning"><AlertCircle size={22}/></span><span><strong>{cardValue(attention.length,summaryReading)}</strong><small>Sources needing attention</small></span><ArrowUpRight size={18}/></button><button type="button" onClick={()=>changeSection('notifications')}><span className="connection-stat-icon"><Bell size={22}/></span><span><strong>{notifications.error?'Unknown':notifications.data?notifications.data.channels?.length||0:'…'}</strong><small>Notification channels configured</small></span><ArrowUpRight size={18}/></button></div>
- <nav className="connection-workspaces" aria-label="Connection sections">{[['connected','Connected',Wifi],['setup','Needs Setup',Settings],['notifications','Notifications',Bell],['remote','Remote Access',Wifi]].map(([id,label,Glyph]:any)=><button type="button" key={id} aria-current={section===id?'page':undefined} className={section===id?'active':''} onClick={()=>changeSection(id)}><Glyph size={18}/>{label}</button>)}</nav>
+ <nav className="connection-workspaces tabs" aria-label="Connection sections">{[['connected','Connected',Wifi],['setup','Needs Setup',Settings],['notifications','Notifications',Bell],['remote','Remote Access',Wifi]].map(([id,label,Glyph]:any)=><button type="button" key={id} aria-current={section===id?'page':undefined} className={`tab ${section===id?'active':''}`} onClick={()=>changeSection(id)}><Glyph size={18}/>{label}</button>)}</nav>
  {(error||cluster.error||direct.error||nodes.error||health.error)&&<div className="connection-feedback" role="alert"><p className="error">{error||cluster.error||direct.error||nodes.error||health.error}</p><button type="button" className="btn secondary small" aria-busy={busy} disabled={busy} onClick={checkSetup}>Retry connection checks</button></div>}{message&&<p role="status" className="connection-feedback">{message}</p>}
  {section==='remote'?<OperationsHealth remote/>:section==='notifications'?<div className="settings-overview-grid notification-settings-grid connection-notifications"><NotificationSettings owner editing busy={busy} search=""/></div>:<>
  <div className="connection-section-heading" id="connection-health"><div><h2>{section==='connected'?'Connected sources':'Complete your connections'}</h2><p>{section==='connected'?'Verified infrastructure sources and their management pages.':'Resolve access issues below. Guest agents and optional Docker setup are listed separately.'}</p></div><label className="connection-search"><Search size={17}/><input aria-label="Search connections" placeholder="Search name, node or address…" value={search} onChange={e=>setSearch(e.target.value)}/></label></div>

@@ -1,307 +1,308 @@
+import {brandIconImages} from './bundled-icon-images';
 export const brandAssets:Record<string,{name:string;src:string;category:string}>={
   "proxmox": {
     "name": "Proxmox VE",
-    "src": "/assets/brands/proxmox.svg",
+    "src": brandIconImages["proxmox"],
     "category": "service"
   },
   "docker": {
     "name": "Docker",
-    "src": "/assets/brands/docker.svg",
+    "src": brandIconImages["docker"],
     "category": "service"
   },
   "truenas": {
     "name": "TrueNAS",
-    "src": "/assets/brands/truenas.svg",
+    "src": brandIconImages["truenas"],
     "category": "service"
   },
   "discord": {
     "name": "Discord",
-    "src": "/assets/brands/discord.svg",
+    "src": brandIconImages["discord"],
     "category": "service"
   },
   "telegram": {
     "name": "Telegram",
-    "src": "/assets/brands/telegram.svg",
+    "src": brandIconImages["telegram"],
     "category": "service"
   },
   "ubuntu": {
     "name": "Ubuntu",
-    "src": "/assets/brands/ubuntu.svg",
+    "src": brandIconImages["ubuntu"],
     "category": "os"
   },
   "debian": {
     "name": "Debian",
-    "src": "/assets/brands/debian.svg",
+    "src": brandIconImages["debian"],
     "category": "os"
   },
   "linux": {
     "name": "Linux",
-    "src": "/assets/brands/linux.svg",
+    "src": brandIconImages["linux"],
     "category": "os"
   },
   "alpinelinux": {
     "name": "Alpine Linux",
-    "src": "/assets/brands/alpinelinux.svg",
+    "src": brandIconImages["alpinelinux"],
     "category": "os"
   },
   "archlinux": {
     "name": "Arch Linux",
-    "src": "/assets/brands/archlinux.svg",
+    "src": brandIconImages["archlinux"],
     "category": "os"
   },
   "fedora": {
     "name": "Fedora",
-    "src": "/assets/brands/fedora.svg",
+    "src": brandIconImages["fedora"],
     "category": "os"
   },
   "redhat": {
     "name": "Red Hat",
-    "src": "/assets/brands/redhat.svg",
+    "src": brandIconImages["redhat"],
     "category": "os"
   },
   "centos": {
     "name": "Centos",
-    "src": "/assets/brands/centos.svg",
+    "src": brandIconImages["centos"],
     "category": "os"
   },
   "rockylinux": {
     "name": "Rocky Linux",
-    "src": "/assets/brands/rockylinux.svg",
+    "src": brandIconImages["rockylinux"],
     "category": "os"
   },
   "almalinux": {
     "name": "AlmaLinux",
-    "src": "/assets/brands/almalinux.svg",
+    "src": brandIconImages["almalinux"],
     "category": "os"
   },
   "opensuse": {
     "name": "openSUSE",
-    "src": "/assets/brands/opensuse.svg",
+    "src": brandIconImages["opensuse"],
     "category": "os"
   },
   "freebsd": {
     "name": "FreeBSD",
-    "src": "/assets/brands/freebsd.svg",
+    "src": brandIconImages["freebsd"],
     "category": "os"
   },
   "openbsd": {
     "name": "OpenBSD",
-    "src": "/assets/brands/openbsd.svg",
+    "src": brandIconImages["openbsd"],
     "category": "os"
   },
   "android": {
     "name": "Android",
-    "src": "/assets/brands/android.svg",
+    "src": brandIconImages["android"],
     "category": "os"
   },
   "apple": {
     "name": "macOS",
-    "src": "/assets/brands/apple.svg",
+    "src": brandIconImages["apple"],
     "category": "os"
   },
   "linuxmint": {
     "name": "Linux Mint",
-    "src": "/assets/brands/linuxmint.svg",
+    "src": brandIconImages["linuxmint"],
     "category": "os"
   },
   "kalilinux": {
     "name": "Kali Linux",
-    "src": "/assets/brands/kalilinux.svg",
+    "src": brandIconImages["kalilinux"],
     "category": "os"
   },
   "raspberrypi": {
     "name": "Raspberry Pi OS",
-    "src": "/assets/brands/raspberrypi.svg",
+    "src": brandIconImages["raspberrypi"],
     "category": "os"
   },
   "nixos": {
     "name": "NixOS",
-    "src": "/assets/brands/nixos.svg",
+    "src": brandIconImages["nixos"],
     "category": "os"
   },
   "gentoo": {
     "name": "Gentoo",
-    "src": "/assets/brands/gentoo.svg",
+    "src": brandIconImages["gentoo"],
     "category": "os"
   },
   "react": {
     "name": "React",
-    "src": "/assets/brands/react.svg",
+    "src": brandIconImages["react"],
     "category": "service"
   },
   "nodedotjs": {
     "name": "Node.js",
-    "src": "/assets/brands/nodedotjs.svg",
+    "src": brandIconImages["nodedotjs"],
     "category": "service"
   },
   "express": {
     "name": "Express",
-    "src": "/assets/brands/express.svg",
+    "src": brandIconImages["express"],
     "category": "service"
   },
   "typescript": {
     "name": "TypeScript",
-    "src": "/assets/brands/typescript.svg",
+    "src": brandIconImages["typescript"],
     "category": "service"
   },
   "postgresql": {
     "name": "PostgreSQL",
-    "src": "/assets/brands/postgresql.svg",
+    "src": brandIconImages["postgresql"],
     "category": "service"
   },
   "vite": {
     "name": "Vite",
-    "src": "/assets/brands/vite.svg",
+    "src": brandIconImages["vite"],
     "category": "service"
   },
   "github": {
     "name": "GitHub",
-    "src": "/assets/brands/github.svg",
+    "src": brandIconImages["github"],
     "category": "service"
   },
   "homeassistant": {
     "name": "Home Assistant",
-    "src": "/assets/brands/homeassistant.svg",
+    "src": brandIconImages["homeassistant"],
     "category": "service"
   },
   "jellyfin": {
     "name": "Jellyfin",
-    "src": "/assets/brands/jellyfin.svg",
+    "src": brandIconImages["jellyfin"],
     "category": "service"
   },
   "plex": {
     "name": "Plex",
-    "src": "/assets/brands/plex.svg",
+    "src": brandIconImages["plex"],
     "category": "service"
   },
   "sonarr": {
     "name": "Sonarr",
-    "src": "/assets/brands/sonarr.svg",
+    "src": brandIconImages["sonarr"],
     "category": "service"
   },
   "radarr": {
     "name": "Radarr",
-    "src": "/assets/brands/radarr.svg",
+    "src": brandIconImages["radarr"],
     "category": "service"
   },
   "qbittorrent": {
     "name": "qBittorrent",
-    "src": "/assets/brands/qbittorrent.svg",
+    "src": brandIconImages["qbittorrent"],
     "category": "service"
   },
   "portainer": {
     "name": "Portainer",
-    "src": "/assets/brands/portainer.svg",
+    "src": brandIconImages["portainer"],
     "category": "service"
   },
   "nginx": {
     "name": "Nginx",
-    "src": "/assets/brands/nginx.svg",
+    "src": brandIconImages["nginx"],
     "category": "service"
   },
   "apache": {
     "name": "Apache",
-    "src": "/assets/brands/apache.svg",
+    "src": brandIconImages["apache"],
     "category": "service"
   },
   "mariadb": {
     "name": "Mariadb",
-    "src": "/assets/brands/mariadb.svg",
+    "src": brandIconImages["mariadb"],
     "category": "service"
   },
   "mysql": {
     "name": "Mysql",
-    "src": "/assets/brands/mysql.svg",
+    "src": brandIconImages["mysql"],
     "category": "service"
   },
   "redis": {
     "name": "Redis",
-    "src": "/assets/brands/redis.svg",
+    "src": brandIconImages["redis"],
     "category": "service"
   },
   "mongodb": {
     "name": "Mongodb",
-    "src": "/assets/brands/mongodb.svg",
+    "src": brandIconImages["mongodb"],
     "category": "service"
   },
   "nextcloud": {
     "name": "Nextcloud",
-    "src": "/assets/brands/nextcloud.svg",
+    "src": brandIconImages["nextcloud"],
     "category": "service"
   },
   "immich": {
     "name": "Immich",
-    "src": "/assets/brands/immich.svg",
+    "src": brandIconImages["immich"],
     "category": "service"
   },
   "grafana": {
     "name": "Grafana",
-    "src": "/assets/brands/grafana.svg",
+    "src": brandIconImages["grafana"],
     "category": "service"
   },
   "prometheus": {
     "name": "Prometheus",
-    "src": "/assets/brands/prometheus.svg",
+    "src": brandIconImages["prometheus"],
     "category": "service"
   },
   "uptimekuma": {
     "name": "Uptime Kuma",
-    "src": "/assets/brands/uptimekuma.svg",
+    "src": brandIconImages["uptimekuma"],
     "category": "service"
   },
   "adguard": {
     "name": "Adguard",
-    "src": "/assets/brands/adguard.svg",
+    "src": brandIconImages["adguard"],
     "category": "service"
   },
   "pihole": {
     "name": "Pi-hole",
-    "src": "/assets/brands/pihole.svg",
+    "src": brandIconImages["pihole"],
     "category": "service"
   },
   "traefikproxy": {
     "name": "Traefik",
-    "src": "/assets/brands/traefikproxy.svg",
+    "src": brandIconImages["traefikproxy"],
     "category": "service"
   },
   "caddy": {
     "name": "Caddy",
-    "src": "/assets/brands/caddy.svg",
+    "src": brandIconImages["caddy"],
     "category": "service"
   },
   "cloudflare": {
     "name": "Cloudflare",
-    "src": "/assets/brands/cloudflare.svg",
+    "src": brandIconImages["cloudflare"],
     "category": "service"
   },
   "gitlab": {
     "name": "Gitlab",
-    "src": "/assets/brands/gitlab.svg",
+    "src": brandIconImages["gitlab"],
     "category": "service"
   },
   "gitea": {
     "name": "Gitea",
-    "src": "/assets/brands/gitea.svg",
+    "src": brandIconImages["gitea"],
     "category": "service"
   },
   "wordpress": {
     "name": "Wordpress",
-    "src": "/assets/brands/wordpress.svg",
+    "src": brandIconImages["wordpress"],
     "category": "service"
   },
   "openai": {
     "name": "OpenAI",
-    "src": "/assets/brands/openai.svg",
+    "src": brandIconImages["openai"],
     "category": "service"
   },
   "windows": {
     "name": "Windows",
-    "src": "/assets/brands/windows.svg",
+    "src": brandIconImages["windows"],
     "category": "os"
   },
   "mssql": {
     "name": "Microsoft SQL Server",
-    "src": "/assets/brands/mssql.svg",
+    "src": brandIconImages["mssql"],
     "category": "service"
   }
 };

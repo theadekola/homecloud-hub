@@ -8,6 +8,7 @@ for unit in service timer path; do
 done
 systemctl daemon-reload
 systemctl enable --now iclusters-updater.timer iclusters-updater.path
+systemctl start --no-block iclusters-updater.service
 
 # Also runs from older installed update commands after pulling this release.
 python3 deployment/configure-https.py

@@ -1,3 +1,4 @@
+import {pageIconImages} from '../bundled-icon-images';
 import {useState} from 'react';
 import {LayoutDashboard,Database,Network,HardDriveDownload,Activity,Bell,Sparkles,Terminal,FolderOpen,Users,Settings} from 'lucide-react';
 
@@ -20,6 +21,6 @@ export function pageIconForTitle(title:string):PageIconName{
 }
 // Decorative beside a visible heading or link label. No user-provided image URLs.
 export default function PageIcon({name,size=24,className=''}:{name:PageIconName;size?:number;className?:string}){
- const [failed,setFailed]=useState(''),key=Object.hasOwn(pageIcons,name)?name:'dashboard',Fallback=pageIcons[key],dimension=Number.isFinite(size)?Math.max(12,Math.min(48,size)):24,src=`/assets/pages/${key}.svg`;
+ const [failed,setFailed]=useState(''),key=Object.hasOwn(pageIcons,name)?name:'dashboard',Fallback=pageIcons[key],dimension=Number.isFinite(size)?Math.max(12,Math.min(48,size)):24,src=pageIconImages[key];
  return <span className={`page-image-icon ${className}`} data-page-icon={key} aria-hidden="true" style={{width:dimension,height:dimension}}>{failed===src?<Fallback size={dimension}/>:<img src={src} width={dimension} height={dimension} alt="" draggable={false} decoding="async" onError={()=>setFailed(src)}/>}</span>;
 }

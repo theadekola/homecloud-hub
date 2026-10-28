@@ -9,7 +9,7 @@ cat > "$temporary/bin/git" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
   symbolic-ref) exit 0;;
-  fetch) grep -q '"state":"checking"' "$FIXTURE/status/update-status.json"; exit $?;;
+  fetch) grep -q '"state":"checking"' "$FIXTURE/status/update-status.json" || exit 1; if [[ -e "$FIXTURE/retain" ]]; then grep -q '"available":true' "$FIXTURE/status/update-status.json" || exit 1; fi; [[ ! -e "$FIXTURE/fail-fetch" ]]; exit $?;;
   rev-parse) if [[ $2 == HEAD ]]; then cat "$FIXTURE/current"; else echo bbbbbbb; fi;;
 esac
 EOF
@@ -26,6 +26,12 @@ export FIXTURE=$temporary PATH="$temporary/bin:$PATH"
 echo aaaaaaa > "$temporary/current"
 bash "$temporary/worker"
 grep -q '"available":true' "$temporary/status/update-status.json"
+touch "$temporary/retain"
+bash "$temporary/worker"
+touch "$temporary/fail-fetch"
+if bash "$temporary/worker"; then exit 1; fi
+grep -q '"available":true' "$temporary/status/update-status.json"
+rm "$temporary/retain" "$temporary/fail-fetch"
 echo '{}' > "$temporary/repo/runtime/update-request.json"
 bash "$temporary/worker"
 grep -q '"state":"completed"' "$temporary/status/update-status.json"

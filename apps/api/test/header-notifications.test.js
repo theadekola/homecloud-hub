@@ -52,3 +52,8 @@ test('manual resolution leaves attention counts and uses manual wording instead 
  alert.status='resolved';alert.resolution='manual';observeHeaderActivity(state,snapshot);
  const result=feed.read(user);assert.equal(result.badgeCount,0);assert.equal(result.attentionCount,0);assert.ok(result.activity.some(r=>r.title==='Manually resolved: Offline'));assert.ok(!result.activity.some(r=>r.title==='Recovered: Offline'));
 });
+
+test('owners see available updates throughout checking and get actionable warnings for stale workers',()=>{
+ const {feed}=fixture();for(const state of ['ready','checking']){const result=feed.read(owner,{enabled:true,configured:true,available:true,state});assert.equal(result.updateCount,1);assert.equal(result.attention[0].title,'Software update available')}
+ const stale=feed.read(owner,{enabled:false,configured:true,available:true,state:'unavailable',message:'Worker is stale.'});assert.equal(stale.updateCount,1);assert.equal(stale.attention[0].title,'Software updater needs attention');assert.equal(stale.attention[0].severity,'warning');assert.match(stale.attention[0].message,/stale/);assert.equal(feed.read(user,{enabled:false,configured:true,state:'unavailable'}).updateCount,0);assert.equal(feed.read(owner,{enabled:true,configured:true,available:false,state:'completed'}).updateCount,0);
+});

@@ -19,3 +19,8 @@ test('bundled product logo is the existing PNG artwork and needs no separate ima
  assert.deepEqual(Buffer.from(encoded,'base64'),fs.readFileSync(path.join(root,'public/assets/iclusters-192.png')));
  for(const file of ['pages/Login.tsx','components/Layout.tsx','components/AboutSettings.tsx']){const component=fs.readFileSync(path.join(root,'src',file),'utf8');assert.match(component,/src=\{productLogo\}/);assert.doesNotMatch(component,/src="\/assets\/iclusters-/)}
 });
+
+test('system and page icon catalogs bundle decodable PNG headers with full source coverage',()=>{
+ const source=fs.readFileSync(path.join(root,'src/bundled-icon-images.ts'),'utf8'),catalog=name=>JSON.parse(source.split('export const '+name+':Record<string,string>=')[1].split(';\n')[0]),brands=catalog('brandIconImages'),pages=catalog('pageIconImages');assert.equal(Object.keys(brands).length,61);assert.equal(Object.keys(pages).length,11);
+ for(const data of [...Object.values(brands),...Object.values(pages)]){assert.match(data,/^data:image\/png;base64,/);const bytes=Buffer.from(data.split(',')[1],'base64');assert.equal(bytes.subarray(1,4).toString(),'PNG');assert.equal(bytes.readUInt32BE(16),192);assert.equal(bytes.readUInt32BE(20),192)}
+});

@@ -11,6 +11,9 @@ latest=$current
 available=false
 state=ready
 message='Up to date.'
+# Keep a previously detected release visible while the next fetch is in progress.
+prior_latest=$(python3 -c 'import json,re; s=json.load(open("/var/lib/iclusters-updater/update-status.json")); v=s.get("latest", ""); print(v if s.get("available") and re.fullmatch(r"[a-fA-F0-9]{7,40}", v) else "")' 2>/dev/null || true)
+if [[ -n $prior_latest && $prior_latest != "$current" ]]; then latest=$prior_latest; available=true; fi
 write_status() {
   printf '{"current":"%s","latest":"%s","available":%s,"state":"%s","message":"%s","checkedAt":"%s","checkId":"%s"}\n' "$current" "$latest" "$available" "$state" "$message" "$(date -u +%FT%TZ)" "$check_id" > /var/lib/iclusters-updater/update-status.json.tmp
   mv /var/lib/iclusters-updater/update-status.json.tmp /var/lib/iclusters-updater/update-status.json
@@ -26,6 +29,7 @@ state=checking; message='Checking GitHub for updates...'; write_status
 timeout 90 git fetch --quiet origin
 state=ready; message='Up to date.'
 latest=$(git rev-parse '@{upstream}')
+available=false
 if [[ $current != "$latest" ]]; then available=true; message='A new update is available.'; fi
 if [[ -f runtime/update-request.json ]]; then
   rm runtime/update-request.json

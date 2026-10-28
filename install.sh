@@ -88,6 +88,7 @@ source deployment/build-env.sh
 docker compose build --pull
 systemctl daemon-reload
 systemctl enable --now i-clusters.service
+sh deployment/export-controller-ca.sh
 echo "i-Clusters installed at $url"
 echo 'Keep the installation private until you have registered the owner account.'
 echo 'Open this URL and register your owner account. No setup code is required.'

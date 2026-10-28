@@ -100,10 +100,12 @@ Open **Settings → Connections → Add Connection**.
 
 | Connection | Setup |
 | --- | --- |
-| Proxmox Node | Enter cluster endpoint/token/TLS settings, test and save, then pair the node using the displayed instructions. One active Proxmox cluster is supported. |
+| Proxmox Node | Enter cluster endpoint/token/TLS settings, test and save, then select the node and choose Connect Automatically with SSH, or use the manual pairing instructions. One active Proxmox cluster is supported. |
 | Docker Host | Create a short-lived pairing command and run it on the Linux Docker host. Verify the discovered Engine before opening Docker. |
 | Advanced: Direct Docker API | Use an existing authenticated HTTPS Docker endpoint with the required CA/client certificates. This is optional for paired hosts. |
 | TrueNAS | Use its configuration popup to save the HTTPS origin, API key, supported protocol and trusted CA as required. |
+
+Automatic node setup requires a verified SSH fingerprint, a root or password-based sudo account and explicit installation approval. It discovers the node IP, verifies its hostname and Proxmox tools, transfers the bundled connector and public controller CA when needed, pairs it and waits for a fresh heartbeat. Passwords are not saved. Existing connector installations are never overwritten.
 
 For Proxmox pairing, install one connector per node. Linux CT access uses `pct exec`; Linux VM access uses `qm guest exec`. VMs need the QEMU Guest Agent enabled in Proxmox and installed/running inside the VM. Guests need `/bin/sh`, `curl`, `base64` and the local Docker socket. Windows guests are not provisioned by this Linux Docker setup flow.
 

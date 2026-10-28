@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """i-Clusters outbound connector for Proxmox nodes or standalone Docker hosts."""
+import ssl
 import hashlib,argparse,sys,base64,json,os,re,shlex,socket,subprocess,threading,time,urllib.request,queue,pathlib,uuid,ipaddress
 
 # Compatibility reads keep existing paired connectors usable through the rename.
@@ -427,7 +428,7 @@ def operations_job(job):
 
 def post(config,path,body):
  request=urllib.request.Request(config['url']+'/api/node-agent/'+path,data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+config.get('token','')})
- with urllib.request.urlopen(request,timeout=30) as response:return json.load(response)
+ with urllib.request.urlopen(request,timeout=30,**({'context':ssl.create_default_context(cadata=config['ca'])} if config.get('ca') else {})) as response:return json.load(response)
 
 def read_job(job):
  # Mutations, installations and streaming event reads keep their own serial lane.

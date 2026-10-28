@@ -14,4 +14,5 @@ python3 deployment/configure-https.py
 if docker compose ps --status running --services | grep -qx caddy; then
   docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
   docker compose up -d --wait --wait-timeout 180 caddy api
+  sh deployment/export-controller-ca.sh
 fi

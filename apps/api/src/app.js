@@ -1,3 +1,4 @@
+import {automaticNodePairing} from './automatic-node-pairing.js';
 import {pairingTargets} from './pairing-targets.js';
 import {proxmoxTestError} from './proxmox-test-error.js';
 import {automaticConnectorUpdates} from './connector-auto-updates.js';
@@ -74,7 +75,7 @@ import { request,pve,docker,dockerSnapshot,proxmoxVmAction,proxmoxLxcAction,prox
 import { encode,required,integer,httpError,retention,pveWrite,backupJobs,createBackupJob,runBackupJob,toggleBackupJob,backupArchives,restoreArchive,truenas } from './infrastructure.js';
 
 
-export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,autoConnectorUpdates=automaticConnectorUpdates,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,powerPermissions=powerPermissionSetup,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile}={}){
+export function createApp({authenticate=auth,authorize=requireRole,audit=writeAudit,monitor=liveMonitor,db=pool,configuration=configurationStore,activity=headerNotifications,notificationService=notifier,connectorUpdates=connectorUpdater,autoConnectorUpdates=automaticConnectorUpdates,connectionService=connectionActions,connectorAddress=connectorSSHAddress,guestPermissions=guestPermissionRepair,powerPermissions=powerPermissionSetup,guestConnectionReader=createGuestConnectionReader({config:clusterConfig}),imageUpdates=dockerImageUpdates,imageUpdateInstaller=installDockerImageUpdate,dockerUpdateQuery=docker,operationJournalFile,nodePairing=automaticNodePairing}={}){
 
  const app=express(),readCache=createReadCache(),reportPerformance=createReportPerformance();
  app.use((req,res,next)=>{const started=performance.now();res.on('finish',()=>{if(req.method==='GET'&&req.route?.path)reportPerformance.record(req.route.path,performance.now()-started,res.statusCode)});next()});
@@ -128,6 +129,9 @@ export function createApp({authenticate=auth,authorize=requireRole,audit=writeAu
  app.get('/api/node-agents/:id/update',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({update:connectorUpdates.status(req.params.id)});});
  app.post('/api/node-agents/:id/update',authorize('owner'),async(req,res)=>{const update=connectorUpdates.request(req.params.id,req.body);res.locals.activityStatus='queued';await audit(req,'connector.update',req.params.id,{version:update.version,revision:update.revision},'queued');res.status(202).json({update});});
  app.post('/api/node-agents/:id/maintenance',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');const result=await connectionService.perform(req.params.id,req.body);await audit(req,'connection.'+result.action,req.params.id,{target:result.target,active:result.active},'success');res.json({result});});
+ app.get('/api/node-agents/automatic-pairing/target',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await nodePairing.target(req.query.node));});
+ app.get('/api/node-agents/automatic-pairing/:job',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json({job:nodePairing.status(req.params.job)});});
+ app.post('/api/node-agents/automatic-pairing',authorize('owner'),loginLimiter,async(req,res)=>{try{if(!req.secure)throw httpError('Open i-Clusters over HTTPS before entering SSH credentials.',400);const job=await nodePairing.start(req.body);req.body.password='';await audit(req,'node-agent.automatic-pairing',job.node,{job:job.id},'queued');res.set('Cache-Control','no-store');res.status(202).json({job});}finally{req.body.password='';}});
  app.get('/api/node-agents/pairing-targets',authorize('owner'),async(req,res)=>{res.set('Cache-Control','no-store');res.json(await pairingTargets(req.query.kind));});
  app.post('/api/node-agents/pairing',authorize('owner'),async(req,res)=>{const pairing=createPairing(req.body);await audit(req,'node-agent.pairing','nodes',{},'success');res.set('Cache-Control','no-store');res.json(pairing);});
  app.post('/api/node-agents/pairing/status',authorize('owner'),(req,res)=>{res.set('Cache-Control','no-store');res.json(pairingStatus(req.body.code));});

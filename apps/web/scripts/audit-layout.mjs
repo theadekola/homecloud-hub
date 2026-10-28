@@ -23,6 +23,7 @@ const sample={
  ...Object.fromEntries(['errors','alerts','networks','volumes','pools','datasets','disks','shares','interfaces','devices','routes','dns','rules','history','jobs','points','tasks','logs','users','connections','notifications','destinations','schedules','policies'].map(k=>[k,[]]))
 };
 function fixture(path){
+ if(process.env.LAYOUT_PROXMOX_SAVE&&path==='/connections/proxmox')return {cluster:null};
  if(path==='/auth/me')return {user:{id:'owner',name:'Layout Review',role:process.env.LAYOUT_ROLE||'owner'}};
  if(path==='/header-notifications')return {attentionCount:1,updateCount:1,criticalCount:0,attention:[{id:'update',kind:'update',title:'Docker image update available',message:'control-vm / zabbix-postgres · postgres:16 has a new registry image',severity:'info',link:'/docker?tab=Updates'}]};
  if(path==='/docker/updates')return {rows:[],settings:{enabled:true,intervalHours:6}};
@@ -57,7 +58,7 @@ const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
 const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
 const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0}});
-let browser;
+let browser,clusterSaves=0,clusterTests=0;
 try{
  await server.listen();const base=server.resolvedUrls.local[0];
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -66,6 +67,14 @@ try{
  await page.route('**/api/**',async route=>{
   readCount++;if(checkRefresh)await new Promise(resolve=>setTimeout(resolve,150));
   const path=new URL(route.request().url()).pathname.replace('/api','');
+  if(process.env.LAYOUT_PROXMOX_SAVE){
+   assert.ok(!path.includes('power-permissions'),'Saving must not open or call the removed power setup flow');
+   if(path==='/connections/proxmox'&&route.request().method()==='PUT'||path==='/connections/proxmox/test'&&route.request().method()==='POST'){
+    const body=route.request().postDataJSON();assert.equal(body.management,true);assert.equal(body.verifyTls,false);
+    if(route.request().method()==='PUT')clusterSaves++;else clusterTests++;
+    return route.fulfill({json:{ok:true,nodes:[{name:'node01',status:'online'}],management:{verified:true,power:true,configuration:true}}});
+   }
+  }
   // The audit must never reach an actual provider or perform a management write.
   if(route.request().method()!=='GET'&&path!=='/ssh/fingerprint'&&!(checkRefresh&&path==='/docker/updates/check'))failures.push(`Unexpected write: ${path}`);
   return route.fulfill({json:fixture(path)});
@@ -163,6 +172,19 @@ try{
    await page.evaluate(()=>{localStorage.setItem('iclusters_docker_host','docker-fixture');window.dispatchEvent(new Event('iclusters-connection'));});
    await page.waitForFunction(()=>document.querySelector('.page-breadcrumbs')?.textContent.includes('control-vm'));
    assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
+  }
+  if(process.env.LAYOUT_PROXMOX_SAVE){
+   const beforeSaves=clusterSaves,beforeTests=clusterTests;
+   await page.goto(base+'settings?tab=Connections&setup=proxmox');const form=page.locator('.cluster-form');await form.waitFor();
+   assert.equal(await form.locator('details,select').count(),0,'Removed advanced sections and access selector must be absent');
+   for(const [name,value] of Object.entries({name:'Fixture Lab',host:'pve.test',port:'8006',tokenId:'iclusters@pve!hub',tokenSecret:'fixture-only'}))await form.locator(`[name=${name}]`).fill(value);
+   await form.getByRole('button',{name:'Test Connection',exact:true}).click();
+   await page.waitForFunction(()=>document.querySelector('.cluster-form')?.textContent.includes('Connection verified'));
+   assert.equal(clusterSaves,beforeSaves);assert.equal(clusterTests,beforeTests+1);
+   await form.getByRole('button',{name:'Save',exact:true}).click();await page.locator('.connection-success').waitFor();
+   assert.match(await page.locator('.connection-success').innerText(),/power and configuration access verified/);
+   assert.equal(clusterSaves,beforeSaves+1);assert.equal(await page.getByLabel('Proxmox administrator password',{exact:true}).count(),0);
+   await page.waitForFunction(()=>!document.querySelector('.cluster-form'));
   }
   await page.goto(base);await page.getByRole('button',{name:'Add Widget'}).click();
   await page.getByRole('dialog').waitFor();

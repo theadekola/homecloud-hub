@@ -147,3 +147,9 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .software-update-notice.warning>svg{color:#eeb652}
 .software-update-notice>.btn{flex-shrink:0}
 @media(max-width:600px){.software-update-notice{flex-wrap:wrap;align-items:flex-start}.software-update-notice>div{flex-basis:calc(100% - 40px)}.software-update-notice>.btn{margin-inline-start:36px}}
+
+.cluster-setup-guide{font-size:14px;line-height:1.6;padding:16px;border:1px solid var(--theme-border,#334155);border-radius:10px;background:var(--theme-surface,#102337);min-inline-size:0}
+.cluster-setup-guide h4{margin:0 0 10px}
+.cluster-setup-guide ol{padding-inline-start:22px;margin:0}
+.cluster-setup-guide li+li{margin-top:10px}
+.cluster-setup-guide code{overflow-wrap:anywhere}

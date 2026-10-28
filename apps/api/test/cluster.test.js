@@ -25,10 +25,13 @@ const openssl=process.platform==='win32'?'C:/Program Files/Git/mingw64/bin/opens
 await test('owner can test and save a live cluster, secrets stay hidden and failures preserve the connection',{skip:spawnSync(openssl,['version']).status!==0},async()=>{
  const key=path.join(process.env.DATA_DIR,'key.pem'),cert=path.join(process.env.DATA_DIR,'cert.pem');
  assert.equal(spawnSync(openssl,['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost,IP:127.0.0.1']).status,0);
- const ca=fs.readFileSync(cert,'utf8');let calls=0;
+ const ca=fs.readFileSync(cert,'utf8');let calls=0,denied='';
+ const managementPrivileges=Object.fromEntries(['Sys.Audit','VM.Audit','VM.Allocate','VM.PowerMgmt','VM.Config.CPU','VM.Config.Memory','VM.Config.Disk','VM.Config.Network','VM.Config.Options','Datastore.Audit','Datastore.AllocateSpace'].map(p=>[p,1]));
  const upstream=https.createServer({key:fs.readFileSync(key),cert:ca},(req,res)=>{
   calls++;if(req.headers.authorization!==`PVEAPIToken=${input.tokenId}=${input.tokenSecret}`){res.writeHead(401);return res.end('{}');}
-  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data:[{type:'node',node:'pve-a',status:'online'},{type:'node',node:'pve-b',status:'online'}]}));
+  res.setHeader('Content-Type','application/json');
+  if(req.url.startsWith('/api2/json/access/permissions')){const path=new URL(req.url,'https://fixture.test').searchParams.get('path');return res.end(JSON.stringify({data:{[path]:denied===path?{}:managementPrivileges}}));}
+  res.end(JSON.stringify({data:[{type:'node',node:'pve-a',status:'online'},{type:'node',node:'pve-b',status:'online'}]}));
  });
  await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));
  const {createApp}=await import('../src/app.js');const {requireRole}=await import('../src/security.js');const {proxmoxSnapshot}=await import('../src/connectors.js');
@@ -47,6 +50,9 @@ await test('owner can test and save a live cluster, secrets stay hidden and fail
   const read=await call('GET');assert.equal(read.body.cluster.name,'Lab');assert.ok(!JSON.stringify(read).includes(input.tokenSecret));assert.ok(!JSON.stringify(read).includes(ca));
   assert.equal((await proxmoxSnapshot()).nodes.length,2);
   assert.equal((await call('PUT',{...config,tokenSecret:'wrong'})).status,502);assert.equal(clusterStore.read().tokenSecret,input.tokenSecret);
+  denied='/';const rejected=await call('PUT',{...config,name:'Do not save',management:true});assert.equal(rejected.status,403);assert.match(rejected.body.error,/PVEAdmin/);assert.equal(clusterStore.read().name,'Lab');assert.equal(invalidated,1);
+  denied='';const verified=await call('POST',{...config,management:true},'/test');assert.equal(verified.status,200);assert.equal(verified.body.management.verified,true);assert.equal(invalidated,1);
+  const saved=await call('PUT',{...config,management:true});assert.equal(saved.status,200);assert.equal(saved.body.management.power,true);assert.equal(invalidated,2);assert.ok(!JSON.stringify(saved.body).includes(input.tokenSecret));
   assert.ok(!JSON.stringify(audits).includes(input.tokenSecret));assert.equal((await call('DELETE')).status,200);assert.equal(clusterStore.read(),null);
  }finally{await new Promise(resolve=>server.close(resolve));await new Promise(resolve=>upstream.close(resolve));}
 });

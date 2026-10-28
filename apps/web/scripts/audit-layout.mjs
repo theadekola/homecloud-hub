@@ -43,14 +43,16 @@ function fixture(path){
 }
 const routes=['/','/proxmox','/docker','/storage','/network','/backups','/monitoring','/alerts','/ai','/users','/settings','/tools/sftp','/tools/shell'];
 for(const [page,tabs] of Object.entries({
- proxmox:['Nodes','Virtual Machines','LXC Containers','Storage','Tasks & Logs'],
+ proxmox:['Overview','Nodes','Virtual Machines','LXC Containers','Storage','Networks','Tasks & Logs'],
  docker:['Images','Volumes','Networks','Compose Stacks','Events','Updates'],
- storage:['Disks','Datasets / Volumes','Snapshots','Shares','Performance'],
- network:['Interfaces','Devices','Routing','DNS','Traffic Analysis'],
- backups:['Restore Points','Schedules','Retention Policies','Destinations','Reports'],
+ storage:['Configuration','Disks','Datasets / Volumes','Snapshots','Shares','Performance'],
+ network:['Interfaces','Devices','Routing','DNS','Traffic Analysis','Docker Networks'],
+ backups:['Restore Points','Schedules','Retention Policies','Destinations','Reports','Recovery Tests'],
+ monitoring:['Provider Jobs','Hardware & Diagnostics'],
  alerts:['Alert History','Alert Rules'],users:['Audit Logs'],
- settings:['System','Security','Connections','Appearance','About']
+ settings:['General','System','Security','Connections','Appearance','About']
 }))for(const tab of tabs)routes.push(`/${page}?tab=${encodeURIComponent(tab)}`);
+for(const section of ['connected','setup','notifications','remote'])routes.push(`/settings?tab=Connections&section=${section}`);
 const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
 const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
@@ -95,6 +97,20 @@ try{
     if(process.env.LAYOUT_ROLE&&process.env.LAYOUT_ROLE!=='owner')assert.equal(await notice.count(),0,'Update prompts are owner-only');
     else{assert.ok(await notice.isVisible(),`${route}: persistent software update prompt is visible`);assert.match(await notice.innerText(),/Software update available/);assert.equal(await notice.getByRole('link').getAttribute('href'),'/settings?tab=About');if(process.env.LAYOUT_UPDATE_NOTICE==='stale')assert.equal(await notice.getAttribute('role'),'alert');}
    }
+   if(process.env.LAYOUT_CHECK_PATHS==='1'){
+    const path=page.getByRole('navigation',{name:'Page path',exact:true});
+    if(route==='/')assert.equal(await path.count(),0,'Overview must have no page path');
+    else{
+     assert.equal(await path.count(),1,`${route}: exactly one shared page path`);
+     const current=path.locator('[aria-current=page]');assert.equal(await current.count(),1,`${route}: one current section`);
+     const requested=new URL(route,base).searchParams.get('tab');
+     if(requested&&route.startsWith('/settings')){
+      assert.ok((await path.innerText()).includes(requested),`${route}: selected Settings tab in path`);
+      const titles={General:'General Settings',System:'System Settings',Security:'Security Settings',Connections:'Connections',Appearance:'Appearance Settings',About:'About i-Clusters'};
+      assert.equal(await page.locator('.content h1').first().innerText(),titles[requested],`${route}: Settings title matches tab`);
+     }
+    }
+   }
    if(process.env.LAYOUT_CHECK_COMPACT==='1'){
     const compact=await page.evaluate(()=>{
      const issues=[];
@@ -134,6 +150,19 @@ try{
    await page.waitForTimeout(5500);
    assert.ok(await page.getByRole('status',{name:'Software update available',exact:true}).isVisible(),'Update prompt persists beyond the old five-second toast');
    assert.equal(await page.locator('.topbar .update-message').count(),0,'Header toast must not obscure the persistent prompt');
+  }
+  if(process.env.LAYOUT_CHECK_PATHS==='1'){
+   await page.goto(base+'settings?tab=General');
+   await page.getByRole('navigation',{name:'Settings sections',exact:true}).getByRole('button',{name:'Security',exact:true}).click();
+   await page.getByRole('heading',{name:'Security Settings',exact:true}).waitFor();
+   assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Security');
+   await page.getByRole('navigation',{name:'Page path',exact:true}).getByRole('link',{name:'Settings',exact:true}).click();
+   await page.getByRole('heading',{name:'General Settings',exact:true}).waitFor();
+   await page.goto(base+'docker?tab=Volumes');
+   await page.locator('.page-breadcrumbs').waitFor();
+   await page.evaluate(()=>{localStorage.setItem('iclusters_docker_host','docker-fixture');window.dispatchEvent(new Event('iclusters-connection'));});
+   await page.waitForFunction(()=>document.querySelector('.page-breadcrumbs')?.textContent.includes('control-vm'));
+   assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
   }
   await page.goto(base);await page.getByRole('button',{name:'Add Widget'}).click();
   await page.getByRole('dialog').waitFor();

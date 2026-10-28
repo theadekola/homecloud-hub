@@ -52,6 +52,7 @@ for(const [page,tabs] of Object.entries({
 }))for(const tab of tabs)routes.push(`/${page}?tab=${encodeURIComponent(tab)}`);
 const selectedRoutes=process.env.LAYOUT_ROUTES?.split(',')||routes;
 const widths=(process.env.LAYOUT_WIDTHS||'1280,768,390').split(',').map(Number);
+const checkRefresh=process.env.LAYOUT_CHECK_REFRESH==='1';let readCount=0,refreshControls=0;
 const failures=[],server=await createServer({root,server:{host:'127.0.0.1',port:0}});
 let browser;
 try{
@@ -59,10 +60,11 @@ try{
  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
  const page=await browser.newPage();
  await page.addInitScript(()=>{localStorage.setItem('iclusters_access_token','layout-fixture');localStorage.setItem('iclusters_last_activity',String(Date.now()));});
- await page.route('**/api/**',route=>{
+ await page.route('**/api/**',async route=>{
+  readCount++;if(checkRefresh)await new Promise(resolve=>setTimeout(resolve,150));
   const path=new URL(route.request().url()).pathname.replace('/api','');
   // The audit must never reach an actual provider or perform a management write.
-  if(route.request().method()!=='GET'&&path!=='/ssh/fingerprint')failures.push(`Unexpected write: ${path}`);
+  if(route.request().method()!=='GET'&&path!=='/ssh/fingerprint'&&!(checkRefresh&&path==='/docker/updates/check'))failures.push(`Unexpected write: ${path}`);
   return route.fulfill({json:fixture(path)});
  });
  let errors=[];page.on('pageerror',e=>errors.push(e.stack||e.message));
@@ -87,6 +89,20 @@ try{
     return issues;
    });
    failures.push(...[...errors,...problems].map(p=>`${width}px ${route}: ${p}`));
+   if(checkRefresh){
+    const buttons=page.locator('button.refresh-button:visible');
+    for(let index=0;index<await buttons.count();index++){
+     const button=buttons.nth(index),label=(await button.getAttribute('aria-label'))||await button.innerText();
+     if(!/Refresh|Scan Disks|Recheck Connections|Check for Updates/i.test(label)||!await button.isEnabled())continue;
+     const before=readCount;await button.click();
+     assert.equal(await button.getAttribute('data-refreshing'),'true',`${route}: ${label} should show progress`);
+     const glyph=button.locator('.lucide-refresh-cw,.lucide-refresh-ccw').first();
+     assert.notEqual(await glyph.evaluate(e=>getComputedStyle(e).animationName),'none',`${route}: ${label} should spin`);
+     await page.waitForFunction(()=>!document.querySelector('button.refresh-button[aria-busy="true"]'),{},{timeout:10000});
+     assert.ok(readCount>before,`${route}: ${label} should request fresh data`);refreshControls++;
+    }
+   }
+
   }
   await page.goto(base);await page.getByRole('button',{name:'Add Widget'}).click();
   await page.getByRole('dialog').waitFor();
@@ -99,5 +115,5 @@ try{
  }
  console.log(`Reviewed ${selectedRoutes.length*widths.length} page/section layouts and ${widths.length*2} dialogs.`);
  assert.deepEqual(failures,[]);
- console.log('No page overflow, escaped controls, broken dashboard words or runtime errors.');
+ console.log('No page overflow, escaped controls, broken dashboard words or runtime errors.');if(checkRefresh)console.log(`Verified ${refreshControls} refresh controls request data and visibly rotate.`);
 }finally{await browser?.close();await server.close();}

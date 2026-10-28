@@ -66,3 +66,16 @@ test('workspace refresh coalesces repeat clicks and waits for every mounted repo
  const a=deferred(),b=deferred();let phase=0;const calls=[];const page=await harness(async(p,options)=>{calls.push({p,options});if(phase===1)return p==='/a'?a.promise:b.promise;return {value:'Fresh '+p}});
  try{await page.render([['a','/a'],['b','/b'],['bundle','__bundle__']]);phase=1;const button=page.container.querySelector('[data-bundle]');await act(async()=>{button.click();button.click();await tick()});assert.equal(calls.filter(c=>c.p==='/a').length,2);assert.equal(calls.filter(c=>c.p==='/b').length,2);assert.equal(calls.some(c=>c.p==='/not-mounted'),false);assert.equal(button.disabled,true);await act(async()=>{a.reject(Error('A unavailable'));await tick()});assert.equal(button.disabled,true);assert.match(page.container.querySelector('[data-id=a]').textContent,/A unavailable/);await act(async()=>{b.resolve({value:'B recovered'});await tick()});assert.equal(button.disabled,false);assert.match(page.container.querySelector('[data-id=b]').textContent,/B recovered/);phase=2;await act(async()=>{button.click();await tick()});assert.equal(page.container.querySelector('[data-id=a] small').textContent,'');assert.ok(calls.slice(2).every(c=>c.options.headers['X-IClusters-Refresh']==='1'));}finally{a.resolve({});b.resolve({});await page.close()}
 });
+
+test('manual refresh waits for partial provider scans and polls without starting another scan',async()=>{
+ const calls=[],last=deferred();let reads=0,finished=false;
+ const page=await harness(async(path,options)=>{calls.push(options);reads++;if(reads===1)return {value:'Old'};if(reads===2)return {value:'Partial',refreshing:true};return last.promise;});
+ try{
+  await page.render([['a','/dashboard']]);let work;
+  await act(async()=>{work=page.hooks.refreshResources(['/dashboard']).then(()=>{finished=true});await tick()});
+  assert.equal(finished,false);assert.match(page.container.textContent,/Partial/);
+  await act(async()=>{await new Promise(r=>setTimeout(r,1100))});
+  assert.equal(calls.length,3);assert.equal(calls[1].headers['X-IClusters-Refresh'],'1');assert.equal(calls[2].headers,undefined);assert.equal(finished,false);
+  await act(async()=>{last.resolve({value:'Fresh'});await work});assert.equal(finished,true);assert.match(page.container.textContent,/Fresh/);
+ }finally{last.resolve({value:'Fresh'});await page.close()}
+});

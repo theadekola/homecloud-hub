@@ -38,7 +38,19 @@ function load(entry:Resource,force=false,background=false):Promise<void>{
  if(!force&&entry.hasData&&Date.now()-entry.updated<10000)return Promise.resolve();
  const controller=new AbortController(),ticket=++entry.generation;let timedOut=false;const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},30000);entry.controller=controller;entry.forced=force&&!background;entry.loading=true;
  const work=(async()=>{
-  try{const result=await api(entry.path,{signal:controller.signal,...(force&&!background?{headers:{'X-IClusters-Refresh':'1'}}:{})});if(ticket===entry.generation&&entry.scope===scope()){entry.data=result;entry.hasData=true;entry.updated=Date.now();entry.error='';}}
+  try{
+   let manual=force&&!background;
+   do{
+    const result=await api(entry.path,{signal:controller.signal,...(manual?{headers:{'X-IClusters-Refresh':'1'}}:{})});manual=false;
+    if(ticket!==entry.generation||entry.scope!==scope()||controller.signal.aborted)break;
+    entry.data=result;entry.hasData=true;entry.updated=Date.now();entry.error='';emit(entry);
+    if(!force||background||!result?.refreshing)break;
+    // A bounded provider scan may return partial data. Poll that scan without
+    // forcing another one, and keep the manual refresh pending until it settles.
+    await new Promise<void>(resolve=>{const done=()=>{clearTimeout(timer);controller.signal.removeEventListener('abort',done);resolve()},timer=setTimeout(done,1000);controller.signal.addEventListener('abort',done,{once:true});});
+   }while(!controller.signal.aborted);
+   if(timedOut)throw Error('Refresh timed out');
+  }
   catch(e:any){if(ticket===entry.generation&&(!controller.signal.aborted||timedOut)){entry.error=(e.updating||timedOut&&isSoftwareUpdating())?'':timedOut?'Report request timed out. Check the connection and use Refresh to retry.':e.message;entry.updated=0;if(e.status===401||e.status===403){entry.hasData=false;entry.data=undefined;}}}
   finally{window.clearTimeout(timeout);if(ticket===entry.generation){entry.pending=undefined;entry.loading=false;emit(entry);}}
  })();entry.pending=work;emit(entry);return work;
@@ -55,7 +67,7 @@ export function useApi<T>(path: string, initial: T, refreshMs?:number|((data:T)=
   window.addEventListener('iclusters-refresh',schedule);
   return()=>{active=false;entry.listeners.delete(notify);window.clearTimeout(timer);window.removeEventListener('iclusters-refresh',schedule);queueMicrotask(()=>{if(!entry.listeners.size&&entry.pending){entry.generation++;entry.controller?.abort();entry.pending=undefined;entry.loading=false;}});};
  },[entry,refreshMs]);
- return {data:(entry.hasData?entry.data:initialValue.current) as T,setData,loading:entry.loading,error:entry.error,refresh};
+ return {data:(entry.hasData?entry.data:initialValue.current) as T,setData,loading:entry.loading||!entry.error&&entry.data?.refreshing===true,error:entry.error,refresh};
 }
 
 export async function refreshResources(prefixes:string[]){

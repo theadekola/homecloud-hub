@@ -67,3 +67,15 @@ test('slow fleet refresh preserves dated service observations without fabricatin
 test('expired service observations do not count as reachable during a refresh',async()=>{
  const {progressServices}=await import('../src/monitor.js');const pending=[{id:'docker-fleet',status:'pending'}];assert.deepEqual(progressServices(pending,[{id:'docker:a',status:'reachable'}],'2026-01-01T00:00:00Z',Date.parse('2026-01-01T00:04:00Z')),pending);
 });
+
+test('Alerts and connection health honor a manual refresh header and expose scans that are still running',async()=>{
+ process.env.JWT_SECRET||='loading-test-access-secret-at-least-32';process.env.JWT_REFRESH_SECRET||='loading-test-refresh-secret-at-least-32';
+ const {createApp}=await import('../src/app.js');const flags=[];let scanning=false;
+ const monitor={sample:async(force=false)=>{flags.push(force);return {sampledAt:new Date().toISOString(),services:[],hosts:[],alerts:[],metrics:[],refreshing:scanning}},isRefreshing:()=>scanning,invalidate:async()=>{}};
+ const app=createApp({authenticate:(req,res,next)=>{req.user={sub:'refresh-owner',role:'owner'};next()},monitor,audit:async()=>{}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+ try{
+  for(const route of ['/alerts','/connections/health']){flags.length=0;scanning=true;const response=await fetch(`http://127.0.0.1:${server.address().port}/api${route}`,{headers:{'X-IClusters-Refresh':'1'}});assert.equal(response.status,200);assert.equal((await response.json()).refreshing,true);assert.ok(flags.includes(true),route+' must initiate a fresh scan');}
+  const partial=await fetch(`http://127.0.0.1:${server.address().port}/api/alerts`);assert.equal((await partial.json()).refreshing,true);
+  scanning=false;const response=await fetch(`http://127.0.0.1:${server.address().port}/api/alerts`);assert.equal((await response.json()).refreshing,undefined);
+ }finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
+});

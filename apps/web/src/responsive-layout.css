@@ -105,3 +105,8 @@ body,.app-shell,.main-shell{min-inline-size:0;max-inline-size:100%}
 .content :is(.tabs,.pve-tabbar)>button{flex-shrink:0;white-space:nowrap}
 .content :is(.users-table-scroll,.monitor-table-scroll){min-inline-size:0;max-inline-size:100%;overflow:auto;overscroll-behavior-inline:contain}
 @media(max-width:800px){.content .overview-controls{justify-content:flex-start}}
+
+/* Rotate the refresh glyph only while its own control is doing work. */
+.refresh-button[data-refreshing="true"] :is(.lucide-refresh-cw,.lucide-refresh-ccw){animation:report-loading-rotate .8s linear infinite;transform-origin:center}
+.refresh-button-error{color:var(--theme-text);font-size:12px;line-height:1.5;flex-basis:100%;overflow-wrap:anywhere}
+@media(prefers-reduced-motion:reduce){.refresh-button[data-refreshing="true"] :is(.lucide-refresh-cw,.lucide-refresh-ccw){animation:none;opacity:.65}}

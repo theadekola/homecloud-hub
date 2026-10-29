@@ -1,10 +1,11 @@
-# Rebuild the upstream release with the patched HTTP/2 dependency. Go's module
+# Rebuild the upstream release with patched HTTP/2 and JWK-parsing dependencies. Go's module
 # checksum database validates downloaded modules; CI scans the resulting binary.
 FROM golang:1.27.3-alpine AS builder
 WORKDIR /build
 RUN go mod init iclusters.local/caddy-build \
  && go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 \
  && go get golang.org/x/net@v0.60.0 \
+ && go get github.com/go-jose/go-jose/v4@v4.1.6 \
  && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy github.com/caddyserver/caddy/v2/cmd/caddy
 
 FROM caddy:2.11.7-alpine

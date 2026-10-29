@@ -4,7 +4,7 @@ Applies to 3.1.0-rc.3. Developer: The Adekola; company: ATT-Tech.
 
 | Component | Tested or implemented scope | Acceptance boundary |
 | --- | --- | --- |
-| Controller runtime | Node.js 24; PostgreSQL 17; Linux Docker/Compose deployment; Caddy 2.11.7 HTTPS with patched x/net dependency; compiled React frontend | CI uses an isolated Ubuntu runner. Customer Ubuntu/kernel/Engine/Compose versions must be recorded and checked. |
+| Controller runtime | Node.js 24; PostgreSQL 17; Linux Docker/Compose deployment; Caddy 2.11.7 HTTPS with patched x/net and go-jose dependencies; compiled React frontend | CI uses an isolated Ubuntu runner. Customer Ubuntu/kernel/Engine/Compose versions must be recorded and checked. |
 | Proxmox VE | API-token inventory and supported VM/LXC, storage, backup, restore, task and network routes; paired Linux node connector | Protocol fixtures do not certify every VE minor release, token ACL or guest OS. Record exact versions and execute disposable-resource acceptance. |
 | Docker | Paired Linux hosts/eligible Linux Proxmox guests or authenticated direct Engine API; image updates for supported lifecycle/configuration | Shared namespaces/lifecycle dependencies, local-only images and digest-pinned tag checks have explicit restrictions. Compose file deployment and coordinated stack migration are not supplied. |
 | TrueNAS | HTTPS JSON-RPC integration for 25.04+ method families, with method-dependent compatibility | Exact SCALE releases, credentials, certificate trust and each enabled write operation require live acceptance. No universal compatibility claim. |

@@ -2,7 +2,7 @@
 import {releaseNotes} from './release-notes.mjs';
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
 const root=path.resolve(new URL('../',import.meta.url).pathname),read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8')),main=read('package.json');
-assert.match(main.version,/^\d+\.\d+\.\d+-rc\.\d+$/);
+assert.match(main.version,/^\d+\.\d+\.\d+(?:-rc\.\d+)?$/);
 for(const file of ['package.json','apps/api/package.json','apps/web/package.json']){const data=read(file);assert.equal(data.version,main.version,file);assert.equal(data.author,'The Adekola',file);assert.equal(data.company,'ATT-Tech',file);assert.equal(data.license,'MIT',file)}
 for(const file of ['apps/api/package-lock.json','apps/web/package-lock.json']){const lock=read(file);assert.equal(lock.version,main.version,file);assert.equal(lock.packages[''].version,main.version,file);assert.equal(lock.packages[''].license,'MIT',file)}
 const notesFile=`docs/releases/v${main.version}.md`;assert.ok(fs.statSync(path.join(root,notesFile)).size>1000);const rendered=releaseNotes(fs.readFileSync(path.join(root,notesFile),'utf8'),{file:notesFile,repository:'theadekola/i-clusters',tag:`v${main.version}`});assert.ok(rendered.includes(`/blob/v${main.version}/SECURITY.md`));assert.ok(!rendered.includes('](../'));

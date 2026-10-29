@@ -1,6 +1,6 @@
 # Customer acceptance record
 
-Version: 3.1.0-rc.3 · Developer: The Adekola · Company: ATT-Tech.
+Version: 1.0.0 · Developer: The Adekola · Company: ATT-Tech.
 
 Copy this checklist into a private customer record. Do not commit customer addresses, credentials, archives or raw logs. Default status is **not yet verified**; a box may be checked only with dated evidence.
 

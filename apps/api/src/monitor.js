@@ -27,6 +27,12 @@ export function alertConditions(snapshot,rules){
   const conditions=snapshot.operations?operationalConditions(snapshot.operations):[];
   for(const service of snapshot.services)if(['error','partial'].includes(service.status))conditions.push({key:`connection:${service.id||service.name}`,connectorId:service.id||service.provider,title:service.status==='partial'?'Incomplete monitoring':'Connection failed',source:service.name,provider:service.provider,severity:service.status==='partial'?'warning':'critical',details:service.error});
   for(const row of snapshot.proxmox?.storage||[])if(row.status==='offline'&&String(row.content||'').split(',').includes('backup'))conditions.push({key:`backup-storage:${row.node}:${row.id}`,title:'Backup storage unavailable',source:`${row.node} / ${row.name}`,node:row.node,resourceId:row.id,provider:'proxmox',severity:'warning',details:'Proxmox reports this backup storage offline. Its backup archives cannot be checked. Open Backups → Destinations to inspect its status.'});
+  for(const task of snapshot.proxmox?.backupHistory?.tasks||[]){
+   const outcome=String(task.exitstatus||task.status||'');
+   const finished=Number.isFinite(task.endtime)&&task.endtime>0;
+   const recent=Number.isFinite(task.starttime)&&task.starttime*1000>=Date.now()-86400000&&task.starttime*1000<=Date.now()+60000;
+   if(task.upid&&task.node&&recent&&finished&&outcome&&!['ok','running','stopped','unknown'].includes(outcome.toLowerCase()))conditions.push({key:`backup-task:${task.upid}`,title:'Backup task failed',source:`${task.node} / ${task.id||'Guest selection'}`,node:task.node,provider:'proxmox',severity:'critical',occurredAt:new Date(task.endtime*1000).toISOString(),details:'Proxmox reports a failed backup task. Open Backups → Reports → Inspect Task Logs to investigate. An online destination does not establish that it is writable or that the backup succeeded.'});
+  }
   const resources=[...(snapshot.proxmox?.nodes||[]).map(n=>({...n,provider:'proxmox'})),...monitoredDocker(snapshot).map(c=>({...c,id:c.monitorId,provider:'docker',memory:c.memoryPercent})),...(snapshot.proxmox?.storage||[]).map(p=>({...p,provider:'proxmox',storage:p.usage})),...(snapshot.truenas?.pools||[]).map(p=>({...p,provider:'truenas',storage:p.usage}))];
   for(const rule of rules.filter(r=>r.enabled!==false))for(const resource of resources){
     if(rule.provider!=='all'&&rule.provider!==resource.provider)continue;
@@ -80,6 +86,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
         for(const existing of state.alerts)if(existing.status!=='resolved'&&!activeKeys.has(existing.key)){
           if(existing.key?.startsWith('docker-image:'))continue;
           if(existing.key?.startsWith('operations:')){if(operationalRecovery(existing,snapshot.operations)){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}continue;}
+          if(existing.key?.startsWith('backup-task:'))continue;
           if(existing.key?.startsWith('backup-storage:')){const row=snapshot.proxmox?.storage?.find(row=>row.node===existing.node&&row.id===existing.resourceId);if(row?.status==='online'&&String(row.content||'').split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}else if(typeof row?.content==='string'&&!row.content.split(',').includes('backup')){existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;existing.resolution='no-longer-backup-destination';existing.details='This storage is no longer configured for backup content. This does not mean its filesystem mount was repaired.';}continue;}
           const service=snapshot.services.find(s=>existing.connectorId?(s.id||s.provider)===existing.connectorId:s.provider===existing.provider);
           const removedConnection=existing.key?.startsWith('connection:')&&(service?.status==='not-configured'||!service&&existing.connectorId?.startsWith('docker:')&&snapshot.dockerFleet?.connectorsComplete===true&&!snapshot.dockerFleet.connectors.some(n=>existing.connectorId.startsWith(`docker:${n.id}:`)));
@@ -97,7 +104,7 @@ export function createMonitor(sources=providers,persistence={get,mutate},checkSe
               if(rule&&rule.enabled!==false&&(!row||!Number.isFinite(value)||(row.status!=null&&!['online','running','healthy','available'].includes(String(row.status).toLowerCase()))))continue;
             }existing.status='resolved';existing.resolvedAt=snapshot.sampledAt;}
         }
-        for(const condition of conditions){const closed=state.alerts.find(a=>a.key===condition.key&&a.status==='resolved'&&a.resolution==='manual');if(closed&&Date.parse(snapshot.sampledAt)<=Date.parse(closed.resolvedAt))continue;const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
+        for(const condition of conditions){const closed=state.alerts.find(a=>a.key===condition.key&&a.status==='resolved'&&a.resolution==='manual');if(closed&&(condition.key.startsWith('backup-task:')||Date.parse(snapshot.sampledAt)<=Date.parse(closed.resolvedAt)))continue;const current=state.alerts.find(a=>a.key===condition.key&&a.status!=='resolved');
           if(current){Object.assign(current,condition,{lastSeen:snapshot.sampledAt});}else state.alerts.unshift({...condition,id:crypto.randomUUID(),status:'active',triggered:snapshot.sampledAt,lastSeen:snapshot.sampledAt});
         }
         state.alerts=state.alerts.slice(0,1000);

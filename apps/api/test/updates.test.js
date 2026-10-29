@@ -17,3 +17,8 @@ test('updates reject absent or stale host workers and queue only one request',()
 test('stale updater status is diagnosed while a check can wake its configured worker',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'iclusters-stale-worker-'));try{fs.writeFileSync(path.join(dir,'update-status.json'),JSON.stringify({checkedAt:'2000-01-01T00:00:00Z',available:true,state:'ready',message:'A new update is available.'}));const bridge=updateBridge(dir),status=bridge.status();assert.equal(status.configured,true);assert.equal(status.enabled,false);assert.equal(status.available,true);assert.equal(status.state,'unavailable');assert.match(status.message,/has not reported/);assert.throws(()=>bridge.request(),{status:503});assert.equal(bridge.check().state,'checking');assert.ok(fs.existsSync(path.join(dir,'update-check.json')));}finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
+
+test('version is always reported and legacy update notes exclude merge chatter and duplicates',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'update-notes-'));
+ try{const bridge=updateBridge(dir);assert.equal(bridge.status().version,'1.0.0');fs.writeFileSync(path.join(dir,'update-status.json'),JSON.stringify({checkedAt:new Date().toISOString(),changes:['Merge pull request #151 from branch','Fix discovery','Fix discovery','Merge branch main',null,'Improve UI']}));const status=bridge.status();assert.equal(status.version,'1.0.0');assert.deepEqual(status.changes,['Fix discovery','Improve UI']);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

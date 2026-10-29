@@ -32,3 +32,30 @@
 .appearance-preview[data-preview-theme="light"] :is(p,.appearance-preview-top span,.appearance-preview-layout aside){color:#50647f}
 .appearance-preview[data-preview-theme="light"] :is(.appearance-preview-top,.appearance-preview-metrics>span){border-color:#c4d2e3}
 .appearance-preview[data-preview-theme="dark"]{color:#dce9f8}
+
+/* Light mode needs darker accents and status text on bright surfaces. */
+:root[data-preset][data-theme="light"] {
+  --theme-icon: color-mix(in srgb, var(--app-accent) 72%, #182b43);
+  --theme-success: #137344;
+}
+:root[data-theme="light"] :is(.overview-stat small,.vm-stat span,.docker-manager .docker-counts,.node-services-grid small) {
+  color: var(--theme-success, #137344) !important;
+}
+:root[data-theme="light"] :is(.pve-tabbar [aria-selected="true"],.nodes-detail-tabs button.active,.vm-detail-tabs button.active,.vm-layout button.active,.connection-filters .active,.connection-view button[aria-pressed="true"],.tabs button.active,.settings-overview-tabs button.active) {
+  background: var(--theme-highlight) !important;
+  color: var(--theme-icon) !important;
+  border-color: var(--app-accent) !important;
+}
+:root[data-theme="light"] .node-service-pills button {
+  background: var(--theme-raised);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-border);
+}
+:root[data-theme="light"] .overview-stat-icon {
+  background: var(--theme-highlight);
+  color: var(--theme-icon);
+}
+:root[data-theme="light"] .badge.green { background: #e4f4ea; color: #17653c; }
+:root[data-theme="light"] .badge.red { background: #fce8ec; color: #a51d36; }
+:root[data-theme="light"] .badge.yellow { background: #fff1cd; color: #815800; }
+:root[data-theme="light"] .badge.blue { background: #e4edff; color: #214e9a; }

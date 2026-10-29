@@ -13,9 +13,17 @@ export async function copyTerminalSelection(text:string){
  if(!navigator.clipboard?.writeText)throw Error('Copy is unavailable in this browser or connection. Use HTTPS or select and copy the text manually.');
  await navigator.clipboard.writeText(text);
 }
+export async function exitTerminalFullscreen(element:HTMLElement|null){
+ if(!element)return;
+ element.classList.remove('terminal-expanded');
+ if(element.ownerDocument.fullscreenElement===element)await element.ownerDocument.exitFullscreen();
+}
 export async function fullscreenTerminal(element:HTMLElement|null){
- if(!element?.requestFullscreen)throw Error('Fullscreen is unavailable in this browser.');
- await element.requestFullscreen();
+ if(!element)return false;
+ if(element.ownerDocument.fullscreenElement===element||element.classList.contains('terminal-expanded')){await exitTerminalFullscreen(element);return false;}
+ // Mobile browsers and embedded pages may reject the Fullscreen API.
+ if(element.requestFullscreen)try{await element.requestFullscreen();return true;}catch{/* Expand within the browser viewport instead. */}
+ element.classList.add('terminal-expanded');return true;
 }
 export async function collectSFTPDownload(operation:Operation,path:string){
  const stat=await operation({action:'stat',path});

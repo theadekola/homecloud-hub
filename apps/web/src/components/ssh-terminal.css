@@ -1,0 +1,7 @@
+/* Preserve the live terminal DOM while expanding, including mobile keyboards. */
+.ssh-shell.terminal-expanded{position:fixed;inset:0;top:var(--terminal-viewport-top,0px);bottom:auto;width:100%;height:var(--terminal-viewport-height,100dvh);max-height:none;z-index:10000;display:flex;flex-direction:column;box-sizing:border-box;background:var(--theme-surface,#0a2134);padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));overflow:hidden}
+.ssh-shell.terminal-expanded .ssh-terminal{flex:1;height:auto;min-height:0;min-width:0}
+.ssh-shell.terminal-expanded .shell-session-toolbar{flex:none}
+.shell-session-toolbar .header-actions .icon-btn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:10px;flex:none}
+.shell-session-heading{min-width:0}.shell-session-heading span{min-width:0}.shell-session-heading b,.shell-session-heading small{overflow-wrap:anywhere}
+@media(max-width:600px){.ssh-shell.terminal-expanded .shell-clipboard-help{font-size:11px;max-height:3.5em;overflow:auto}.shell-session-toolbar .header-actions{flex-wrap:wrap}}

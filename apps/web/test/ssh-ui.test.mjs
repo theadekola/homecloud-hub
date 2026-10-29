@@ -33,7 +33,7 @@ test('terminal preserves long paste order, reports unsupported controls and surv
   const text='a'.repeat(8191)+'😀'+'b'.repeat(9000);
   await act(async()=>{globalThis.__terminalInput(text);globalThis.__terminalInput('last');await tick();});
   const chunks=calls.filter(c=>c.init?.body).map(c=>JSON.parse(c.init.body).input).filter(x=>x!==undefined);assert.equal(chunks.join(''),text+'last');assert.ok(chunks.every(x=>x.length<=8192));
-  const buttons=[...page.container.querySelectorAll('.shell-session-toolbar button')];assert.ok(buttons.some(b=>b.textContent.trim()==='Copy'));assert.ok(buttons.some(b=>b.textContent.trim()==='Paste'));assert.ok(!buttons.some(b=>b.textContent.trim()==='Clear'));await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.ok(page.container.textContent.includes('Fullscreen is unavailable'));
+  const buttons=[...page.container.querySelectorAll('.shell-session-toolbar button')];assert.equal(buttons.length,4);assert.ok(buttons.every(b=>b.getAttribute('aria-label')&&b.textContent.trim()===''));const terminal=page.container.querySelector('.ssh-terminal');await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.ok(page.container.querySelector('.terminal-expanded'));assert.equal(page.container.querySelector('.ssh-terminal'),terminal);await page.click(page.container.querySelector('[aria-label="Exit fullscreen terminal"]'));assert.equal(page.container.querySelector('.terminal-expanded'),null);assert.equal(page.container.querySelector('.ssh-terminal'),terminal);
  }finally{await page.close();await tick();delete globalThis.__terminalInput;}
  assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);
 });
@@ -178,7 +178,7 @@ test('legacy updater completion works and stalled checks release the button with
  const stalled=await updateFixture(),clock=Date.now;try{await stalled.click([...stalled.container.querySelectorAll('[role=dialog] button')].find(b=>b.textContent==='Check for Updates'));Date.now=()=>clock()+151000;await stalled.poll();assert.match(stalled.container.textContent,/did not finish/);assert.equal([...stalled.container.querySelectorAll('[role=dialog] button')].find(b=>b.textContent==='Check for Updates').disabled,false);}finally{Date.now=clock;await stalled.close()}
 });
 
-const terminalButton=(page,label)=>[...page.container.querySelectorAll('.shell-session-toolbar button')].find(b=>b.textContent.trim()===label);
+const terminalButton=(page,label)=>[...page.container.querySelectorAll('.shell-session-toolbar button')].find(b=>b.getAttribute('aria-label')===({'Copy':'Copy selected text','Paste':'Paste text','Select All':'Select all terminal text'}[label]||label));
 const terminalProps={target:'node:fixture',sessionId:'fixture',name:'Fixture',active:true};
 test('terminal toolbar copies selected output, selects all and pastes through the ordered SSH input queue',async()=>{
  const copied=[],inputs=[];const page=await mounted('components/SSHAccess.tsx',terminalProps,async(p,o)=>{if(o?.body){const b=JSON.parse(o.body);if(b.input)inputs.push(b.input)}return {output:'',closed:false}},false,false,['/'],'default',win=>Object.defineProperty(win.navigator,'clipboard',{value:{writeText:async text=>copied.push(text),readText:async()=> 'echo clipboard text'}}));
@@ -217,7 +217,7 @@ test('shell survives route navigation with its existing terminal and disconnect 
  await act(async()=>{await tick()});const terminal=page.container.querySelector('.ssh-terminal');assert.ok(terminal);assert.ok(document.documentElement.classList.contains('shell-scroll-locked'));
  await page.click([...page.container.querySelectorAll('a')].find(a=>a.textContent==='Test dashboard'));assert.equal(page.container.querySelector('.ssh-terminal'),terminal);assert.equal(page.container.querySelector('[hidden]').hidden,true);assert.equal(document.documentElement.classList.contains('shell-scroll-locked'),false);assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,0);
  await page.click([...page.container.querySelectorAll('a')].find(a=>a.textContent==='Test shell'));assert.equal(page.container.querySelector('.ssh-terminal'),terminal);assert.equal(calls.filter(c=>c.p==='/ssh/connect').length,1);
- await page.click([...page.container.querySelectorAll('button')].find(b=>b.textContent==='Disconnect'));await tick();assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);assert.equal(page.container.querySelector('.ssh-terminal'),null);
+ await page.click(page.container.querySelector('.shell-tab button[aria-label^="Close "]'));await tick();assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);assert.equal(page.container.querySelector('.ssh-terminal'),null);
  }finally{await page.close()}
  assert.equal(calls.filter(c=>c.init?.method==='DELETE').length,1);
 });
@@ -269,4 +269,25 @@ test('software updates require opening review then explicit installation, with p
  await page.click([...dialog.querySelectorAll('button')].find(b=>b.textContent==='Update Software'));assert.equal(page.posts(),1);assert.equal(page.container.querySelector('.update-message'),null);assert.ok(dialog.querySelector('.update-spinner'));assert.equal([...dialog.querySelectorAll('button')].find(b=>b.textContent==='Update Software').disabled,true);
  await page.click([...dialog.querySelectorAll('button')].find(b=>b.textContent==='Close'));assert.equal(page.container.querySelector('[role=dialog]'),null);await page.click(page.container.querySelector('[aria-label="Updating software"]'));assert.ok(page.container.querySelector('[role=dialog]'));assert.equal(page.posts(),1);page.status({state:'failed',message:'Updater failed',pending:false});await page.poll();assert.match(page.container.textContent,/Updater failed/);
  }finally{sessionStorage.removeItem('iclusters_update_started');await page.close()}
+});
+
+for(const mobile of [false,true])test(`terminal fullscreen toggles native mode, falls back on rejection, and exits on hide or Escape (mobile=${mobile})`,async()=>{
+ let native=null,entries=0,exits=0;
+ const page=await mounted('components/SSHAccess.tsx',terminalProps,async()=>({output:'',closed:false}),mobile,false,['/'],'default',win=>{
+  Object.defineProperty(win.document,'fullscreenElement',{get:()=>native});
+  win.HTMLElement.prototype.requestFullscreen=async function(){entries++;native=this;win.document.dispatchEvent(new win.Event('fullscreenchange'));};
+  win.document.exitFullscreen=async()=>{exits++;native=null;win.document.dispatchEvent(new win.Event('fullscreenchange'));};
+ });
+ try{const terminal=page.container.querySelector('.ssh-terminal');
+  await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.equal(entries,1);assert.ok(native);await page.click(page.container.querySelector('[aria-label="Exit fullscreen terminal"]'));assert.equal(exits,1);assert.equal(native,null);
+  page.dom.window.HTMLElement.prototype.requestFullscreen=async()=>{throw Error('Not permitted')};
+  await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));assert.ok(page.container.querySelector('.terminal-expanded'));
+  await act(async()=>document.dispatchEvent(new page.dom.window.KeyboardEvent('keydown',{key:'Escape'})));assert.equal(page.container.querySelector('.terminal-expanded'),null);
+  await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));await page.render({...terminalProps,active:false});assert.equal(page.container.querySelector('.terminal-expanded'),null);assert.equal(page.container.querySelector('.ssh-terminal'),terminal);
+ }finally{await page.close();}
+});
+
+test('expanded mobile terminal follows the visual viewport without replacing the session',async()=>{
+ let viewport;const page=await mounted('components/SSHAccess.tsx',terminalProps,async()=>({output:'',closed:false}),true,false,['/'],'default',win=>{viewport=new win.EventTarget();viewport.height=700;viewport.offsetTop=0;Object.defineProperty(win,'visualViewport',{value:viewport});});
+ try{const terminal=page.container.querySelector('.ssh-terminal');await page.click(page.container.querySelector('[aria-label="Fullscreen terminal"]'));viewport.height=360;viewport.offsetTop=25;await act(async()=>viewport.dispatchEvent(new page.dom.window.Event('resize')));const shell=page.container.querySelector('.ssh-shell');assert.equal(shell.style.getPropertyValue('--terminal-viewport-height'),'360px');assert.equal(shell.style.getPropertyValue('--terminal-viewport-top'),'25px');assert.equal(page.container.querySelector('.ssh-terminal'),terminal);}finally{await page.close();}
 });

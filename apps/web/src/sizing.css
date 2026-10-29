@@ -60,7 +60,7 @@
 .content .metric-grid.metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, calc((100% - 3 * var(--space-grid)) / 4))), 1fr));
-  grid-auto-rows: minmax(var(--metric-height), auto);
+  grid-auto-rows: minmax(var(--metric-height), 1fr);
   align-items: stretch;
   gap: var(--space-grid);
   min-width: 0;
@@ -191,7 +191,7 @@
   }
 }
 @media (max-width: 800px) {
-  :root { --space-panel: 12px; --space-grid: 12px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
+  :root { --space-panel: 12px; --space-grid: 12px; --metric-height: 144px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
   :root[data-density="compact"] { --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
   .content { padding: 16px; }
   .content .metric-grid.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

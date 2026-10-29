@@ -1,6 +1,7 @@
 import ReportLoading from './ReportLoading';
+import {Eye,EyeOff} from 'lucide-react';
 import {useState,type ReactNode} from 'react';
 export default function SSHFingerprintValue({fingerprint,pending,children,loading=false}:{fingerprint:string;pending:string;children?:ReactNode;loading?:boolean}){
- const [visible,setVisible]=useState(false);
- return <>{loading&&<ReportLoading message={pending}/>} {!loading&&<code>{fingerprint?(visible?fingerprint:'SHA256:••••••••••••••••'):pending}</code>}<div className="ssh-fingerprint-actions">{fingerprint&&<button type="button" className="btn secondary small" aria-expanded={visible} onClick={()=>setVisible(v=>!v)}>{visible?'Hide SSH fingerprint':'Show SSH fingerprint'}</button>}{children}</div></>;
+ const [visible,setVisible]=useState(false),label=visible?'Hide SSH fingerprint':'Show SSH fingerprint';
+ return <><div className="ssh-fingerprint-heading"><b>Verify SSH host identity</b>{fingerprint&&<button type="button" className="icon-btn" aria-label={label} title={label} aria-expanded={visible} onClick={()=>setVisible(v=>!v)}>{visible?<EyeOff size={18}/>:<Eye size={18}/>}</button>}</div>{loading?<ReportLoading message={pending}/>:<code>{fingerprint?(visible?fingerprint:'SHA256:••••••••••••••••'):pending}</code>}<div className="ssh-fingerprint-verification">{children}</div></>;
 }

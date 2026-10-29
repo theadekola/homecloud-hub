@@ -1886,11 +1886,10 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .btn[aria-busy="true"]:not(.refresh-button):not(.update-button)::before,
 .icon-btn[aria-busy="true"]::before{content:"";display:inline-block;flex:none;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:update-rotate .8s linear infinite}
 .btn[aria-busy="true"]:not(.refresh-button):not(.update-button)>svg:not(.update-spinner),.icon-btn[aria-busy="true"]>svg{display:none}
-.ssh-fingerprint-actions{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:10px;align-items:center}
-.ssh-fingerprint-actions>.btn{grid-column:1;grid-row:1;max-width:100%}
-.ssh-fingerprint .ssh-fingerprint-actions>label{display:contents}
-.ssh-fingerprint-actions>label>input[type="checkbox"]{grid-column:2;grid-row:1;justify-self:start;width:20px;min-width:20px;height:20px;min-height:20px;margin:0}
-.ssh-fingerprint-actions>label>span{grid-column:1/-1;grid-row:2}
+.ssh-fingerprint-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ssh-fingerprint-heading>b{min-width:0}.ssh-fingerprint-heading>.icon-btn{flex:none;width:34px;height:34px;padding:6px}
+.ssh-fingerprint .ssh-fingerprint-verification>label{display:flex;flex-direction:row;align-items:flex-start;gap:8px}
+.ssh-fingerprint-verification>label>input[type="checkbox"]{flex:none;width:18px;min-width:18px;height:18px;min-height:18px;margin:1px 0 0;padding:0}
+.ssh-fingerprint-verification>label>span{flex:1;min-width:0}
 .software-update-review dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px}
 .software-update-review dd{margin:0;overflow-wrap:anywhere}.software-update-review [role="status"]{display:flex;align-items:center;gap:10px}.software-update-review ul{padding-left:22px}.software-update-review li{margin-bottom:10px}
 @media(prefers-reduced-motion:reduce){.btn[aria-busy="true"]::before,.icon-btn[aria-busy="true"]::before{animation:none}}

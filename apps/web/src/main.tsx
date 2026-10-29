@@ -1,3 +1,4 @@
+import InstallPrompt from './components/InstallPrompt';
 import './brand-storage';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -19,7 +20,7 @@ applyAppearance();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter><App /></BrowserRouter>
+    <BrowserRouter><App /><InstallPrompt/></BrowserRouter>
   </React.StrictMode>
 );
 
@@ -32,3 +33,7 @@ import './components/VmCreateWizard.css';
 import './connection-notice.css';
 
 import './responsive-layout.css';
+
+if ('serviceWorker' in navigator && window.isSecureContext) {
+ window.addEventListener('load',()=>{void navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).catch(()=>{/* Installation remains available through the browser menu. */});});
+}

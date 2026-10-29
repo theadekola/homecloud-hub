@@ -180,6 +180,27 @@ class AgentTests(unittest.TestCase):
     self.assertEqual(result['status'],200);self.assertTrue(observed);self.assertLess(len(result['body']),1000);self.assertTrue(release.is_set())
    finally:release.set();server.shutdown();server.server_close();thread.join(timeout=2)
 class OperationalTests(unittest.TestCase):
+ def test_new_gateway_guards_forwarding_before_start_and_persists_guard(self):
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);config=root/'icvpn.conf';policy=root/'policy.json';helper=root/'routing.py';events=[]
+   def command(args,**kwargs):
+    events.append(args)
+    if args==['wg','genkey']:return 'private-fixture'
+    return ''
+   with patch.object(agent,'VPN_CONFIG',config),patch.object(agent,'VPN_POLICY',policy),patch.object(agent,'VPN_HELPER',helper),patch.object(agent,'command_json',return_value=[]),patch.object(agent,'run',side_effect=command),patch.object(agent,'apply_vpn_firewall',side_effect=lambda *args:events.append('guard')) as firewall:
+    agent.operations_job(self.job({'action':'vpn-setup','address':'10.77.0.1/24','port':51820}))
+   self.assertLess(events.index('guard'),events.index(['systemctl','enable','--now','wg-quick@icvpn']))
+   firewall.assert_called_once_with({'authorized':True,'rules':[],'clientNetworks':[]},{})
+   self.assertEqual(json.loads(policy.read_text())['rules'],[])
+   self.assertIn('PreUp = /usr/bin/python3 '+str(helper)+' --vpn-firewall',config.read_text())
+   for item in (config,policy,helper):self.assertEqual(item.stat().st_mode&0o777,0o600)
+   self.assertNotIn('sysctl',str(events))
+ def test_new_gateway_never_starts_when_isolation_guard_fails(self):
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory)
+   with patch.object(agent,'VPN_CONFIG',root/'icvpn.conf'),patch.object(agent,'VPN_POLICY',root/'policy.json'),patch.object(agent,'VPN_HELPER',root/'routing.py'),patch.object(agent,'command_json',return_value=[]),patch.object(agent,'run',return_value='key') as run,patch.object(agent,'apply_vpn_firewall',side_effect=RuntimeError('nft rejected')):
+    with self.assertRaisesRegex(RuntimeError,'isolation or startup failed'):agent.operations_job(self.job({'action':'vpn-setup','address':'10.77.0.1/24','port':51820}))
+    self.assertFalse(any(call.args[0][0]=='systemctl' for call in run.call_args_list))
  def job(self,body,host='node'):
   return {'host':host,'body':base64.b64encode(json.dumps(body).encode()).decode()}
  def test_invalid_operational_actions_never_run_a_command(self):

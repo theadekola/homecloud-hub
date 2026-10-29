@@ -59,10 +59,13 @@ jobs:
         run: |
           sh deployment/generate-secrets.sh > /dev/null
           source deployment/build-env.sh
+          # Reproduce hardened deployment checkouts whose public files are owner-only.
+          chmod 600 apps/web/public/manifest.webmanifest apps/web/public/sw.js apps/web/public/assets/iclusters-*.png
           docker compose up -d --build --wait --wait-timeout 180
           docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/iclusters-ci-root.crt
           curl --fail --show-error --cacert /tmp/iclusters-ci-root.crt https://localhost:6002/api/health
           NODE_EXTRA_CA_CERTS=/tmp/iclusters-ci-root.crt node deployment/check-registration.mjs
+          NODE_EXTRA_CA_CERTS=/tmp/iclusters-ci-root.crt node deployment/check-mobile-assets.mjs
       - name: Check deployed Caddy security dependencies
         run: |
           docker compose exec -T caddy caddy build-info > /tmp/iclusters-caddy-build-info.txt

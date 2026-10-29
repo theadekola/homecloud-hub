@@ -1893,3 +1893,11 @@ html.shell-scroll-locked,html.shell-scroll-locked body{height:100%;overflow:hidd
 .software-update-review dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px}
 .software-update-review dd{margin:0;overflow-wrap:anywhere}.software-update-review [role="status"]{display:flex;align-items:center;gap:10px}.software-update-review ul{padding-left:22px}.software-update-review li{margin-bottom:10px}
 @media(prefers-reduced-motion:reduce){.btn[aria-busy="true"]::before,.icon-btn[aria-busy="true"]::before{animation:none}}
+
+/* One cluster toolbar and explicit, accessible inspection panels. */
+.pve-context-actions{display:contents}
+.task-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.task-detail-heading h3{margin-right:auto}
+.task-log-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:8px;padding-top:8px}
+.content .task-log-actions .btn{min-width:0;padding:8px 5px;font-size:11px;gap:4px;white-space:normal}.task-log-actions .btn svg{flex-shrink:0}
+.task-manager .task-workspace.task-list-only,.pve-network .network-workspace.network-interfaces-only{grid-template-columns:minmax(0,1fr)}

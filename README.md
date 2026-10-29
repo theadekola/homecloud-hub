@@ -8,9 +8,9 @@
 
 i-Clusters is a self-hosted infrastructure management application for Proxmox VE, Docker and TrueNAS. It brings inventory, monitoring, supported infrastructure actions, backups, SSH terminals and SFTP into one responsive interface.
 
-Developed by **The Adekola** for **ATT-Tech**. Application version: **3.1.0-rc.3** (release candidate). Licence: [MIT](LICENSE).
+Developed by **The Adekola** for **ATT-Tech**. Application version: **1.0.0** (release baseline; publication paused). Licence: [MIT](LICENSE).
 
-**Release status:** controlled evaluation candidate, with separate controllers per customer. Production provider acceptance, physical-device testing and independent security review remain open. See [release notes](docs/releases/v3.1.0-rc.3.md), [CHANGELOG](CHANGELOG.md), [release policy](docs/release-policy.md) and [acceptance checklist](docs/acceptance-checklist.md).
+**Release status:** controlled evaluation candidate, with separate controllers per customer. Production provider acceptance, physical-device testing and independent security review remain open. See [release notes](docs/releases/v1.0.0.md), [CHANGELOG](CHANGELOG.md), [release policy](docs/release-policy.md) and [acceptance checklist](docs/acceptance-checklist.md).
 
 ## Contents
 
@@ -217,7 +217,7 @@ Use [GitHub Issues](https://github.com/theadekola/i-clusters/issues) for reprodu
 - [Documentation index](docs/README.md)
 - [Compatibility and scope](docs/compatibility.md)
 - [Operations, retention and incident response](docs/operations.md)
-- [Release policy](docs/release-policy.md) and [release notes](docs/releases/v3.1.0-rc.3.md)
+- [Release policy](docs/release-policy.md) and [release notes](docs/releases/v1.0.0.md)
 - [Customer acceptance checklist](docs/acceptance-checklist.md)
 - [Contributing](CONTRIBUTING.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 

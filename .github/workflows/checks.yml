@@ -140,12 +140,12 @@ jobs:
         with:
           name: release-evidence
           path: artifacts/evidence
-      - name: Publish the tested release candidate once
+      - name: Publish the reviewed version once
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./package.json').version")
-          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]] || { echo 'Automatic publication is restricted to reviewed release candidates.'; exit 1; }
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]] || { echo 'Use a reviewed semantic version or release candidate.'; exit 1; }
           tag="v$version"
           notes="docs/releases/$tag.md"
           test -s "$notes"
@@ -156,4 +156,6 @@ jobs:
           git archive --format=tar.gz --prefix="iclusters-$version/" "$GITHUB_SHA" > "artifacts/evidence/iclusters-$version.tar.gz"
           (cd artifacts/evidence && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           node deployment/release-notes.mjs "$notes" "$GITHUB_REPOSITORY" "$tag" /tmp/iclusters-release-notes.md
-          gh release create "$tag" artifacts/evidence/* --target "$GITHUB_SHA" --title "i-Clusters $version" --notes-file /tmp/iclusters-release-notes.md --prerelease
+          release_flags=()
+          if [[ $version == *-rc.* ]]; then release_flags+=(--prerelease); fi
+          gh release create "$tag" artifacts/evidence/* --target "$GITHUB_SHA" --title "i-Clusters $version" --notes-file /tmp/iclusters-release-notes.md "${release_flags[@]}"

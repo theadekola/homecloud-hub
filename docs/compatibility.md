@@ -1,6 +1,6 @@
 # Compatibility and deployment scope
 
-Applies to 3.1.0-rc.3. Developer: The Adekola; company: ATT-Tech.
+Applies to 1.0.0. Developer: The Adekola; company: ATT-Tech.
 
 | Component | Tested or implemented scope | Acceptance boundary |
 | --- | --- | --- |

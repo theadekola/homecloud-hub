@@ -97,6 +97,6 @@ Jobs execute in the API process with encrypted durable checkpoints. Browser navi
 
 Before contacting the registry, the installer inspects the reviewed immutable image reference locally. If its identity and repository digest match the review, it reuses that downloaded image and proceeds through replacement and health verification. A manually completed pull can therefore be reused without another download. Otherwise the bounded registry pull remains necessary. Mounted data and existing rollback checks remain preserved.
 
-## Bounded checks (3.1.0-rc.2)
+## Bounded checks (v1.0.0)
 
 Manual inventory has a 30-second deadline. The registry phase uses rolling workers (four per scan, at most two per host), a two-minute scan budget, ten-second image inspections and fifteen-second registry requests. Transient failures receive one bounded retry. Results appear individually; unknown or timed-out checks retain existing update alerts. Large or slow inventories may require another check; an incomplete scan is never proof that an image is current. Active status refreshes every two seconds without adding a global spinner. Image downloads and installation progress use their separate operation deadlines.

@@ -10,7 +10,7 @@ cat > "$temporary/bin/git" <<'EOF'
 case "$1" in
   symbolic-ref) exit 0;;
   fetch) grep -q '"state":"checking"' "$FIXTURE/status/update-status.json" || exit 1; if [[ -e "$FIXTURE/retain" ]]; then grep -q '"available":true' "$FIXTURE/status/update-status.json" || exit 1; fi; [[ ! -e "$FIXTURE/fail-fetch" ]]; exit $?;;
-  log) printf '%s\n' 'Fix "SSH" popup' 'Improve update review';;
+  log) printf '%s\n' 'Merge pull request #151 from branch' 'Fix "SSH" popup' 'Fix "SSH" popup' 'Improve update review';;
   rev-parse) if [[ $2 == HEAD ]]; then cat "$FIXTURE/current"; else echo bbbbbbb; fi;;
 esac
 EOF

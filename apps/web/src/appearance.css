@@ -68,3 +68,10 @@
   border-color: var(--theme-border) !important;
   color: var(--theme-text);
 }
+
+/* Resource readings are cards, rather than raised action controls. */
+:root[data-preset] .content .resource-tile {
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text) !important;
+}

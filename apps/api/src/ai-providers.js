@@ -3,7 +3,7 @@ export const aiProviders={
  anthropic:{label:'Anthropic Claude',base:'https://api.anthropic.com/v1/',types:['messages'],defaultModel:'claude-sonnet-5-5',models:['claude-sonnet-5-5','claude-haiku-5-5','claude-opus-5-5']},
  gemini:{label:'Google Gemini',base:'https://generativelanguage.googleapis.com/v1beta/',types:['generate-content'],defaultModel:'gemini-3.8-flash',models:['gemini-3.8-flash','gemini-3.6-flash','gemini-3.5-flash-lite']},
  deepseek:{label:'DeepSeek',base:'https://api.deepseek.com/',types:['chat-completions'],defaultModel:'deepseek-flash',models:['deepseek-flash','deepseek-v4-pro']},
- groq:{label:'Groq',base:'https://api.groq.com/openai/v1/',types:['chat-completions'],defaultModel:'llama-3.3-70b-versatile',models:['llama-3.3-70b-versatile','llama-3.1-8b-instant']},
+ groq:{label:'Groq',base:'https://api.groq.com/openai/v1/',types:['chat-completions'],defaultModel:'openai/gpt-oss-120b',models:['openai/gpt-oss-120b','openai/gpt-oss-20b']},
  mistral:{label:'Mistral AI',base:'https://api.mistral.ai/v1/',types:['chat-completions'],defaultModel:'mistral-small-latest',models:['mistral-small-latest','mistral-large-latest']}
 };
 export const publicAIProviders=()=>Object.fromEntries(Object.entries(aiProviders).map(([id,{base,...publicInfo}])=>[id,publicInfo]));

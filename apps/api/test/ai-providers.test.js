@@ -41,3 +41,9 @@ test('unsupported providers and invalid model paths cannot initiate external req
 test('provider failures are actionable without reflecting upstream bodies or credentials',async()=>{
  const previous=globalThis.fetch;try{for(const id of Object.keys(aiProviders)){globalThis.fetch=async()=>new Response(JSON.stringify({error:{message:'provider-secret https://secret.example'}}),{status:403});await assert.rejects(()=>queryAI({AI_PROVIDER:id,OPENAI_API_KEY:'provider-secret'},'x'),error=>error.aiError&&error.message.includes(aiProviders[id].label)&&!error.message.includes('provider-secret')&&!error.message.includes('secret.example'));}}finally{globalThis.fetch=previous}
 });
+for(const id of ['anthropic','gemini'])test(`${id} follows opaque model cursors and rejects pagination loops`,async()=>{
+ const previous=globalThis.fetch;let calls=0;
+ const row=n=>id==='gemini'?{name:`models/gemini-${n}`,supportedGenerationMethods:['generateContent']}:{id:`claude-${n}`};
+ globalThis.fetch=async url=>{calls++;if(calls===2)assert.ok(url.includes(encodeURIComponent('opaque /?&')));return Response.json(id==='gemini'?{models:[row(calls)],...(calls===1?{nextPageToken:'opaque /?&'}:{})}:{data:[row(calls)],has_more:calls===1,last_id:'opaque /?&'});};
+ try{assert.equal((await listAIModels({AI_PROVIDER:id,OPENAI_API_KEY:'fixture'})).length,2);calls=0;globalThis.fetch=async()=>Response.json(id==='gemini'?{models:[row(1)],nextPageToken:'repeat'}:{data:[row(1)],has_more:true,last_id:'repeat'});await assert.rejects(()=>listAIModels({AI_PROVIDER:id,OPENAI_API_KEY:'fixture'}),/pagination/);}finally{globalThis.fetch=previous;}
+});

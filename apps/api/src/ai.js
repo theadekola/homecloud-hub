@@ -23,8 +23,18 @@ async function requestAI(config,resource,body){
  }catch(error){if(error.aiError)throw error;if(error.name==='TimeoutError'||error.name==='AbortError')throw failure(`${name} did not respond within 30 seconds. Check the server network and retry.`,504);throw failure(`Cannot reach ${name}. Check the i-Clusters server network, DNS and HTTPS access.`);}
 }
 export async function listAIModels(config){
- const provider=providerFor(config),data=await requestAI(config,provider.id==='gemini'?'models?pageSize=1000':provider.id==='anthropic'?'models?limit=1000':'models');
- const rows=provider.id==='gemini'?data.models:data.data;if(!Array.isArray(rows))throw failure(`${provider.label} returned an invalid model list. Retry or enter a custom model ID.`);
+ const provider=providerFor(config),base=provider.id==='gemini'?'models?pageSize=1000':provider.id==='anthropic'?'models?limit=1000':'models',rows=[],seen=new Set();
+ let resource=base;
+ for(let page=0;resource&&page<10;page++){
+  const data=await requestAI(config,resource),batch=provider.id==='gemini'?data.models:data.data;
+  if(!Array.isArray(batch))throw failure(`${provider.label} returned an invalid model list. Retry or enter a custom model ID.`);
+  rows.push(...batch);
+  const cursor=provider.id==='gemini'?data.nextPageToken:provider.id==='anthropic'&&data.has_more?data.last_id:null;
+  if(!cursor){resource=null;break;}
+  if(typeof cursor!=='string'||seen.has(cursor))throw failure(`${provider.label} returned invalid model pagination.`);
+  seen.add(cursor);resource=base+'&'+(provider.id==='gemini'?'pageToken=':'after_id=')+encodeURIComponent(cursor);
+ }
+ if(resource)throw failure(`${provider.label} model list exceeded the pagination limit. Enter a custom model ID.`);
  return [...new Set(rows.filter(m=>provider.id!=='gemini'||m?.supportedGenerationMethods?.includes('generateContent')).filter(m=>provider.id!=='mistral'||m?.capabilities?.completion_chat!==false).filter(m=>m?.active!==false).map(m=>provider.id==='gemini'?m?.name?.replace(/^models\//,''):m?.id).filter(validAIModel).filter(id=>provider.id!=='openai'||/^(?:gpt-|chatgpt-|o\d|ft:)/.test(id)).filter(id=>!/(?:audio|realtime|transcribe|whisper|tts|embed|image|instruct|deep-research|search)/i.test(id)))].sort((a,b)=>a.localeCompare(b)).slice(0,500);
 }
 export async function queryAI(config,input,test=false){

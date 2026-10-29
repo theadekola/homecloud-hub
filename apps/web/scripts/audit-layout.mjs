@@ -203,7 +203,7 @@ try{
    assert.equal(await page.locator('.page-breadcrumbs [aria-current=page]').innerText(),'Volumes');
   }
   if(process.env.LAYOUT_STORAGE_CLEANUP){
-   await page.goto(base+'storage');await page.getByRole('link',{name:'Add TrueNAS',exact:true}).waitFor();assert.equal(await page.locator('.storage-scope-note').count(),0);assert.equal(await page.getByRole('button',{name:'media-storage',exact:true}).count(),0);assert.ok(await page.getByRole('button',{name:'local',exact:true}).isVisible());await page.getByRole('link',{name:'Add TrueNAS',exact:true}).click();const config=page.getByRole('dialog',{name:'Configure TrueNAS',exact:true});await config.waitFor();assert.ok(await config.getByLabel('HTTPS endpoint',{exact:true}).isVisible());await config.getByRole('button',{name:'Close dialog',exact:true}).click();
+   await page.goto(base+'storage');await page.getByRole('link',{name:'Connect TrueNAS',exact:true}).waitFor();assert.equal(await page.locator('.storage-scope-note').count(),0);assert.equal(await page.getByRole('button',{name:'media-storage',exact:true}).count(),0);assert.ok(await page.getByRole('button',{name:'local',exact:true}).isVisible());await page.getByRole('link',{name:'Connect TrueNAS',exact:true}).click();const config=page.getByRole('dialog',{name:'Configure TrueNAS',exact:true});await config.waitFor();assert.ok(await config.getByLabel('HTTPS endpoint',{exact:true}).isVisible());await config.getByRole('button',{name:'Close dialog',exact:true}).click();
    await page.goto(base+'docker');const picker=page.getByLabel('Docker host for resource views',{exact:true});await picker.waitFor();assert.equal(await picker.locator('option[value="docker-fixture"]').innerText(),'control-vm');
   }
   if(process.env.LAYOUT_GUEST_RESTART){

@@ -5,6 +5,7 @@ import {useInstallationWakeLock} from '../installation-wake-lock';
 import {Download,LoaderCircle} from 'lucide-react';
 import {useEffect,useRef,useState} from 'react';
 import {api} from '../api';
+import {version as bundledVersion} from '../../package.json';
 export default function UpdateButton({showLabel=false}:{showLabel?:boolean}){
  const [open,setOpen]=useState(false);
  const [status,setStatus]=useState<any>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[statusError,setStatusError]=useState(''),[checking,setChecking]=useState(false),[transient,setTransient]=useState(false),[requested,setRequested]=useState(false);
@@ -34,7 +35,7 @@ export default function UpdateButton({showLabel=false}:{showLabel?:boolean}){
  if(!open&&!showLabel&&!running&&(!status?.available||!status?.enabled||!!statusError))return null;
  return <div className="software-update"><button type="button" className="btn secondary update-button" onClick={()=>setOpen(true)} aria-busy={running||scanning} disabled={!status&&!statusError} aria-label={statusError?'Retry update status':running?'Updating software':scanning?'Checking for software updates':installable?'Review software update':'Check for software updates'} title={status?.message||'Check for software updates'}>{running||scanning?<LoaderCircle size={20} className="update-spinner" aria-hidden="true"/>:<Download size={20} aria-hidden="true"/>}{showLabel&&<span>{statusError?'Retry update status':running?'Updating…':scanning?'Checking…':installable?'Review Update':'Check for Updates'}</span>}{status?.available&&<span className="update-dot" aria-label="New update available"/>}</button>{open&&createPortal(<Modal open title="Software update" onClose={()=>setOpen(false)}><div className="software-update-review">
  <p>{running?'The update is in progress. This page reconnects automatically when the server restarts.':installable?'Review the available i-Clusters update, then install it below.':'Check the configured release branch for an i-Clusters update.'}</p>
- <dl><dt>Installed revision</dt><dd><code>{status?.current||'Not reported'}</code></dd><dt>Available revision</dt><dd><code>{status?.latest||'Not reported'}</code></dd>{status?.checkedAt&&Number.isFinite(Date.parse(status.checkedAt))&&<><dt>Last checked</dt><dd>{new Date(status.checkedAt).toLocaleString()}</dd></>}</dl>
+ <dl><dt>Software version</dt><dd>{status?.version||bundledVersion}</dd>{status?.buildNumber&&<><dt>Build number</dt><dd>{status.buildNumber}</dd></>}<dt>Installed revision</dt><dd><code>{status?.current||'Not reported'}</code></dd><dt>Available revision</dt><dd><code>{status?.latest||'Not reported'}</code></dd>{status?.checkedAt&&Number.isFinite(Date.parse(status.checkedAt))&&<><dt>Last checked</dt><dd>{new Date(status.checkedAt).toLocaleString()}</dd></>}</dl>
  {!!status?.changes?.length&&<><h4>Update information</h4><ul>{status.changes.map((change:string,index:number)=><li key={index}>{change}</li>)}</ul></>}
  {!message&&status?.message&&<p>{status.message}</p>}
  {(running||scanning)&&<p role="status"><LoaderCircle className="update-spinner" size={20}/>{running?'Updating and waiting for reconnection…':'Checking for updates…'}</p>}

@@ -665,7 +665,7 @@ test('VM and CT summaries preserve live guest measurements despite unavailable g
  const GiB=1024**3;for(const file of ['VirtualMachines','LxcContainers']){
  const live={id:'1',name:'healthy-guest',node:'a',status:'running',memory:2*GiB,memoryTotal:4*GiB,disk:10*GiB,diskTotal:100*GiB,cpu:10},offline={id:'2',name:'unavailable-guest',node:'b',nodeAvailable:false,status:'unknown',memory:null,memoryTotal:null,disk:null,diskTotal:null};
  const data={resourceInventoryComplete:true,nodes:[{name:'a',status:'online'},{name:'b',status:'offline'}],vms:[live,offline],lxc:[live,offline],storage:[],errors:['b unavailable']};
- const page=await mounted(`pages/${file}.tsx`,{data,refresh:async()=>{}},async()=>({}));try{const cards=page.container.querySelector('.vm-stats');assert.match(cards.textContent,/2.0 GiB/);assert.match(cards.textContent,/10.0 GiB/);assert.match(page.container.textContent,/Memory 1\/2/);assert.match(page.container.textContent,/healthy-guest/);assert.match(page.container.textContent,/unavailable-guest/)}finally{await page.close()}
+ const page=await mounted(`pages/${file}.tsx`,{data,refresh:async()=>{}},async()=>({}));try{const cards=page.container.querySelector('.vm-stats');assert.match(cards.textContent,/2.0 GiB/);assert.match(cards.textContent,/10.0 GiB/);assert.doesNotMatch(page.container.textContent,/guests measured/);assert.match(page.container.textContent,/healthy-guest/);assert.match(page.container.textContent,/unavailable-guest/)}finally{await page.close()}
  }
 });
 

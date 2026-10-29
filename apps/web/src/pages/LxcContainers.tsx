@@ -54,7 +54,6 @@ export default function LxcContainers({navigation,data,role,clusterUrl,refresh,l
    <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <CtStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={HardDrive} label="Root Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>
   </div>
- <p className="muted" role="status">{available.coverage}</p>
  {navigation}
   <div className="vm-workspace">
    <Card className="vm-list-card">

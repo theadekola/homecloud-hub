@@ -2,6 +2,7 @@
    page-specific colors and charts can change without changing the card scale. */
 :root {
   --space-panel: 12px;
+  --space-section: 12px;
   --space-grid: 8px;
   --metric-height: 0px;
   --metric-icon: 36px;
@@ -377,3 +378,16 @@
 .truenas-certificate-guide .truenas-ip-instruction{padding:10px;border-left:3px solid var(--app-accent,#6366f1);background:var(--theme-surface,#18233b)}
 
 .backup-scope-warning{margin:14px 0;padding:14px;border:1px solid #78612c;border-radius:10px;background:#292316;overflow-wrap:anywhere}.backup-scope-warning p{margin:8px 0}
+
+/* Page tabs use one section gap instead of stacking grid gaps and margins.
+   Inner card tabs retain their own layout. Grid contents keep their columns. */
+.content.content :where(section, div):not(.card):not(.modal):has(> :is(.tabs, .pve-tabbar)) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-section);
+}
+.content.content :where(section, div):not(.card):not(.modal):has(> :is(.tabs, .pve-tabbar)) > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}

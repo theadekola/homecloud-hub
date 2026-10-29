@@ -55,7 +55,6 @@ export default function VirtualMachines({navigation,data,role,clusterUrl,refresh
    <VmStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={MemoryStick} label="Memory Usage" value={bytes(usedMemory)} detail={totalMemory==null?'Capacity unavailable':`of ${bytes(totalMemory)}`}/>
    <VmStat reading={{loading,data:loading&&!data?.sampledAt?null:data}} icon={HardDrive} label="Disk Usage" value={bytes(usedDisk)} detail={totalDisk==null?'Capacity unavailable':`of ${bytes(totalDisk)}`}/>
   </div>
- <p className="muted" role="status">{available.coverage}</p>
  {navigation}
   <div className="vm-workspace">
    <Card className="vm-list-card">

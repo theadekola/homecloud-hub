@@ -249,3 +249,10 @@ test('closing a pending task read keeps refresh available and ignores its late r
  const page=await mounted('pages/ProxmoxTasks.tsx',{role:'viewer',hours:'24'},async p=>p.startsWith('/proxmox/tasks')?{tasks:[{upid:'pending',node:'n1',type:'qmstart',status:'OK',starttime:1,endtime:2}],nodes:[{node:'n1'}]}:p.includes('/log')?new Promise(r=>finish=r):{status:'stopped',exitstatus:'OK'});
  try{await page.click(page.container.querySelector('[aria-label="View task pending"]'));assert.equal(button(page,'Refresh').disabled,true);await page.click(page.container.querySelector('[aria-label="Close task details"]'));assert.equal(button(page,'Refresh').disabled,false);await act(async()=>finish({logs:[{n:1,t:'late output'}]}));assert.equal(page.container.querySelector('.task-detail-stack'),null);assert.ok(!page.container.textContent.includes('late output'));}finally{await page.close()}
 });
+
+test('VM and CT summaries lead directly into page tabs without standalone coverage sections',async()=>{
+ for(const file of ['VirtualMachines','LxcContainers']){
+  const page=await mounted(`pages/${file}.tsx`,{data:guests,role:'viewer',navigation:React.createElement('div',{className:'tabs'},'Page tabs'),refresh:async()=>{}},async()=>({config:{},status:{},history:[],interfaces:[],errors:[]}));
+  try{const cards=page.container.querySelector('.vm-stats');assert.equal(cards.children.length,4);assert.ok(cards.nextElementSibling.classList.contains('tabs'));assert.equal(cards.nextElementSibling.nextElementSibling.className,'vm-workspace');assert.doesNotMatch(page.container.textContent,/guests measured|Missing or offline readings are excluded/);}finally{await page.close()}
+ }
+});

@@ -36,3 +36,16 @@ test('browse and permissions are bound to an unlocked detected filesystem',async
  await assert.rejects(()=>datasetRoot('tank/fs',async()=>[{id:'tank/fs',type:'VOLUME',mountpoint:'/mnt/tank/fs'}]),/mountpoint/);
  await assert.rejects(()=>datasetRoot('tank/fs',async()=>[{id:'tank/fs',type:'FILESYSTEM',locked:true,mountpoint:'/mnt/tank/fs'}]),/mountpoint/);
 });
+
+test('volume inventory exposes guest totals separately without fabricating per-volume usage',async()=>{
+ const result=await datasetInventory({proxmox:true,guests:{vms:[{id:'100',node:'one',status:'running',disk:40,diskTotal:100}]},inventory:async()=>({errors:[],resources:[{node:'one',name:'local',status:'online'}]}),query:async()=>[{volid:'local:vm-100-disk-0',vmid:100,content:'images',size:200},{volid:'local:vm-100-disk-1',vmid:100,content:'images',size:300}]});
+ for(const row of result.resources){assert.equal(row.used,null);assert.equal(row.available,null);assert.deepEqual(row.guestUsage,{used:40,available:60,total:100,scope:'guest',guestId:'100',source:'QEMU guest agent'});}
+});
+test('guest measurements require the matching node, guest type, running state and valid usage',async()=>{
+ for(const guest of [{id:'100',node:'other',status:'running',disk:40,diskTotal:100},{id:'100',node:'one',status:'stopped',disk:40,diskTotal:100},{id:'100',node:'one',status:'running',nodeAvailable:false,disk:40,diskTotal:100},{id:'100',node:'one',status:'running',disk:110,diskTotal:100}]){
+  const result=await datasetInventory({proxmox:true,guests:{vms:[guest]},inventory:async()=>({errors:[],resources:[{node:'one',name:'local',status:'online'}]}),query:async()=>[{volid:'local:vm-100-disk-0',vmid:100,content:'images',size:200}]});assert.equal(result.resources[0].guestUsage,null);
+ }
+});
+test('native volume usage is not mixed with guest totals',async()=>{
+ const result=await datasetInventory({proxmox:true,guests:{vms:[{id:'100',node:'one',status:'running',disk:40,diskTotal:100}]},inventory:async()=>({errors:[],resources:[{node:'one',name:'local',status:'online'}]}),query:async()=>[{volid:'local:vm-100-disk-0',vmid:100,content:'images',size:200,used:20}]});assert.equal(result.resources[0].used,20);assert.equal(result.resources[0].available,null);assert.equal(result.resources[0].guestUsage,null);
+});

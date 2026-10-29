@@ -7,6 +7,7 @@ import App from './App';
 import {applyAppearance} from './appearance';
 import './styles.css';
 import './sizing.css';
+import './storage-inspection.css';
 import './appearance.css';
 import './themes.css';
 import './brand-icons.css';

@@ -8,15 +8,23 @@ export function normalizeDataset(d){
  const used=number(d.used),available=number(d.available),quota=number(d.quota),volsize=number(d.volsize);
  return {id:`truenas:${d.id||d.name}`,resourceId:d.id||d.name,name:d.name,provider:'truenas',pool:d.name.split('/')[0],type:d.type==='VOLUME'?'ZFS Volume':'Dataset',used,available,size:d.type==='VOLUME'?volsize:quota>0?quota:null,mountpoint:value(d.mountpoint),compression:value(d.compression),deduplication:value(d.deduplication),readonly:value(d.readonly),created:value(d.creation),status:d.locked===true?'Locked':d.mounted?.value==='no'?'Unmounted':d.mounted?.value==='yes'?'Mounted':'Reported',usedByDataset:number(d.usedbydataset),quota:quota>0?quota:null};
 }
-export async function datasetInventory({proxmox=false,truenasEnabled=false,snapshot={},query=pve,tn=truenas,inventory=storageInventory}={}){
+export async function datasetInventory({proxmox=false,truenasEnabled=false,snapshot={},guests={},query=pve,tn=truenas,inventory=storageInventory}={}){
  const resources=[],errors=[],pools=[];let coverage={complete:true};
+ const guestUsage=(row,node)=>{
+  if(number(row.used)!=null||number(row.available)!=null)return null;
+  const list=row.content==='images'?guests.vms:guests.lxc;
+  const guest=(list||[]).find(g=>String(g.id)===String(row.vmid)&&g.node===node&&g.status==='running'&&g.nodeAvailable!==false);
+  const used=number(guest?.disk),total=number(guest?.diskTotal);
+  if(used==null||total==null||used<0||total<=0||used>total)return null;
+  return {used,available:total-used,total,scope:'guest',guestId:String(guest.id),source:row.content==='images'?'QEMU guest agent':'Container filesystem'};
+ };
  if(proxmox)try{
   const result=await inventory();coverage=result.coverage||coverage;errors.push(...result.errors);pools.push(...result.resources.map(p=>({...p,provider:'proxmox'})));
   const seen=new Set();const online=result.resources.filter(p=>p.status==='online');
   for(let i=0;i<online.length;i+=5)await Promise.all(online.slice(i,i+5).map(async p=>{
    try{const rows=await query(`/nodes/${encode(p.node)}/storage/${encode(p.name)}/content`);
     for(const row of rows.filter(r=>['images','rootdir'].includes(r.content))){const key=p.shared===true?`shared:${row.volid}`:`${p.node}:${row.volid}`;if(seen.has(key))continue;seen.add(key);
-     resources.push({id:`proxmox:${key}`,resourceId:row.volid,name:row.volid,provider:'proxmox',pool:p.name,node:p.node,type:row.content==='images'?'VM Volume':'CT Volume',size:number(row.size),used:number(row.used),available:null,mountpoint:null,status:'Reported',vmid:row.vmid??null,format:row.format||null,shared:p.shared});
+     resources.push({id:`proxmox:${key}`,resourceId:row.volid,name:row.volid,provider:'proxmox',pool:p.name,node:p.node,type:row.content==='images'?'VM Volume':'CT Volume',size:number(row.size),used:number(row.used),available:number(row.available),guestUsage:guestUsage(row,p.node),mountpoint:null,status:'Reported',vmid:row.vmid??null,format:row.format||null,shared:p.shared});
     }
    }catch(e){errors.push(`${p.node}/${p.name} volumes: ${e.message}`);}
   }));

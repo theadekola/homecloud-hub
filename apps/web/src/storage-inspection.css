@@ -1,0 +1,30 @@
+.content .storage-inline-inspect .widget-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.content .storage-inline-inspect .widget-title h3 { margin: 0; }
+.content .storage-inline-inspect .widget-title .icon-btn { flex: none; margin-left: auto; }
+.content .storage-pools-toolbar {
+  display: grid;
+  grid-template-columns: minmax(90px, .9fr) minmax(130px, 1.4fr) repeat(4, minmax(100px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+.content .storage-pools-toolbar > :is(h3, label, select) {
+  width: 100%; min-width: 0; max-width: none; margin: 0;
+}
+.content .storage-pools-toolbar select { font-size: 12px; padding: 10px 8px; }
+.content .storage-datasets .dataset-layout { grid-template-columns: minmax(0, 1fr); }
+.storage-usage-scope { display: block; font-size: 10px; color: var(--theme-muted); margin-top: 4px; }
+.modal:has(.dataset-detail-card) { max-width: 760px; }
+.modal .dataset-detail-card { min-width: 0; }
+.modal .dataset-detail-card .header-actions { margin-top: 12px; }
+@media (max-width: 800px) {
+  .content .storage-pools-toolbar { display: flex; flex-wrap: wrap; }
+  .content .storage-pools-toolbar > h3 { flex-basis: 100%; }
+  .content .storage-pools-toolbar > label { flex: 1 1 100%; }
+  .content .storage-pools-toolbar > select { flex: 1 1 140px; }
+}

@@ -63,6 +63,11 @@ jobs:
           docker compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > /tmp/iclusters-ci-root.crt
           curl --fail --show-error --cacert /tmp/iclusters-ci-root.crt https://localhost:6002/api/health
           NODE_EXTRA_CA_CERTS=/tmp/iclusters-ci-root.crt node deployment/check-registration.mjs
+      - name: Check deployed Caddy security dependencies
+        run: |
+          docker compose exec -T caddy caddy build-info > /tmp/iclusters-caddy-build-info.txt
+          grep -E '[[:space:]]github.com/go-jose/go-jose/v4[[:space:]]+v4\.1\.6([[:space:]]|$)' /tmp/iclusters-caddy-build-info.txt
+          grep -E '[[:space:]]golang.org/x/net[[:space:]]+v0\.60\.0([[:space:]]|$)' /tmp/iclusters-caddy-build-info.txt
       - name: Disposable Docker worker crash recovery
         run: |
           ICLUSTERS_CI_DRILL=1 ICLUSTERS_DRILL_IMAGE="$(docker image inspect --format '{{.Id}}' "$(docker compose images -q api | head -1)")" node deployment/check-docker-crash-recovery.mjs
@@ -81,7 +86,7 @@ jobs:
         id: images
         run: |
           mkdir -p artifacts/evidence
-          cp /tmp/iclusters-*-sbom.json artifacts/evidence/
+          cp /tmp/iclusters-*-sbom.json /tmp/iclusters-caddy-build-info.txt artifacts/evidence/
           echo "api=$(docker compose images -q api | head -1)" >> "$GITHUB_OUTPUT"
           mapfile -t images < <(for service in api web caddy postgres; do docker compose images -q "$service"; done)
           docker image inspect --format '{{json .}}' "${images[@]}" | jq -s 'map({Id,RepoTags,RepoDigests,Architecture,Os,Created})' > artifacts/evidence/image-identities.json

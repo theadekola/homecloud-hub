@@ -60,3 +60,11 @@
 :root[data-preset] .profile-dropdown button{color:var(--theme-text)}
 :root[data-preset] .profile-dropdown button:hover{background:var(--theme-highlight)}
 :root[data-preset] .profile-dropdown small{color:var(--theme-muted)}
+
+/* Summary surfaces match the regular cards in both light and dark presets. */
+:root[data-preset] .content .metric-grid.metric-grid > * {
+  padding: var(--metric-padding) !important;
+  background: var(--theme-surface) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text);
+}

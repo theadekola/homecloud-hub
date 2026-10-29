@@ -4,12 +4,13 @@
   --space-panel: 12px;
   --space-section: 12px;
   --space-grid: 12px;
-  --metric-height: 128px;
+  --metric-height: 112px;
+  --metric-padding: 10px;
   --card-radius: var(--app-radius, 14px);
   --card-shadow: 0 2px 5px rgb(0 0 0 / .12), 0 8px 20px rgb(0 0 0 / .10);
-  --metric-icon: 36px;
+  --metric-icon: 32px;
   --metric-glyph: 20px;
-  --metric-value: 22px;
+  --metric-value: 20px;
 }
 :root[data-density="compact"] { --space-panel: 10px; --space-grid: 12px; --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
 .brand-icon { flex-shrink: 0; }
@@ -55,11 +56,15 @@
 }
 .content.content .report-unified :is(.report-source-note, .report-pagination small, .report-pagination span) { font-size: 11px; }
 
-/* Shared card width: at most four columns, including incomplete last rows.
-   Narrow panels reflow without shrinking metric text into tiny columns. */
+/* Summaries stay on one row. Narrow screens scroll within the summary,
+   keeping the page and its content at the viewport width. */
 .content .metric-grid.metric-grid {
+  --metric-icon: 32px; --metric-value: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, calc((100% - 3 * var(--space-grid)) / 4))), 1fr));
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 1fr);
+  overflow-x: auto;
   grid-auto-rows: minmax(var(--metric-height), 1fr);
   align-items: stretch;
   gap: var(--space-grid);
@@ -67,11 +72,11 @@
 }
 .content .metric-grid.metric-grid > * {
   display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-  gap: 8px; min-width: 0; min-height: var(--metric-height);
+  gap: 8px; min-width: 0; min-height: var(--metric-height); position: relative;
   box-sizing: border-box; align-self: stretch;
   height: auto; max-height: none; grid-column: auto;
   /* Older page themes used !important for these two properties. */
-  padding: var(--space-panel) !important;
+  padding: var(--metric-padding) !important;
   border-radius: var(--card-radius); text-align: left;
   box-shadow: var(--card-shadow);
   overflow: visible; container-type: inline-size;
@@ -119,7 +124,7 @@
 }
 .content .metric-grid.metric-grid > .card:has(> button:only-child) { padding: 0 !important; }
 .content .metric-grid.metric-grid > .card > button:only-child {
-  min-width: 0; width: 100%; height: auto; min-height: 100%; padding: var(--space-panel);
+  min-width: 0; width: 100%; height: auto; min-height: 100%; padding: var(--metric-padding);
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   border-radius: inherit;
 }
@@ -191,10 +196,10 @@
   }
 }
 @media (max-width: 800px) {
-  :root { --space-panel: 12px; --space-grid: 12px; --metric-height: 144px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
+  :root { --space-panel: 12px; --space-grid: 12px; --metric-height: 112px; --metric-icon: 32px; --metric-glyph: 20px; --metric-value: 20px; }
   :root[data-density="compact"] { --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
   .content { padding: 16px; }
-  .content .metric-grid.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .content .metric-grid.metric-grid { grid-auto-columns: minmax(240px, 1fr); }
   .content .metric-grid.metric-grid > *,
   .content .metric-grid.metric-grid > .card > button:only-child {
     gap: 8px;
@@ -207,9 +212,6 @@
   .content.content .header-actions { width: 100%; }
   .content.content .header-actions > * { max-width: 100%; }
   .content .modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
-}
-@media (max-width: 380px) {
-  .content .metric-grid.metric-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (pointer: coarse) {
   .content :is(.btn, .tab, .icon-btn) { min-height: 44px; }
@@ -424,3 +426,19 @@
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
 }
+
+/* Icons share the heading area so descriptions can use the full card width. */
+.content .metric-grid.metric-grid :is([class$="-icon"], i):has(> svg),
+.content .metric-grid.metric-grid > * > span:has(> svg),
+.content .metric-grid.metric-grid > * > svg,
+.content .metric-grid.metric-grid > .card > button > span:has(> svg),
+.content .metric-grid.metric-grid .performance-stat-content > span {
+  position: absolute;
+  top: var(--metric-padding);
+  right: var(--metric-padding);
+}
+.content .metric-grid.metric-grid :is(div, span):has(> strong) > strong,
+.content .metric-grid.metric-grid :is(div, span):has(> strong) > :is(small, .small, span):first-child {
+  padding-right: calc(var(--metric-icon) + 8px);
+}
+.content .connection-overview.metric-grid > button > svg { display: none; }

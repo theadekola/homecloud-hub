@@ -1,3 +1,4 @@
+import {vpnGateways,requireVPNNode} from './vpn-gateways.js';
 import {verifyProxmoxManagement} from './proxmox-management-access.js';
 import {automaticDockerPairing} from './automatic-docker-pairing.js';
 import {automaticNodePairing} from './automatic-node-pairing.js';
@@ -511,9 +512,10 @@ read('/proxmox/node/:node/logs',async req=>({logs:await pve(`/nodes/${encode(req
  action('post','/recovery-tests/:id/verify','admin','backup.recovery-test.verify',req=>recoveryTests.attest(req.params.id,req.body,req.user.sub),true);
  read('/operations/performance',()=>reportPerformance.snapshot(),'admin');
  read('/operations/health',()=>operationsView(operationalNodes()),'admin');
+ read('/operations/vpn-gateways',()=>vpnGateways({query:pve,agents:operationalNodes}),'admin');
  action('post','/operations/:id/network-check','owner','network.diagnose',req=>operationalAction(req.params.id,{action:'network-check'}));
  action('post','/operations/:id/tools','owner','host.monitoring-tools.install',req=>connectionService.perform(req.params.id,{...req.body,action:'monitoring-tools',target:'node'}));
- action('post','/operations/:id/vpn','owner','vpn.configure',req=>{if(!['vpn-setup','vpn-add','vpn-remove','vpn-lan'].includes(req.body.action))throw httpError('Unsupported VPN action');return operationalAction(req.params.id,req.body)},true);
+ action('post','/operations/:id/vpn','owner','vpn.configure',async req=>{if(!['vpn-setup','vpn-add','vpn-remove','vpn-lan'].includes(req.body.action))throw httpError('Unsupported VPN action');await requireVPNNode(req.params.id,{query:pve,agents:operationalNodes});return operationalAction(req.params.id,req.body)},true);
  read('/diagnostics',req=>providerDiagnostics({hostId:typeof req.query.dockerHost==='string'?req.query.dockerHost:undefined}),'owner');
  action('post','/configuration/ai/models','owner','configuration.models',async req=>({models:await listAIModels(validateConfiguration('ai',req.body.configuration??{},configuration.resolve('ai')))}));
  read('/configuration/:service',req=>configuration.publicConfig(req.params.service),'owner');

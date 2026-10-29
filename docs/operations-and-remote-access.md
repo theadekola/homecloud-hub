@@ -147,3 +147,21 @@ The connector saves its prior script, preserves the configuration byte-for-byte,
 No Proxmox node, VM, container, Docker service or WireGuard service is restarted by this updater. Pairing is retained. A brief monitoring delay is possible, and network, disk or systemd failures cannot be guaranteed interruption-free. Backups and external host recovery access remain useful. Disabling automatic updates prevents future offers; an already offered update is allowed to finish verification. Automatic updating requires the standard root-owned Linux/systemd connector installation.
 
 Check the per-node state and fresh heartbeat after enabling. A completed state verifies that the offered revision reported back, not that every guest service was tested. Review failed/unverified states before Authorize retry. For manual recovery, inspect iclusters-node-agent.service and the private /var/lib/iclusters-connector-update directory. Do not delete or replace the pairing configuration to repair an update. Source tests use isolated fixtures; no live connector rollout is performed during development.
+
+## Mobile dashboard and installation
+
+The Remote Access tab includes a local QR encoder and a responsive mobile-access card. The dashboard QR contains only an HTTPS origin and `/?install=1`, never a session token, password or VPN profile. Scanning opens the normal dashboard sign-in in the phone browser. Use the same Wi-Fi or an already working VPN, and a dashboard name/address reachable from that phone with a trusted TLS certificate. A QR code does not provide public hosting, certificate trust or VPN connectivity.
+
+Android offers an explicit **Install i-Clusters** action when the browser supplies its installation event. The event is used only after a user gesture and is single-use. If unavailable, the page provides browser-menu instructions. iPhone/iPad show **Share → Add to Home Screen**, with **Open as Web App** when available. Installed/standalone windows suppress the prompt. The prompt is also available before sign-in for scanned links. Installation remains subject to device/browser eligibility and trusted HTTPS.
+
+The service worker handles navigation network failures with a connection notice. It does not cache HTML, API responses, keys or credentials and does not intercept API requests. It supplies no offline authenticated dashboard.
+
+The VPN status panel separates **Gateway ready** from actual device connectivity. Stale/offline telemetry is unavailable. Recent peer handshakes do not prove that this browser uses the tunnel or that an external client can reach a service. Use official WireGuard clients; OpenVPN and L2TP/IPsec are not implemented. The browser cannot switch on an operating-system VPN.
+
+A newly approved device profile can be downloaded or deliberately revealed as a second, clearly labelled **VPN QR code**, for scanning inside WireGuard. That code contains a private device key and must be protected. Both representations remain only in component memory and are cleared when the gateway changes or the page is left. New device address suggestions follow the gateway's /24 and skip allocated peer addresses.
+
+For an actual deployment, record the gateway LAN address, nonoverlapping tunnel subnet, UDP listening port, reachable public hostname/IP and router forwarding destination. CGNAT requires a reachable design outside this built-in setup. Approve each client and each LAN service deliberately; keep a local administration session open. Test a real handshake from mobile data, access to the intended service, denial of another port/server, and revocation before claiming remote verification.
+
+References: [browser installation events](https://web.dev/learn/pwa/installation-prompt), [Apple Home Screen guidance](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios), [WireGuard quick start](https://www.wireguard.com/quickstart/).
+
+New gateway setup with the updated connector also persists an empty forwarding policy and its PreUp helper, applies the deny guard before enabling the tunnel, and refuses startup when firewall installation fails. It preserves the host’s existing forwarding setting. Update the gateway connector before setup. Existing gateways receive this protection by explicitly applying their reviewed LAN policy, including an empty policy for gateway-only access.

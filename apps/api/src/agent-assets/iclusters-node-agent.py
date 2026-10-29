@@ -379,8 +379,8 @@ def operations_job(job):
   address=ipaddress.ip_interface(body.get('address',''))
   port=body.get('port')
   if address.version!=4 or address.network.prefixlen!=24 or not any(address.ip in ipaddress.ip_network(n) for n in ['10.0.0.0/8','172.16.0.0/12','192.168.0.0/16']) or address.ip in (address.network.network_address,address.network.broadcast_address) or type(port)!=int or not 1024<=port<=65535:raise RuntimeError('Use a private IPv4 /24 gateway address and port 1024–65535')
-  directory=pathlib.Path('/etc/wireguard');config=directory/(VPN_INTERFACE+'.conf')
-  if config.exists():raise RuntimeError('Managed VPN already exists; it will not be overwritten')
+  config=VPN_CONFIG;directory=config.parent
+  if any(p.exists() for p in (config,VPN_POLICY,VPN_HELPER)):raise RuntimeError('Managed VPN already exists; it will not be overwritten')
   interfaces=command_json(['ip','-j','address'],3)
   for interface in interfaces:
    for item in interface.get('addr_info',[]):
@@ -388,10 +388,17 @@ def operations_job(job):
   run(['apt-get','update'],timeout=120);run(['apt-get','install','-y','wireguard-tools','nftables'],timeout=180)
   directory.mkdir(mode=0o700,parents=True,exist_ok=True)
   key=run(['wg','genkey'],timeout=5).strip()
+  policy={'authorized':True,'rules':[],'clientNetworks':[]}
+  # Persist the forward guard before enabling a tunnel on hosts that may already forward.
+  for target,content in [(VPN_POLICY,json.dumps(policy)),(VPN_HELPER,pathlib.Path(__file__).read_text())]:
+   fd=os.open(str(target),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+   with os.fdopen(fd,'w') as f:f.write(content)
   fd=os.open(str(config),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-  with os.fdopen(fd,'w') as f:f.write('[Interface]\nAddress = '+str(address)+'\nListenPort = '+str(port)+'\nPrivateKey = '+key+'\nSaveConfig = true\n')
-  try:run(['systemctl','enable','--now','wg-quick@'+VPN_INTERFACE],timeout=30)
-  except Exception:raise RuntimeError('VPN configuration was created but startup failed. Inspect the gateway service before retrying.')
+  with os.fdopen(fd,'w') as f:f.write('[Interface]\nPreUp = /usr/bin/python3 '+str(VPN_HELPER)+' --vpn-firewall\nAddress = '+str(address)+'\nListenPort = '+str(port)+'\nPrivateKey = '+key+'\nSaveConfig = true\n')
+  try:
+   apply_vpn_firewall(policy,{})
+   run(['systemctl','enable','--now','wg-quick@'+VPN_INTERFACE],timeout=30)
+  except Exception:raise RuntimeError('VPN configuration was created but isolation or startup failed. Inspect the gateway service before retrying.')
   result={'message':'VPN gateway started. Configure router UDP forwarding when needed. Access currently reaches this gateway only; LAN routing and firewall policy are separate.'}
  elif operation in ('vpn-add','vpn-remove'):
   key=body.get('publicKey','')

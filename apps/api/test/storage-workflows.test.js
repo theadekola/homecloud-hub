@@ -23,8 +23,8 @@ test('storage inventory distinguishes node assignments from globally disabled or
  const configs=[{storage:'backup-ssd',nodes:'node01',type:'dir',path:'/mnt/backup',content:'backup',shared:0},{storage:'media-storage',nodes:'node02',type:'dir',path:'/mnt/pve/media-storage',is_mountpoint:1,content:'backup',shared:0},{storage:'paused',nodes:'node01',disable:1,shared:0}];
  const query=async path=>path==='/nodes'?[{node:'node01'},{node:'node02'}]:path==='/storage'?configs:path.includes('/node01/')?[{storage:'backup-ssd',active:1,enabled:1,total:100,used:30,avail:70},{storage:'media-storage',active:0,enabled:0},{storage:'paused',active:0,enabled:0}]:[{storage:'backup-ssd',active:0,enabled:0},{storage:'media-storage',active:0,enabled:1}];
  const result=await storageInventory(query),foreign=result.resources.find(row=>row.id==='node02/backup-ssd'),offline=result.resources.find(row=>row.id==='node02/media-storage');
- assert.equal(foreign.status,'not-assigned');assert.equal(foreign.applicable,false);assert.deepEqual(foreign.assignedNodes,['node01']);assert.match(foreign.availabilityReason,/not assigned to node02/);assert.equal(offline.status,'offline');assert.match(offline.availabilityReason,/required mount point.*media-storage/);assert.equal(result.resources.find(row=>row.id==='node01/paused').status,'disabled');
- const summary=storageSummary(result.resources.map(row=>({...row,provider:'proxmox'})),result.coverage);assert.equal(summary.notAssigned,2);assert.equal(summary.pools,3);assert.equal(summary.capacity,100);
+ assert.equal(foreign,undefined);assert.ok(result.resources.every(row=>row.applicable!==false));assert.equal(offline.status,'offline');assert.match(offline.availabilityReason,/required mount point.*media-storage/);assert.equal(result.resources.find(row=>row.id==='node01/paused').status,'disabled');
+ const summary=storageSummary(result.resources.map(row=>({...row,provider:'proxmox'})),result.coverage);assert.equal(summary.notAssigned,0);assert.equal(summary.pools,3);assert.equal(summary.capacity,100);
 });
 test('registered storage missing from a node response remains visible without fabricated capacity',async()=>{
  const result=await storageInventory(async path=>path==='/nodes'?[{node:'node01'}]:path==='/storage'?[{storage:'registered',nodes:'node01',type:'dir',path:'/mnt/data',shared:0}]:[]);
@@ -60,4 +60,9 @@ test('unavailable TrueNAS inventory cannot look like a successful empty disk or 
   sample={...sample,services:[{provider:'truenas',status:'partial'}],truenas:{pools:[],snapshots:[],errors:['pool.snapshot.query: Fixture permission denied']}};
   const storage=await (await fetch(root+'/storage?view=pools')).json();assert.ok(storage.errors.some(e=>e.includes('pool.snapshot.query')));
  }finally{server.closeAllConnections();await new Promise(r=>server.close(r));for(const [key,value] of [['TRUENAS_URL',priorUrl],['TRUENAS_API_KEY',priorKey]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+});
+
+test('a single connected node never exposes storage assigned only to another node',async()=>{
+ const result=await storageInventory(async path=>path==='/nodes'?[{node:'node01',status:'online'}]:path==='/storage'?[{storage:'local',type:'dir'},{storage:'media-storage',type:'dir',nodes:'node02'}]:[{storage:'local',active:1,enabled:1,total:100,used:30,avail:70},{storage:'media-storage',active:0,enabled:0}]);
+ assert.deepEqual(result.resources.map(row=>row.id),['node01/local']);assert.deepEqual(result.reportedNodes,['node01']);assert.equal(result.coverage.complete,true);
 });

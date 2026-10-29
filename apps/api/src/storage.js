@@ -16,7 +16,8 @@ export async function storageInventory(query=pve){
     const capacity=Number.isFinite(row.total)&&row.total>0?row.total:null;
     const reading=value=>capacity!==null&&Number.isFinite(value)&&value>=0&&value<=capacity?value:null;
     const used=reading(row.used),available=reading(row.avail),enabled=flag(row.enabled),active=flag(row.active),placement=storagePlacement(config,node.node);
-    const status=!placement.applicable?'not-assigned':enabled===false||flag(config.disable)===true?'disabled':active===true?'online':active===false?'offline':'unknown';
+    if(!placement.applicable)continue;
+    const status=enabled===false||flag(config.disable)===true?'disabled':active===true?'online':active===false?'offline':'unknown';
     const availabilityReason=placement.availabilityReason||(status==='disabled'?'Disabled in Proxmox. Enabling this storage affects all assigned nodes.':status==='offline'?[1,true,'1'].includes(config.is_mountpoint)?`Proxmox reports this storage inactive. Check its required mount point ${config.path||''} on ${node.node}.`:`Proxmox reports this storage inactive on ${node.node}. Check the backing device or remote mount.`:status==='unknown'?'Registered in Proxmox; availability was not reported by this node.':`Available on ${node.node}.`);
     resources.push({id:`${node.node}/${row.storage}`,name:row.storage,node:node.node,type:row.type||config.type||'Unknown',shared:flag(row.shared??config.shared),...placement,scopeVerified:!!config.storage,scope:config.storage?placement.scope:'unknown',status,availabilityReason,reported:row.reported!==false,capacity,used,available,usage:capacity!==null&&used!==null?used/capacity*100:null,content:row.content||config.content||null,...Object.fromEntries(['path','server','export','portal','nodes'].filter(key=>typeof config[key]==='string').map(key=>[key,config[key]]))});
    }

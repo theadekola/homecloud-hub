@@ -72,7 +72,7 @@
   min-width: 960px;
   table-layout: fixed;
 }
-.content.content .docker-manager .docker-images table th:first-child { width: 38%; }
+.content.content .docker-manager .docker-images table th:first-child { width: 36%; }
 .content.content .docker-manager .docker-images table th:nth-child(2) { width: 14%; }
 .content.content .docker-manager .docker-volumes table th:first-child { width: 24%; }
 .content.content .docker-manager .docker-volumes table th:nth-child(2) { width: 11%; }

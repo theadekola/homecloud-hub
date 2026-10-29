@@ -98,7 +98,7 @@ def docker_stats(host,body,timeout=15):
  if not isinstance(ids,list) or not 1<=len(ids)<=16 or any(not isinstance(i,str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}',i) for i in ids):raise RuntimeError('Invalid container statistics request')
  ids=list(dict.fromkeys(ids));seconds=max(1,min(8,timeout-2));quoted=' '.join(shlex.quote(i) for i in ids)
  script='command -v curl >/dev/null && test -S /var/run/docker.sock || { echo "Docker socket or guest curl unavailable" >&2; exit 1; }; umask 077; work=$(mktemp -d) || exit 1; trap \'rm -rf "$work"\' EXIT HUP INT TERM; '
- script+='for id in '+quoted+'; do (code=$(curl --silent --show-error --max-time '+str(seconds)+' --max-filesize 32768 --unix-socket /var/run/docker.sock -o "$work/$id.body" -w "%{http_code}" "http://localhost/containers/$id/stats?stream=false" 2>/dev/null) || code=000; printf "%s" "$code" > "$work/$id.code") & done; wait; '
+ script+='for id in '+quoted+'; do (code=$(curl --silent --show-error --max-time '+str(seconds)+' --max-filesize 32768 --unix-socket /var/run/docker.sock -o "$work/$id.body" -w "%{http_code}" "http://localhost/containers/$id/stats?stream=false&one-shot=true" 2>/dev/null) || code=000; printf "%s" "$code" > "$work/$id.code") & done; wait; '
  script+='for id in '+quoted+'; do printf "%s " "$id"; cat "$work/$id.code"; printf " "; base64 < "$work/$id.body" 2>/dev/null | tr -d "\n"; printf "\n"; done'
  output=guest_run(host,script,timeout=max(11,timeout+10))
  if len(output.encode())>1300000:raise RuntimeError('Statistics response exceeds bridge size limit')

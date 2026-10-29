@@ -100,7 +100,7 @@ class AgentTests(unittest.TestCase):
    executable.write_text("#!/usr/bin/python3\nimport sys,json,time\na=sys.argv[1:];identity=a[-1].split('/containers/')[1].split('/')[0];time.sleep(.04)\nif identity=='id5':print('000',end='');sys.exit(28)\nopen(a[a.index('-o')+1],'w').write(json.dumps({'cpu_stats':{'cpu_usage':{'total_usage':10}},'memory_stats':{'usage':100}}));print('200',end='')\n")
    executable.chmod(0o755)
    def guest(host,script,timeout):
-    self.assertEqual(host,'qemu/100');self.assertNotIn('docker stats',script)
+    self.assertEqual(host,'qemu/100');self.assertNotIn('docker stats',script);self.assertIn('stats?stream=false&one-shot=true',script)
     script=script.replace('command -v curl >/dev/null && test -S /var/run/docker.sock','true',1)
     result=subprocess.run(['/bin/sh','-c',script],capture_output=True,text=True,timeout=5,env={**os.environ,'PATH':folder+':/usr/bin:/bin'})
     self.assertEqual(result.returncode,0,result.stderr);return result.stdout

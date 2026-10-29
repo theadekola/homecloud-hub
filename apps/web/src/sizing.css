@@ -3,13 +3,15 @@
 :root {
   --space-panel: 12px;
   --space-section: 12px;
-  --space-grid: 8px;
-  --metric-height: 0px;
+  --space-grid: 12px;
+  --metric-height: 128px;
+  --card-radius: var(--app-radius, 14px);
+  --card-shadow: 0 2px 5px rgb(0 0 0 / .12), 0 8px 20px rgb(0 0 0 / .10);
   --metric-icon: 36px;
   --metric-glyph: 20px;
   --metric-value: 22px;
 }
-:root[data-density="compact"] { --space-panel: 10px; --space-grid: 6px; --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
+:root[data-density="compact"] { --space-panel: 10px; --space-grid: 12px; --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
 .brand-icon { flex-shrink: 0; }
 .brand b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -53,12 +55,12 @@
 }
 .content.content .report-unified :is(.report-source-note, .report-pagination small, .report-pagination span) { font-size: 11px; }
 
-/* At most six metrics per row. auto-fit lets shorter collections fill the row;
-   the 148px minimum also reflows metrics inside narrow page columns. */
+/* Shared card width: at most four columns, including incomplete last rows.
+   Narrow panels reflow without shrinking metric text into tiny columns. */
 .content .metric-grid.metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(148px, calc((100% - 5 * var(--space-grid)) / 6))), 1fr));
-  grid-auto-rows: auto;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(240px, calc((100% - 3 * var(--space-grid)) / 4))), 1fr));
+  grid-auto-rows: minmax(var(--metric-height), auto);
   align-items: stretch;
   gap: var(--space-grid);
   min-width: 0;
@@ -70,7 +72,8 @@
   height: auto; max-height: none; grid-column: auto;
   /* Older page themes used !important for these two properties. */
   padding: var(--space-panel) !important;
-  border-radius: 12px; text-align: left;
+  border-radius: var(--card-radius); text-align: left;
+  box-shadow: var(--card-shadow);
   overflow: visible; container-type: inline-size;
 }
 .content .metric-grid.metric-grid > :last-child { grid-column: auto; }
@@ -188,7 +191,7 @@
   }
 }
 @media (max-width: 800px) {
-  :root { --space-panel: 12px; --space-grid: 8px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
+  :root { --space-panel: 12px; --space-grid: 12px; --metric-icon: 36px; --metric-glyph: 20px; --metric-value: 22px; }
   :root[data-density="compact"] { --metric-icon: 32px; --metric-glyph: 18px; --metric-value: 20px; }
   .content { padding: 16px; }
   .content .metric-grid.metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -390,4 +393,34 @@
 .content.content :where(section, div):not(.card):not(.modal):has(> :is(.tabs, .pve-tabbar)) > * {
   margin-top: 0;
   margin-bottom: 0;
+}
+
+/* Shared surfaces and spacing, without fixed-height tables or clipped details. */
+:root[data-theme="light"] {
+  --card-shadow: 0 2px 5px rgb(15 23 42 / .05), 0 8px 20px rgb(15 23 42 / .06);
+}
+.content.content .card.card,
+.content.content .settings-overview-card {
+  padding: var(--space-panel) !important;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+}
+.content :is(.docker-update-grid, .vm-card-grid, .nodes-grid) {
+  gap: var(--space-section);
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
+.content :is(.docker-update-grid, .vm-card-grid, .nodes-grid) > * {
+  margin-block: 0;
+}
+
+.content .connection-overview.metric-grid > button > svg {
+  width: 18px; height: 18px; flex-basis: 18px;
+  padding: 0; background: none;
+}
+.content :is(.node-grid-card, .vm-card-grid > button) {
+  padding: var(--space-panel);
+  min-height: var(--metric-height);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
 }

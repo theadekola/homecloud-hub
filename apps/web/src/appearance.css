@@ -6,7 +6,7 @@
 :root[data-appearance="custom"] .btn.primary{background:var(--app-accent-fill);color:var(--app-accent-text)}
 :root[data-accent-style="gradient"] .btn.primary{background:linear-gradient(120deg,var(--app-accent-fill),color-mix(in srgb,var(--app-accent-fill) 85%,#07111e))}
 :root[data-section-labels="off"] .sidebar .nav-title{display:none}
-:root[data-density="spacious"]{--space-panel:16px;--space-grid:10px;--metric-height:0px;--metric-icon:40px;--metric-glyph:22px;--metric-value:24px}
+:root[data-density="spacious"]{--space-panel:16px;--space-grid:12px;--metric-height:128px;--metric-icon:40px;--metric-glyph:22px;--metric-value:24px}
 :root[data-density="spacious"] .content .card{padding:16px!important}
 :root[data-density="compact"] .content .card{padding:10px!important}
 :root[data-transitions="off"] *,:root[data-transitions="off"] *:before,:root[data-transitions="off"] *:after{transition:none!important}

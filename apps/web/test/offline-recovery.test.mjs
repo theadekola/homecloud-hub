@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../public/sw.js',import.meta.url),'utf8');
 async function offlineHTML(){
- const events={};vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async()=>{throw Error('unreachable')},Response});
- let promise;events.fetch({request:{mode:'navigate'},respondWith:p=>promise=p});return (await promise).text();
+ const events={};vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async()=>{throw Error('unreachable')},Response,URL});
+ let promise;events.fetch({request:{mode:'navigate',url:'https://host/'},respondWith:p=>promise=p});return (await promise).text();
 }
 function recovery(html,fetch){
  const events={},timers=new Map(),nodes=Object.fromEntries(['retry','status','address'].map(id=>[id,{textContent:'',disabled:false,addEventListener:(name,fn)=>events[id+':'+name]=fn}]));let count=0,reloads=0;
@@ -15,10 +15,10 @@ function recovery(html,fetch){
 }
 test('navigation failures and server errors return a self-contained responsive screen; auth errors stay untouched',async()=>{
  const events={};let status=502;
- vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async()=>new Response('upstream error',{status}),Response});
- let response;events.fetch({request:{mode:'navigate'},respondWith:p=>response=p});const fallback=await response,html=await fallback.text();
+ vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async()=>new Response('upstream error',{status}),Response,URL});
+ let response;events.fetch({request:{mode:'navigate',url:'https://host/'},respondWith:p=>response=p});const fallback=await response,html=await fallback.text();
  assert.equal(fallback.status,503);assert.match(html,/viewport-fit=cover/);assert.match(html,/prefers-color-scheme:light/);assert.match(html,/safe-area-inset/);assert.match(html,/Unable to reach i-Clusters/);assert.match(html,/Your VPN stays managed in its own app/);assert.doesNotMatch(html,/<(?:link|img)[^>]+(?:href|src)=/);assert.equal(fallback.headers.get('Cache-Control'),'no-store');
- status=403;events.fetch({request:{mode:'navigate'},respondWith:p=>response=p});assert.equal((await response).status,403);
+ status=403;events.fetch({request:{mode:'navigate',url:'https://host/'},respondWith:p=>response=p});assert.equal((await response).status,403);
 });
 test('retry probes public health without credentials or cache and reloads only after verified recovery',async()=>{
  const calls=[],page=recovery(await offlineHTML(),async(path,options)=>{calls.push({path,options});return {ok:true,json:async()=>({ok:true})}});
@@ -35,4 +35,13 @@ test('checks time out, pause in hidden pages and stop after leaving the page',as
  [...page.timers.values()].find(t=>t.ms===6000).fn();await checking;assert.equal(page.nodes.retry.disabled,false);assert.equal(page.reloads(),0);
  page.document.hidden=true;page.events['document:visibilitychange']();assert.equal(page.timers.size,0);await page.events['window:online']();assert.equal(calls,1);
  page.events['window:pagehide']();page.document.hidden=false;await page.events['window:online']();assert.equal(calls,1);
+});
+
+test('direct API navigation preserves original network and TLS errors instead of replacing them with an app notice',()=>{
+ const events={};let calls=0;
+ vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:()=>{calls++;throw Error('must not intercept')},Response,URL});
+ for(const path of ['/api','/api/health','/api/health?check=mobile','/api/auth/me']){
+  events.fetch({request:{mode:'navigate',url:'https://host'+path},respondWith:()=>assert.fail('API navigation intercepted')});
+ }
+ assert.equal(calls,0);
 });

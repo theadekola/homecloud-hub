@@ -21,9 +21,9 @@ test('stale configured telemetry never establishes gateway readiness',()=>{
 });
 test('service worker leaves APIs untouched and never caches authenticated navigation',async()=>{
  const events={},source=fs.readFileSync(new URL('../public/sw.js',import.meta.url),'utf8');let fail=false,calls=0;
- vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async request=>{calls++;if(fail)throw Error('offline');return new Response('live')},Response});
+ vm.runInNewContext(source,{self:{addEventListener:(name,fn)=>events[name]=fn},fetch:async request=>{calls++;if(fail)throw Error('offline');return new Response('live')},Response,URL});
  let response;events.fetch({request:{mode:'cors',url:'https://host/api/auth/me'},respondWith:()=>assert.fail('API intercepted')});assert.equal(calls,0);
- events.fetch({request:{mode:'navigate'},respondWith:p=>response=p});assert.equal(await (await response).text(),'live');
- fail=true;events.fetch({request:{mode:'navigate'},respondWith:p=>response=p});const offline=await response;assert.equal(offline.status,503);assert.equal(offline.headers.get('Cache-Control'),'no-store');assert.match(await offline.text(),/Connect to your home network or VPN/);
+ events.fetch({request:{mode:'navigate',url:'https://host/'},respondWith:p=>response=p});assert.equal(await (await response).text(),'live');
+ fail=true;events.fetch({request:{mode:'navigate',url:'https://host/'},respondWith:p=>response=p});const offline=await response;assert.equal(offline.status,503);assert.equal(offline.headers.get('Cache-Control'),'no-store');assert.match(await offline.text(),/Connect to your home network or VPN/);
  assert.equal(source.includes('caches.'),false);
 });

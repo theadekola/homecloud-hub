@@ -38,6 +38,8 @@ self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',event=>{
  if(event.request.mode!=='navigate')return;
+ const path=new URL(event.request.url).pathname;
+ if(path==='/api'||path.startsWith('/api/'))return;
  event.respondWith(fetch(event.request).then(response=>response.status>=500?offlineResponse():response).catch(offlineResponse));
 });
 function offlineResponse(){return new Response(unavailablePage,{status:503,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});}
